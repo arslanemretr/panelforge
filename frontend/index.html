@@ -4,6 +4,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PanelForge</title>
+    <script>
+      (function () {
+        try {
+          var key = "panelforge-theme";
+          var stored = localStorage.getItem(key);
+          var theme = stored === "dark" || stored === "light" ? stored : "light";
+          document.documentElement.setAttribute("data-theme", theme);
+        } catch (error) {
+          document.documentElement.setAttribute("data-theme", "light");
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

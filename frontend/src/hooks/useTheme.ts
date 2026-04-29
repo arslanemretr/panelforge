@@ -11,7 +11,7 @@ function getInitialTheme(): Theme {
   } catch {
     // ignore
   }
-  return "dark";
+  return "light";
 }
 
 function applyTheme(theme: Theme) {
