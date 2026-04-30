@@ -125,8 +125,9 @@ def _project_panel_offsets_3d(
     Panolar X ekseninde yan yana dizilir (cumulative_x).
     """
     if not project_panels:
+        # X: kabinin dış sol duvarından (left_margin dahil değil)
         fallback = Point3D(
-            x=_to_float(panel.left_margin_mm),
+            x=0.0,
             y=_to_float(panel.bottom_margin_mm),
             z=0.0,
         )
@@ -138,8 +139,10 @@ def _project_panel_offsets_3d(
 
     for item in sorted(project_panels, key=lambda v: (v.seq, v.id)):
         defn = item.panel_definition
+        # X: kabinin dış sol duvarından — left_margin_mm dahil edilmez.
+        # Cihaz x_mm ve busbar_x_mm koordinatları dış duvar referanslıdır.
         offset = Point3D(
-            x=cumulative_x + _to_float(defn.left_margin_mm),
+            x=cumulative_x,
             y=_to_float(defn.bottom_margin_mm),
             z=0.0,
         )
