@@ -14,7 +14,73 @@
  *   Z → derinlik, ön yüzeyden arka yüzeye (0 = ön)
  */
 
-import type { Panel, ProjectDevice, ProjectPanel } from "../../types";
+import type { CopperSettings, Panel, ProjectDevice, ProjectPanel } from "../../types";
+
+// ── Bar koordinat satırı ──────────────────────────────────────────────────────
+
+export const PHASE_LABELS = ["L1", "L2", "L3", "N", "PE"];
+
+export interface BarRow {
+  key: string;       // "L1-B1", "L1-B2", …
+  phase: string;
+  barNo: number;     // faz içi sıra (1-indexed)
+  xStart: number;    // mm, assembly sol iç kenarından
+  yCenter: number;   // mm, bar Y merkezi (alttan)
+  zCenter: number;   // mm, bar Z merkezi (ön yüzeyden)
+  length: number;    // mm
+}
+
+/**
+ * CopperSettings'ten her barın kesin 3D merkez koordinatını hesaplar.
+ * Kural: fazlar phase_stack_axis yönünde, faz-içi barlar her zaman Z'de yığılır.
+ */
+export function computeBarTable(cs: CopperSettings): BarRow[] {
+  if (!cs.busbar_length_mm) return [];
+
+  const phaseCount   = Math.min(Number(cs.busbar_phase_count ?? 3), 5);
+  const barsPerPhase = Math.max(1, Number(cs.bars_per_phase ?? 1));
+  const barGap       = Number(cs.bar_gap_mm ?? 0);
+  const barW         = Number(cs.main_width_mm ?? 40);
+  const barT         = Number(cs.main_thickness_mm ?? 5);
+  const barStep      = barT + barGap;        // faz-içi Z adımı
+  const spacing      = Number(cs.main_phase_spacing_mm ?? 60);
+  const stackAxis    = (cs.phase_stack_axis ?? "Y").toUpperCase();
+  const xStart       = Number(cs.busbar_x_mm ?? 0);
+  const baseY        = Number(cs.busbar_y_mm ?? 0);   // bar grubunun alt kenarı
+  const baseZ        = Number(cs.busbar_z_mm ?? 0);   // faz-0, bar-0 ön yüzü
+  const length       = Number(cs.busbar_length_mm);
+
+  const rows: BarRow[] = [];
+
+  for (let pi = 0; pi < phaseCount; pi++) {
+    for (let bi = 0; bi < barsPerPhase; bi++) {
+      let yCenter: number;
+      let zCenter: number;
+
+      if (stackAxis === "Z") {
+        // Fazlar Z'de istifli; faz-içi barlar da Z'de devam eder
+        yCenter = baseY + barW / 2;
+        zCenter = baseZ + barT / 2 + pi * spacing + bi * barStep;
+      } else {
+        // Fazlar Y'de istifli; faz-içi barlar her zaman Z yönünde
+        yCenter = baseY + barW / 2 + pi * spacing;
+        zCenter = baseZ + barT / 2 + bi * barStep;
+      }
+
+      rows.push({
+        key:     `${PHASE_LABELS[pi]}-B${bi + 1}`,
+        phase:   PHASE_LABELS[pi],
+        barNo:   bi + 1,
+        xStart,
+        yCenter: Math.round(yCenter * 10) / 10,
+        zCenter: Math.round(zCenter * 10) / 10,
+        length,
+      });
+    }
+  }
+
+  return rows;
+}
 
 // ── Renk sabitleri ────────────────────────────────────────────────────────────
 
