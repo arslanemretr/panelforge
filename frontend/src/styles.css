@@ -684,12 +684,27 @@ label span {
 .terminal-grid {
   display: grid;
   gap: 0.7rem;
+  overflow-x: auto;
 }
 
 .terminal-row {
   display: grid;
-  grid-template-columns: 1.1fr 0.9fr repeat(3, 1fr);
+  grid-template-columns: minmax(110px, 1.15fr) minmax(90px, 0.8fr) minmax(90px, 0.85fr) minmax(90px, 0.85fr) minmax(90px, 0.85fr) minmax(120px, 1fr) minmax(110px, 0.9fr);
   gap: 0.75rem;
+  min-width: 900px;
+  align-items: center;
+}
+
+.terminal-row-header {
+  padding: 0 0.2rem;
+}
+
+.terminal-row-header span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .canvas-shell {
@@ -813,7 +828,7 @@ th {
 }
 
 .modal-card {
-  width: min(960px, 100%);
+  width: min(1120px, 100%);
   max-height: 90vh;
   overflow: auto;
   border-radius: 24px;
@@ -1109,7 +1124,7 @@ th {
   }
 
   .terminal-row {
-    grid-template-columns: 1fr;
+    min-width: 900px;
   }
 
   .page-heading,

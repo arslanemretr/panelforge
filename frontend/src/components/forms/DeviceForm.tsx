@@ -30,16 +30,16 @@ export function DeviceForm({ initialValue, onSubmit }: DeviceFormProps) {
   const [depthMm, setDepthMm] = useState(Number(initialValue?.depth_mm ?? 180));
   const [terminals, setTerminals] = useState<DeviceTerminal[]>(
     initialValue?.terminals.length
-      ? initialValue.terminals.map((t) => ({
-          terminal_name: t.terminal_name,
-          phase: t.phase,
-          x_mm: Number(t.x_mm),
-          y_mm: Number(t.y_mm),
-          z_mm: t.z_mm != null ? Number(t.z_mm) : 0,
-          terminal_face: t.terminal_face ?? null,
-          hole_diameter_mm: t.hole_diameter_mm != null ? Number(t.hole_diameter_mm) : null,
-          slot_width_mm: t.slot_width_mm != null ? Number(t.slot_width_mm) : null,
-          slot_length_mm: t.slot_length_mm != null ? Number(t.slot_length_mm) : null,
+      ? initialValue.terminals.map((terminal) => ({
+          terminal_name: terminal.terminal_name,
+          phase: terminal.phase,
+          x_mm: Number(terminal.x_mm),
+          y_mm: Number(terminal.y_mm),
+          z_mm: terminal.z_mm != null ? Number(terminal.z_mm) : 0,
+          terminal_face: terminal.terminal_face ?? null,
+          hole_diameter_mm: terminal.hole_diameter_mm != null ? Number(terminal.hole_diameter_mm) : null,
+          slot_width_mm: terminal.slot_width_mm != null ? Number(terminal.slot_width_mm) : null,
+          slot_length_mm: terminal.slot_length_mm != null ? Number(terminal.slot_length_mm) : null,
         }))
       : [
           defaultTerminal("L1", "L1", 30),
@@ -125,15 +125,31 @@ export function DeviceForm({ initialValue, onSubmit }: DeviceFormProps) {
             Terminal ekle
           </button>
         </div>
+
         <div className="terminal-grid">
+          <div className="terminal-row terminal-row-header" aria-hidden="true">
+            <span>Ad</span>
+            <span>Faz</span>
+            <span>X</span>
+            <span>Y</span>
+            <span>Z</span>
+            <span>Yuzey</span>
+            <span>Delik Capi</span>
+          </div>
+
           {terminals.map((terminal, index) => (
             <div className="terminal-row" key={`${terminal.terminal_name}-${index}`}>
               <input
                 value={terminal.terminal_name}
                 onChange={(event) => updateTerminal(index, "terminal_name", event.target.value)}
                 placeholder="Ad"
+                aria-label={`Terminal ${index + 1} adi`}
               />
-              <select value={terminal.phase} onChange={(event) => updateTerminal(index, "phase", event.target.value)}>
+              <select
+                value={terminal.phase}
+                onChange={(event) => updateTerminal(index, "phase", event.target.value)}
+                aria-label={`Terminal ${index + 1} fazi`}
+              >
                 <option value="L1">L1</option>
                 <option value="L2">L2</option>
                 <option value="L3">L3</option>
@@ -145,41 +161,46 @@ export function DeviceForm({ initialValue, onSubmit }: DeviceFormProps) {
                 value={terminal.x_mm}
                 onChange={(event) => updateTerminal(index, "x_mm", Number(event.target.value))}
                 placeholder="X (mm)"
-                title="X — cihaz sol kenarından"
+                title="X koordinati"
+                aria-label={`Terminal ${index + 1} X koordinati`}
               />
               <input
                 type="number"
                 value={terminal.y_mm}
                 onChange={(event) => updateTerminal(index, "y_mm", Number(event.target.value))}
                 placeholder="Y (mm)"
-                title="Y — cihaz alt kenarından"
+                title="Y koordinati"
+                aria-label={`Terminal ${index + 1} Y koordinati`}
               />
               <input
                 type="number"
                 value={terminal.z_mm ?? 0}
                 onChange={(event) => updateTerminal(index, "z_mm", Number(event.target.value))}
                 placeholder="Z (mm)"
-                title="Z — cihaz ön yüzeyinden derinlik"
+                title="Z koordinati"
+                aria-label={`Terminal ${index + 1} Z koordinati`}
               />
               <select
                 value={terminal.terminal_face ?? ""}
                 onChange={(event) => updateTerminal(index, "terminal_face", event.target.value || null)}
-                title="Terminal yüzeyi"
+                title="Terminal yuzeyi"
+                aria-label={`Terminal ${index + 1} yuzeyi`}
               >
-                <option value="">— Yüzey —</option>
-                <option value="front">Ön</option>
+                <option value="">Yuzey</option>
+                <option value="front">On</option>
                 <option value="back">Arka</option>
                 <option value="left">Sol</option>
-                <option value="right">Sağ</option>
-                <option value="top">Üst</option>
+                <option value="right">Sag</option>
+                <option value="top">Ust</option>
                 <option value="bottom">Alt</option>
               </select>
               <input
                 type="number"
                 value={terminal.hole_diameter_mm ?? 0}
                 onChange={(event) => updateTerminal(index, "hole_diameter_mm", Number(event.target.value))}
-                placeholder="Çap (mm)"
-                title="Delik çapı"
+                placeholder="Cap (mm)"
+                title="Delik capi"
+                aria-label={`Terminal ${index + 1} delik capi`}
               />
             </div>
           ))}
@@ -187,7 +208,7 @@ export function DeviceForm({ initialValue, onSubmit }: DeviceFormProps) {
       </div>
 
       <div className="form-actions">
-        <button type="submit">{initialValue ? "Değişiklikleri Kaydet" : "Cihaz kütüphanesine kaydet"}</button>
+        <button type="submit">{initialValue ? "Degisiklikleri Kaydet" : "Cihaz kutuphanesine kaydet"}</button>
       </div>
     </form>
   );
