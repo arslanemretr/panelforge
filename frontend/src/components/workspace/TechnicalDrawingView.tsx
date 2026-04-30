@@ -275,8 +275,8 @@ export function TechnicalDrawingView({
         {cs && !hasSegments && firstLayout && effectiveBarRows.map((row) => {
           const phaseIdx = PHASE_LABELS.indexOf(row.phase);
           const color = PHASE_COLORS[phaseIdx] ?? PHASE_COLORS[0];
-          const rx = fvX(firstLayout.intLeft + row.xStart - Number(cs.busbar_x_mm ?? 0) + Number(cs.busbar_x_mm ?? 0));
-          const ry = fvY(row.yCenter + barW / 2);
+          const rx = fvX(firstLayout.assemblyX + row.xStart);
+          const ry = fvY(firstLayout.bm + row.yCenter + barW / 2);
           const rw = Math.max(row.length * scale, 4);
           const rh = Math.max(barW * scale, 3);
           return (
@@ -372,11 +372,11 @@ export function TechnicalDrawingView({
         })}
 
         {/* Bakır barları — yan görünüm (ZY) */}
-        {cs && !hasSegments && effectiveBarRows.map((row) => {
+        {cs && !hasSegments && firstLayout && effectiveBarRows.map((row) => {
           const phaseIdx = PHASE_LABELS.indexOf(row.phase);
           const color = PHASE_COLORS[phaseIdx] ?? PHASE_COLORS[0];
           const sx = svX(row.zCenter - barT / 2);
-          const sy = fvY(row.yCenter + barW / 2);
+          const sy = fvY(firstLayout.bm + row.yCenter + barW / 2);
           const sw = Math.max(barT * scale, 2);
           const sh = Math.max(barW * scale, 3);
           return (
@@ -467,7 +467,7 @@ export function TechnicalDrawingView({
         {cs && !hasSegments && firstLayout && effectiveBarRows.map((row) => {
           const phaseIdx = PHASE_LABELS.indexOf(row.phase);
           const color = PHASE_COLORS[phaseIdx] ?? PHASE_COLORS[0];
-          const rx = fvX(firstLayout.intLeft + row.xStart - Number(cs.busbar_x_mm ?? 0) + Number(cs.busbar_x_mm ?? 0));
+          const rx = fvX(firstLayout.assemblyX + row.xStart);
           const ry = tvY(row.zCenter - barT / 2);
           const rw = Math.max(row.length * scale, 4);
           const rh = Math.max(barT * scale, 2);
