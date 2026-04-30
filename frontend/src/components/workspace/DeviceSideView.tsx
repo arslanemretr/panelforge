@@ -1,80 +1,302 @@
-import type { Panel, ProjectDevice } from "../../types";
+/**
+ * DeviceSideView — Yan Görünüm (ZY düzlemi)
+ *
+ * Koordinat projeksiyonu (soldan bakış):
+ *   SVG X  ←→  Z (derinlik, 0 = ön yüzey, maxDepth = arka)
+ *   SVG Y  ←→  Y (yükseklik, SVG'de üst = yüksek Y)
+ *
+ * Üç render modu:
+ *   1. Sadece cihazlar (varsayılan — Sekme 2)
+ *   2. Cihazlar + CopperSettings overlay (Sekme 3, canlı önizleme)
+ *   3. Cihazlar + hesaplanmış Busbar segmentleri (Sekme 5, sonuçlar)
+ */
+
+import type { Busbar, CopperSettings, Panel, ProjectDevice, ProjectPanel } from "../../types";
+import {
+  arrowPath,
+  buildCabinetLayouts,
+  deviceBoxes,
+  DEVICE_COLORS,
+  PHASE_COLORS,
+  phaseColorIndex,
+} from "./viewHelpers";
 
 interface DeviceSideViewProps {
   panel?: Panel | null;
+  projectPanels?: ProjectPanel[];
   devices?: ProjectDevice[];
+  copperSettings?: CopperSettings | null;
+  /** Hesaplanmış sonuçlar — varsa segment çizgisi, yoksa CopperSettings overlay */
+  busbars?: Busbar[];
+  title?: string;
 }
 
-const VIEW_WIDTH = 200;
-const VIEW_HEIGHT = 300;
-const PADDING = 16;
+// SVG koordinat sabitleri
+const SVG_W  = 420;
+const PAD_L  = 52;  // sol: Y ekseni etiketi + boyut çizgisi için
+const PAD_R  = 24;
+const PAD_T  = 32;  // üst: "Ön" / "Arka" etiketi için
+const PAD_B  = 44;  // alt: boyut çizgisi + Z ekseni oku için
 
-export function DeviceSideView({ panel, devices = [] }: DeviceSideViewProps) {
+export function DeviceSideView({
+  panel,
+  projectPanels = [],
+  devices = [],
+  copperSettings,
+  busbars,
+  title = "Yan Görünüm (ZY)",
+}: DeviceSideViewProps) {
   if (!panel) {
-    return <div className="empty-state">Yan görünüm için pano seçin.</div>;
+    return (
+      <section className="table-card" style={{ marginTop: 0 }}>
+        <div className="empty-state" style={{ padding: "2rem 0" }}>
+          Yan görünüm için kabin bilgisi gerekiyor.
+        </div>
+      </section>
+    );
   }
 
-  const panelDepth = panel.depth_mm ?? 300;
-  const panelHeight = panel.height_mm;
+  const { layouts, maxHeight: MH, maxDepth: rawMD } = buildCabinetLayouts(
+    projectPanels,
+    panel,
+  );
+  // Derinlik bilgisi yoksa 300mm varsayılan
+  const MD = rawMD > 0 ? rawMD : 300;
 
-  const scaleX = (VIEW_WIDTH - PADDING * 2) / Math.max(panelDepth, 1);
-  const scaleY = (VIEW_HEIGHT - PADDING * 2) / Math.max(panelHeight, 1);
-  const scale = Math.min(scaleX, scaleY);
+  const boxes = deviceBoxes(devices, layouts);
 
-  const W = panelDepth * scale;
-  const H = panelHeight * scale;
+  // Ölçekleme: Z × Y → SVG drawW × drawH
+  const availW = SVG_W - PAD_L - PAD_R;
+  const availH = 340;
+  const scale  = MH > 0 && MD > 0
+    ? Math.min(availW / MD, availH / MH)
+    : 1;
+
+  const drawW = MD * scale;
+  const drawH = MH * scale;
+  const SVG_H = PAD_T + drawH + PAD_B;
+
+  /** Z (mm) → SVG x */
+  const svgX = (z: number) => PAD_L + z * scale;
+  /** Y-from-bottom (mm) + objH → SVG y (top-left corner of rect) */
+  const svgY = (yFromBottom: number, objH = 0) =>
+    PAD_T + (MH - yFromBottom - objH) * scale;
+
+  // ── CopperSettings overlay parametreleri ──────────────────────────────────
+  const cs         = copperSettings;
+  const hasSegments = (busbars?.length ?? 0) > 0;
+  const phaseCount = Math.min(Number(cs?.busbar_phase_count ?? 3), 5);
+  const barW       = Number(cs?.main_width_mm    ?? 40);
+  const barT       = Number(cs?.main_thickness_mm ?? 5);
+  const spacing    = Number(cs?.main_phase_spacing_mm ?? 60);
+  const stackAxis  = (cs?.phase_stack_axis ?? "Y").toUpperCase();
+  const busZ       = Number(cs?.busbar_z_mm ?? 0);
+  const busY       = Number(cs?.busbar_y_mm ?? 0);
+  const firstBm    = layouts[0]?.bm ?? 0;
+
+  // ── İç alan sınırları (ilk kabin referanslı) ──────────────────────────────
+  const firstLayout = layouts[0];
+  const intTopY  = firstLayout ? MH - firstLayout.tm : MH;
+  const intBotY  = firstLayout ? firstLayout.bm       : 0;
 
   return (
-    <div className="canvas-panel">
-      <h4 style={{ marginBottom: "0.5rem", fontSize: "0.85rem", color: "var(--color-muted)" }}>Yan Görünüm</h4>
+    <section className="table-card" style={{ marginTop: 0 }}>
+      <div className="section-header" style={{ marginBottom: "0.5rem" }}>
+        <h3>{title}</h3>
+        <span className="helper-text" style={{ fontSize: "0.82rem" }}>
+          Z = 0 ön · Z = {Math.round(MD)} mm arka&ensp;·&ensp;Y = yükseklik
+        </span>
+      </div>
+
       <svg
-        viewBox={`0 0 ${W + PADDING * 2} ${H + PADDING * 2}`}
+        viewBox={`0 0 ${SVG_W} ${SVG_H}`}
         width="100%"
-        style={{ border: "1px solid var(--color-border)", borderRadius: "4px", background: "#fff" }}
+        style={{
+          display: "block",
+          background: "#fff",
+          border: "1px solid #ccc",
+          borderRadius: "8px",
+        }}
       >
-        {/* Panel outline */}
+        {/* ── Panel gövdesi (ZY kesiti) ────────────────────────────────── */}
+        {/* Ana zemin */}
         <rect
-          x={PADDING}
-          y={PADDING}
-          width={W}
-          height={H}
-          fill="#f8f8f8"
-          stroke="#555"
-          strokeWidth={1.5}
+          x={PAD_L} y={PAD_T}
+          width={drawW} height={drawH}
+          fill="#d8d8d8" stroke="#1a1a1a" strokeWidth={2}
         />
-        {/* Devices */}
-        {devices.map((pd) => {
-          const depth = (pd.device.depth_mm ?? 50) * scale;
-          const y = PADDING + pd.y_mm * scale;
-          const h = pd.device.height_mm * scale;
+        {/* Ön yüzey vurgusu */}
+        <rect
+          x={PAD_L} y={PAD_T}
+          width={Math.max(3, 3 * scale)} height={drawH}
+          fill="#b0b0b0"
+        />
+        {/* İç montaj alanı (kesik çizgi) */}
+        {firstLayout && (
+          <rect
+            x={PAD_L}
+            y={svgY(intTopY)}
+            width={drawW}
+            height={(intTopY - intBotY) * scale}
+            fill="#f0f6ff"
+            stroke="#3366cc"
+            strokeWidth={0.5}
+            strokeDasharray="5 3"
+          />
+        )}
+
+        {/* ── Cihazlar (ZY projeksiyonu) ───────────────────────────────── */}
+        {boxes.map((box, i) => {
+          const { fill, stroke } = DEVICE_COLORS[box.colorIndex % DEVICE_COLORS.length];
+          const sx = svgX(box.z);
+          const sy = svgY(box.y, box.h);
+          const sw = Math.max(box.d * scale, 2);
+          const sh = Math.max(box.h * scale, 2);
+          const fs = Math.min(8, sh * 0.35, sw * 0.2);
           return (
-            <g key={pd.id}>
+            <g key={i}>
               <rect
-                x={PADDING}
-                y={y}
-                width={depth}
-                height={h}
-                fill="#dbeafe"
-                stroke="#3b82f6"
-                strokeWidth={0.8}
-                opacity={0.85}
+                x={sx} y={sy} width={sw} height={sh}
+                fill={fill} stroke={stroke} strokeWidth={1}
+                rx={1} opacity={0.9}
               />
-              {h > 10 && (
+              {fs >= 4 && sh > 10 && sw > 10 && (
                 <text
-                  x={PADDING + depth / 2}
-                  y={y + h / 2}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  fontSize={Math.min(9, h * 0.6)}
-                  fill="#1e40af"
+                  x={sx + sw / 2} y={sy + sh / 2}
+                  textAnchor="middle" dominantBaseline="middle"
+                  fontSize={fs} fill={stroke} fontWeight="600"
+                  fontFamily="'Segoe UI', sans-serif"
                 >
-                  {pd.label}
+                  {box.label}
                 </text>
               )}
             </g>
           );
         })}
+
+        {/* ── CopperSettings overlay (segment yoksa) ───────────────────── */}
+        {cs && !hasSegments && cs.busbar_z_mm != null && cs.busbar_y_mm != null &&
+          Array.from({ length: phaseCount }, (_, pi) => {
+            const color = PHASE_COLORS[pi] ?? PHASE_COLORS[0];
+
+            // Bar'ın sol-alt köşesi (Z, Y from bottom)
+            let rectZ = busZ;
+            let rectY = firstBm + busY + pi * spacing; // fazlar Y'de istifli
+            if (stackAxis === "Z") {
+              rectZ = busZ + pi * spacing;
+              rectY = firstBm + busY;
+            }
+
+            // Yan görünümde bar: Z ekseni boyunca kalınlık (barT), Y boyunca genişlik (barW)
+            const sx = svgX(rectZ);
+            const sy = svgY(rectY, barW);
+            const sw = Math.max(barT * scale, 2);   // Z yönünde kalınlık
+            const sh = Math.max(barW * scale, 3);   // Y yönünde genişlik
+
+            return (
+              <g key={`cs-${pi}`}>
+                <rect
+                  x={sx} y={sy} width={sw} height={sh}
+                  fill={color} opacity={0.75}
+                  rx={1} stroke={color} strokeWidth={0.5}
+                />
+                {sh > 8 && (
+                  <text
+                    x={sx + sw / 2} y={sy + sh / 2}
+                    textAnchor="middle" dominantBaseline="middle"
+                    fontSize={Math.min(7, sh * 0.55)}
+                    fill="#fff" fontWeight="700" fontFamily="monospace"
+                  >
+                    L{pi + 1}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+
+        {/* ── Hesaplanmış busbar segmentleri (ZY projeksiyonu) ─────────── */}
+        {hasSegments && busbars!.flatMap((b) => {
+          const color = PHASE_COLORS[phaseColorIndex(b.phase)];
+          const sw    = b.busbar_type === "main" ? 3 : 1.5;
+          return b.segments.flatMap((seg, si) => {
+            const x1 = svgX(Number(seg.start_z_mm ?? 0));
+            const y1 = svgY(Number(seg.start_y_mm ?? 0));
+            const x2 = svgX(Number(seg.end_z_mm   ?? 0));
+            const y2 = svgY(Number(seg.end_y_mm   ?? 0));
+            // Yalnızca ZY düzleminde hareket eden segmentleri çiz
+            if (Math.abs(x1 - x2) < 0.4 && Math.abs(y1 - y2) < 0.4) return [];
+            return [
+              <line
+                key={`${b.id}-${si}`}
+                x1={x1} y1={y1} x2={x2} y2={y2}
+                stroke={color} strokeWidth={sw}
+                opacity={b.busbar_type === "main" ? 0.95 : 0.75}
+                strokeLinecap="round"
+              />,
+            ];
+          });
+        })}
+
+        {/* ── Koordinat eksenleri ───────────────────────────────────────── */}
+        {/* Z ekseni → */}
+        <line
+          x1={PAD_L} y1={PAD_T + drawH + 20}
+          x2={PAD_L + Math.min(36, drawW * 0.3)} y2={PAD_T + drawH + 20}
+          stroke="#e53935" strokeWidth={1}
+        />
+        <path
+          d={arrowPath(PAD_L, PAD_T + drawH + 20,
+            PAD_L + Math.min(36, drawW * 0.3), PAD_T + drawH + 20, 4)}
+          stroke="#e53935" strokeWidth={1} fill="none"
+        />
+        <text
+          x={PAD_L + Math.min(36, drawW * 0.3) + 4}
+          y={PAD_T + drawH + 24}
+          fontSize={8} fill="#e53935" fontFamily="monospace"
+        >Z</text>
+
+        {/* Y ekseni ↑ */}
+        <line
+          x1={PAD_L - 20} y1={PAD_T + drawH}
+          x2={PAD_L - 20} y2={PAD_T + drawH - Math.min(36, drawH * 0.35)}
+          stroke="#e53935" strokeWidth={1}
+        />
+        <path
+          d={arrowPath(PAD_L - 20, PAD_T + drawH,
+            PAD_L - 20, PAD_T + drawH - Math.min(36, drawH * 0.35), 4)}
+          stroke="#e53935" strokeWidth={1} fill="none"
+        />
+        <text
+          x={PAD_L - 18}
+          y={PAD_T + drawH - Math.min(36, drawH * 0.35) - 4}
+          fontSize={8} fill="#e53935" fontFamily="monospace"
+        >Y</text>
+
+        {/* ── Boyut çizgileri ───────────────────────────────────────────── */}
+        {/* Derinlik — alt */}
+        <line x1={PAD_L}        y1={PAD_T + drawH + 7} x2={PAD_L}        y2={PAD_T + drawH + 12} stroke="#555" strokeWidth={1} />
+        <line x1={PAD_L + drawW} y1={PAD_T + drawH + 7} x2={PAD_L + drawW} y2={PAD_T + drawH + 12} stroke="#555" strokeWidth={1} />
+        <line x1={PAD_L}        y1={PAD_T + drawH + 9} x2={PAD_L + drawW} y2={PAD_T + drawH + 9} stroke="#555" strokeWidth={1} />
+        <rect x={PAD_L + drawW / 2 - 22} y={PAD_T + drawH + 3} width={44} height={12} fill="white" />
+        <text
+          x={PAD_L + drawW / 2} y={PAD_T + drawH + 12}
+          textAnchor="middle" fontSize={9} fill="#333" fontFamily="monospace"
+        >{Math.round(MD)} mm</text>
+
+        {/* Yükseklik — sol */}
+        <line x1={PAD_L - 6} y1={PAD_T}          x2={PAD_L - 11} y2={PAD_T}          stroke="#555" strokeWidth={1} />
+        <line x1={PAD_L - 6} y1={PAD_T + drawH}  x2={PAD_L - 11} y2={PAD_T + drawH}  stroke="#555" strokeWidth={1} />
+        <line x1={PAD_L - 8} y1={PAD_T}          x2={PAD_L - 8}  y2={PAD_T + drawH}  stroke="#555" strokeWidth={1} />
+        <text
+          x={PAD_L - 11} y={PAD_T + drawH / 2}
+          textAnchor="middle" fontSize={9} fill="#333" fontFamily="monospace"
+          transform={`rotate(-90,${PAD_L - 11},${PAD_T + drawH / 2})`}
+        >{Math.round(MH)} mm</text>
+
+        {/* ── Yön etiketleri ─────────────────────────────────────────────── */}
+        <text x={PAD_L + 3}      y={PAD_T - 5} fontSize={7} fill="#888" fontFamily="monospace">Ön (Z=0)</text>
+        <text x={PAD_L + drawW}  y={PAD_T - 5} textAnchor="end" fontSize={7} fill="#888" fontFamily="monospace">Arka</text>
       </svg>
-    </div>
+    </section>
   );
 }

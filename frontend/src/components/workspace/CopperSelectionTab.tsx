@@ -5,6 +5,8 @@ import { client } from "../../api/client";
 import type { CopperDefinition, CopperSettings } from "../../types";
 import { Modal } from "../Modal";
 import { DeviceFrontView } from "./DeviceFrontView";
+import { DeviceSideView } from "./DeviceSideView";
+import { PanelTopView } from "./PanelTopView";
 
 interface CopperSelectionTabProps {
   projectId: number;
@@ -400,6 +402,22 @@ export function CopperSelectionTab({ projectId }: CopperSelectionTabProps) {
               copperSettings={previewSettings}
               title="Ana Bakır Yerleşimi — Ön Görünüş"
             />
+
+            {/* Side + Top views with live overlay */}
+            <div className="view-pair-grid">
+              <DeviceSideView
+                panel={panel}
+                projectPanels={projectPanels}
+                devices={devices}
+                copperSettings={previewSettings}
+              />
+              <PanelTopView
+                panel={panel}
+                projectPanels={projectPanels}
+                devices={devices}
+                copperSettings={previewSettings}
+              />
+            </div>
           </>
         )}
       </section>

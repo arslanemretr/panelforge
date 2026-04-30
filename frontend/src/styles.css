@@ -947,6 +947,13 @@ th {
   align-items: start;
 }
 
+.view-pair-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
 .actions-cell {
   display: flex;
   gap: 0.35rem;
@@ -1063,6 +1070,9 @@ th {
 
 @media (max-width: 980px) {
   .canvas-side-grid {
+    grid-template-columns: 1fr;
+  }
+  .view-pair-grid {
     grid-template-columns: 1fr;
   }
   .workspace-body {

@@ -5,7 +5,9 @@ import { client } from "../../api/client";
 import type { Device, ProjectDevice, ProjectPanel } from "../../types";
 import { Modal } from "../Modal";
 import { DeviceFrontView } from "./DeviceFrontView";
+import { DeviceSideView } from "./DeviceSideView";
 import { LibraryPickerModal } from "./LibraryPickerModal";
+import { PanelTopView } from "./PanelTopView";
 
 interface DeviceSelectionTabProps {
   projectId: number;
@@ -226,6 +228,12 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
 
       {/* ── Front view — full width ── */}
       <DeviceFrontView panel={panel} projectPanels={projectPanels} devices={placed} />
+
+      {/* ── Side + Top views ── */}
+      <div className="view-pair-grid">
+        <DeviceSideView panel={panel} projectPanels={projectPanels} devices={placed} />
+        <PanelTopView panel={panel} projectPanels={projectPanels} devices={placed} />
+      </div>
 
       {/* ── Step 1: pick device from library ── */}
       <LibraryPickerModal
