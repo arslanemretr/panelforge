@@ -275,9 +275,15 @@ export function TechnicalDrawingView({
         {cs && !hasSegments && firstLayout && effectiveBarRows.map((row) => {
           const phaseIdx = PHASE_LABELS.indexOf(row.phase);
           const color = PHASE_COLORS[phaseIdx] ?? PHASE_COLORS[0];
-          const rx = fvX(firstLayout.assemblyX + row.xStart);
+          // Bar global X'i seçilen kabinin başlangıcına (xOffset) göre normalize et
+          const barLocalX = row.xStart - xOffset;
+          const barEndX   = barLocalX + row.length;
+          const visStart  = Math.max(barLocalX, 0);
+          const visEnd    = Math.min(barEndX, TW);
+          if (visEnd <= visStart) return null; // bu kabinde bar yok
+          const rx = fvX(visStart);
           const ry = fvY(firstLayout.bm + row.yCenter + barW / 2);
-          const rw = Math.max(row.length * scale, 4);
+          const rw = Math.max((visEnd - visStart) * scale, 4);
           const rh = Math.max(barW * scale, 3);
           return (
             <g key={`fv-bar-${row.key}`}>
@@ -467,9 +473,15 @@ export function TechnicalDrawingView({
         {cs && !hasSegments && firstLayout && effectiveBarRows.map((row) => {
           const phaseIdx = PHASE_LABELS.indexOf(row.phase);
           const color = PHASE_COLORS[phaseIdx] ?? PHASE_COLORS[0];
-          const rx = fvX(firstLayout.assemblyX + row.xStart);
+          // Bar global X'i seçilen kabinin başlangıcına göre normalize et
+          const barLocalX = row.xStart - xOffset;
+          const barEndX   = barLocalX + row.length;
+          const visStart  = Math.max(barLocalX, 0);
+          const visEnd    = Math.min(barEndX, TW);
+          if (visEnd <= visStart) return null;
+          const rx = fvX(visStart);
           const ry = tvY(row.zCenter - barT / 2);
-          const rw = Math.max(row.length * scale, 4);
+          const rw = Math.max((visEnd - visStart) * scale, 4);
           const rh = Math.max(barT * scale, 2);
           return (
             <g key={`tv-bar-${row.key}`}>
