@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { client } from "../../api/client";
@@ -194,22 +194,68 @@ export function CopperSelectionTab({ projectId }: CopperSelectionTabProps) {
     upsertMutation.mutate(buildUpsertPayload({ ...settings, ...placement }));
   }
 
-  // ── Placement form local state ────────────────────────────────────────────────
-  const [placX, setPlacX] = useState<number>(() => Number(settings.busbar_x_mm ?? 0));
-  const [placY, setPlacY] = useState<number>(() => Number(settings.busbar_y_mm ?? 0));
-  const [placZ, setPlacZ] = useState<number>(() => Number(settings.busbar_z_mm ?? 0));
-  const [placOrient, setPlacOrient] = useState<string>(() => settings.busbar_orientation ?? "horizontal");
-  const [placLen, setPlacLen] = useState<number>(() => Number(settings.busbar_length_mm ?? 0));
-  const [placPhase, setPlacPhase] = useState<number>(() => Number(settings.busbar_phase_count ?? 3));
-  const [placBarsPerPhase, setPlacBarsPerPhase] = useState<number>(() => Number(settings.bars_per_phase ?? 1));
-  const [placBarGap, setPlacBarGap] = useState<number>(() => Number(settings.bar_gap_mm ?? 0));
-  const [placPlane, setPlacPlane] = useState<string>(() => settings.busbar_plane ?? "XY");
-  const [placStackAxis, setPlacStackAxis] = useState<string>(() => settings.phase_stack_axis ?? "Y");
+  function handleRecalculate() {
+    const computed = computeBarTable(previewSettings);
+    const newEdits: BarEdits = {};
+    for (const row of computed) {
+      newEdits[row.key] = {
+        xStart: row.xStart,
+        yCenter: row.yCenter,
+        zCenter: row.zCenter,
+        length: row.length,
+      };
+    }
+    setBarEdits(newEdits);
+    setBarTableOpen(true);
+  }
 
-  // Bar tablosu state
-  const [barEdits, setBarEdits] = useState<BarEdits>({});
+  // ── Placement form local state ────────────────────────────────────────────────
+  const [placX, setPlacX] = useState<number>(0);
+  const [placY, setPlacY] = useState<number>(0);
+  const [placZ, setPlacZ] = useState<number>(0);
+  const [placOrient, setPlacOrient] = useState<string>("horizontal");
+  const [placLen, setPlacLen] = useState<number>(0);
+  const [placPhase, setPlacPhase] = useState<number>(3);
+  const [placBarsPerPhase, setPlacBarsPerPhase] = useState<number>(1);
+  const [placBarGap, setPlacBarGap] = useState<number>(0);
+  const [placPlane, setPlacPlane] = useState<string>("XY");
+  const [placStackAxis, setPlacStackAxis] = useState<string>("Y");
+
+  // Sunucu verisi gelince form alanlarını doldur
+  useEffect(() => {
+    const d = settingsQuery.data;
+    if (!d) return;
+    setPlacX(Number(d.busbar_x_mm ?? 0));
+    setPlacY(Number(d.busbar_y_mm ?? 0));
+    setPlacZ(Number(d.busbar_z_mm ?? 0));
+    setPlacOrient(d.busbar_orientation ?? "horizontal");
+    setPlacLen(Number(d.busbar_length_mm ?? 0));
+    setPlacPhase(Number(d.busbar_phase_count ?? 3));
+    setPlacBarsPerPhase(Number(d.bars_per_phase ?? 1));
+    setPlacBarGap(Number(d.bar_gap_mm ?? 0));
+    setPlacPlane(d.busbar_plane ?? "XY");
+    setPlacStackAxis(d.phase_stack_axis ?? "Y");
+  }, [settingsQuery.data]);
+
+  // Bar tablosu state — localStorage'dan yükle
+  const barEditsKey = `pf-bar-edits-${projectId}`;
+  const [barEdits, setBarEdits] = useState<BarEdits>(() => {
+    try {
+      const stored = localStorage.getItem(`pf-bar-edits-${projectId}`);
+      return stored ? (JSON.parse(stored) as BarEdits) : {};
+    } catch {
+      return {};
+    }
+  });
   const [editingBarKey, setEditingBarKey] = useState<string | null>(null);
   const [barTableOpen, setBarTableOpen] = useState(false);
+
+  // barEdits değişince localStorage'a kaydet
+  useEffect(() => {
+    try {
+      localStorage.setItem(barEditsKey, JSON.stringify(barEdits));
+    } catch { /* storage dolu olabilir */ }
+  }, [barEdits, barEditsKey]);
 
   // Sync from server when settings load
   const serverLoaded = !settingsQuery.isLoading && settingsQuery.data !== undefined;
@@ -230,7 +276,8 @@ export function CopperSelectionTab({ projectId }: CopperSelectionTabProps) {
   };
 
   // Düzenlenmiş bar koordinatları (formül bazı + override)
-  const effectiveBarRows: BarRow[] = computeBarTable(settings).map((row) => ({
+  // previewSettings kullanılır — form değişince tablo da güncellenir
+  const effectiveBarRows: BarRow[] = computeBarTable(previewSettings).map((row) => ({
     ...row,
     ...(barEdits[row.key] ?? {}),
   }));
@@ -453,7 +500,7 @@ export function CopperSelectionTab({ projectId }: CopperSelectionTabProps) {
               </label>
             </FieldGroup>
 
-            {/* Kaydet butonu */}
+            {/* Kaydet & Yeniden Hesapla butonları */}
             <div className="form-actions" style={{ marginBottom: "1.5rem" }}>
               <button
                 type="button"
@@ -476,6 +523,18 @@ export function CopperSelectionTab({ projectId }: CopperSelectionTabProps) {
               >
                 {upsertMutation.isPending ? "Kaydediliyor..." : "Yerleşimi Kaydet"}
               </button>
+
+              <button
+                type="button"
+                className="ghost"
+                disabled={!placLen}
+                title="Mevcut değerlere göre tüm bar koordinatlarını yeniden hesaplar ve koordinat tablosuna yazar"
+                onClick={handleRecalculate}
+                style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}
+              >
+                <span>↺</span> Yeniden Hesapla ve Yerleştir
+              </button>
+
               {upsertMutation.isSuccess && (
                 <span style={{ color: "var(--ok)", fontSize: "0.88rem", alignSelf: "center" }}>✓ Kaydedildi</span>
               )}
