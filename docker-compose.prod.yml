@@ -17,6 +17,8 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://panelforge:panelforge@database:5432/panelforge}
     depends_on:
       - database
+    ports:
+      - "8001:8000"
     command: >
       sh -c "alembic upgrade head &&
       uvicorn app.main:app --host 0.0.0.0 --port 8000"
@@ -29,7 +31,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "${WEB_PORT:-80}:80"
+      - "3000:80"
 
 volumes:
   postgres_data:
