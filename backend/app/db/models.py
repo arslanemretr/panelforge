@@ -199,6 +199,8 @@ class CopperSettings(Base):
     busbar_orientation: Mapped[str | None] = mapped_column(Text, default="horizontal")
     busbar_length_mm: Mapped[Decimal | None] = mapped_column(Numeric)
     busbar_phase_count: Mapped[int | None] = mapped_column(Integer, default=3)
+    bars_per_phase: Mapped[int | None] = mapped_column(Integer, default=1)
+    bar_gap_mm: Mapped[Decimal | None] = mapped_column(Numeric, default=Decimal("0"))
     busbar_plane: Mapped[str | None] = mapped_column(Text, default="XY")   # XY | XZ
     phase_stack_axis: Mapped[str | None] = mapped_column(Text, default="Y") # Y | Z
 
