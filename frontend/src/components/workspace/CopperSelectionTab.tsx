@@ -7,61 +7,14 @@ import { Modal } from "../Modal";
 import { DeviceFrontView } from "./DeviceFrontView";
 import { DeviceSideView } from "./DeviceSideView";
 import { PanelTopView } from "./PanelTopView";
+import {
+  computeBarTable,
+  PHASE_COLORS,
+  PHASE_LABELS,
+  type BarRow,
+} from "./viewHelpers";
 
-// ── Bar tablosu ───────────────────────────────────────────────────────────────
-const PHASE_LABELS = ["L1", "L2", "L3", "N", "PE"];
-
-interface BarRow {
-  key: string;
-  phase: string;
-  barNo: number;
-  xStart: number;
-  yCenter: number;
-  zCenter: number;
-  length: number;
-}
-
-function computeBarTable(cs: CopperSettings): BarRow[] {
-  if (!cs.busbar_length_mm || !cs.busbar_x_mm == null) return [];
-  const phaseCount   = Math.min(Number(cs.busbar_phase_count ?? 3), 5);
-  const barsPerPhase = Math.max(1, Number(cs.bars_per_phase ?? 1));
-  const barGap       = Number(cs.bar_gap_mm ?? 0);
-  const barW         = Number(cs.main_width_mm ?? 40);
-  const barT         = Number(cs.main_thickness_mm ?? 5);
-  const barStep      = barT + barGap;
-  const spacing      = Number(cs.main_phase_spacing_mm ?? 60);
-  const stackAxis    = (cs.phase_stack_axis ?? "Y").toUpperCase();
-  const xStart       = Number(cs.busbar_x_mm ?? 0);
-  const baseY        = Number(cs.busbar_y_mm ?? 0);
-  const baseZ        = Number(cs.busbar_z_mm ?? 0);
-  const length       = Number(cs.busbar_length_mm ?? 0);
-
-  const rows: BarRow[] = [];
-  for (let pi = 0; pi < phaseCount; pi++) {
-    for (let bi = 0; bi < barsPerPhase; bi++) {
-      let yCenter: number;
-      let zCenter: number;
-      if (stackAxis === "Z") {
-        yCenter = baseY + barW / 2;
-        zCenter = baseZ + barT / 2 + pi * spacing + bi * barStep;
-      } else {
-        yCenter = baseY + barW / 2 + pi * spacing + bi * barStep;
-        zCenter = baseZ + barT / 2;
-      }
-      rows.push({
-        key: `${PHASE_LABELS[pi]}-B${bi + 1}`,
-        phase: PHASE_LABELS[pi],
-        barNo: bi + 1,
-        xStart,
-        yCenter: Math.round(yCenter * 10) / 10,
-        zCenter: Math.round(zCenter * 10) / 10,
-        length,
-      });
-    }
-  }
-  return rows;
-}
-
+// ── Tipler ────────────────────────────────────────────────────────────────────
 type BarEdits = Record<string, { xStart: number; yCenter: number; zCenter: number; length: number }>;
 
 // ── Küçük etiketli grup başlığı ───────────────────────────────────────────────
@@ -258,6 +211,7 @@ export function CopperSelectionTab({ projectId }: CopperSelectionTabProps) {
   // Bar tablosu state
   const [barEdits, setBarEdits] = useState<BarEdits>({});
   const [editingBarKey, setEditingBarKey] = useState<string | null>(null);
+  const [barTableOpen, setBarTableOpen] = useState(false);
 
   // Sync from server when settings load
   const serverLoaded = !settingsQuery.isLoading && settingsQuery.data !== undefined;
@@ -276,6 +230,12 @@ export function CopperSelectionTab({ projectId }: CopperSelectionTabProps) {
     busbar_plane: placPlane,
     phase_stack_axis: placStackAxis,
   };
+
+  // Düzenlenmiş bar koordinatları (formül bazı + override)
+  const effectiveBarRows: BarRow[] = computeBarTable(settings).map((row) => ({
+    ...row,
+    ...(barEdits[row.key] ?? {}),
+  }));
 
   // ── Card helper ───────────────────────────────────────────────────────────────
 
@@ -526,141 +486,146 @@ export function CopperSelectionTab({ projectId }: CopperSelectionTabProps) {
               </span>
             </div>
 
-            {/* ── Bar koordinat tablosu ──────────────────────────────────── */}
-            {settings.busbar_length_mm && (() => {
-              const rows = computeBarTable(settings);
-              if (rows.length === 0) return null;
-              return (
-                <div style={{ marginBottom: "1.25rem" }}>
-                  <div style={{
-                    fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.06em",
-                    textTransform: "uppercase", color: "var(--muted)", marginBottom: "0.5rem",
-                    borderBottom: "1px solid var(--line)", paddingBottom: "0.25rem",
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                  }}>
-                    <span>Bar Koordinat Listesi</span>
-                    <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>
-                      {rows.length} bar · hesaplanan merkez noktaları
+            {/* ── Bar koordinat tablosu (açılır/kapanır) ────────────────── */}
+            {settings.busbar_length_mm && effectiveBarRows.length > 0 && (
+              <div style={{ marginBottom: "1.25rem", border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden" }}>
+                {/* Başlık / toggle */}
+                <button
+                  type="button"
+                  onClick={() => setBarTableOpen((v) => !v)}
+                  style={{
+                    width: "100%", display: "flex", alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "0.65rem 1rem", background: "var(--panel-strong)",
+                    border: "none", cursor: "pointer", gap: "0.5rem",
+                  }}
+                >
+                  <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>
+                    Bar Koordinat Listesi
+                  </span>
+                  <span style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                    <span style={{
+                      background: "var(--accent-soft)", color: "var(--accent)",
+                      borderRadius: 20, padding: "2px 10px",
+                      fontSize: "0.78rem", fontWeight: 600,
+                    }}>
+                      {effectiveBarRows.length} bar
                     </span>
-                  </div>
-                  <table className="data-table" style={{ fontSize: "0.85rem" }}>
-                    <thead>
-                      <tr>
-                        <th>Bar</th>
-                        <th>Faz</th>
-                        <th>X Başl. (mm)</th>
-                        <th>Y Merkez (mm)</th>
-                        <th>Z Merkez (mm)</th>
-                        <th>Uzunluk (mm)</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((row) => {
-                        const overrides = barEdits[row.key];
-                        const vals = overrides ?? {
-                          xStart: row.xStart, yCenter: row.yCenter,
-                          zCenter: row.zCenter, length: row.length,
-                        };
-                        const isEditing = editingBarKey === row.key;
-                        const phaseIdx = PHASE_LABELS.indexOf(row.phase);
-                        const dotColor = ["#e53935","#f9a825","#1565c0","#616161","#388e3c"][phaseIdx] ?? "#888";
+                    <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>
+                      {barTableOpen ? "▲" : "▼"}
+                    </span>
+                  </span>
+                </button>
 
-                        return (
-                          <tr key={row.key}>
-                            <td>
-                              <span style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                                <span style={{
-                                  width: 8, height: 8, borderRadius: "50%",
-                                  background: dotColor, flexShrink: 0,
-                                }} />
-                                {row.key}
-                              </span>
-                            </td>
-                            <td style={{ fontWeight: 600, color: dotColor }}>{row.phase}</td>
-                            {isEditing ? (
-                              <>
-                                {(["xStart","yCenter","zCenter","length"] as const).map((field) => (
-                                  <td key={field}>
-                                    <input
-                                      className="input"
-                                      type="number"
-                                      step={0.5}
-                                      style={{ width: "80px", padding: "0.25rem 0.4rem", fontSize: "0.82rem" }}
-                                      value={vals[field]}
-                                      onChange={(e) =>
-                                        setBarEdits((prev) => ({
-                                          ...prev,
-                                          [row.key]: { ...vals, [field]: Number(e.target.value) },
-                                        }))
-                                      }
-                                    />
-                                  </td>
-                                ))}
-                              </>
-                            ) : (
-                              <>
-                                <td style={{ fontFamily: "monospace" }}>{vals.xStart}</td>
-                                <td style={{ fontFamily: "monospace" }}>{vals.yCenter}</td>
-                                <td style={{ fontFamily: "monospace" }}>{vals.zCenter}</td>
-                                <td style={{ fontFamily: "monospace" }}>{vals.length}</td>
-                              </>
-                            )}
-                            <td>
-                              <div className="actions-cell">
-                                {isEditing ? (
-                                  <>
-                                    <button
-                                      type="button"
-                                      className="btn-primary"
-                                      style={{ padding: "0.2rem 0.6rem", fontSize: "0.78rem" }}
-                                      onClick={() => setEditingBarKey(null)}
-                                    >
-                                      Tamam
-                                    </button>
-                                    <button
-                                      type="button"
-                                      style={{ padding: "0.2rem 0.6rem", fontSize: "0.78rem" }}
+                {/* Tablo içeriği */}
+                {barTableOpen && (
+                  <div style={{ overflowX: "auto" }}>
+                    <table className="data-table" style={{ fontSize: "0.82rem", margin: 0 }}>
+                      <thead>
+                        <tr>
+                          <th style={{ width: 80 }}>Bar</th>
+                          <th style={{ width: 48 }}>Faz</th>
+                          <th>X Başl.</th>
+                          <th>Y Merkez</th>
+                          <th>Z Merkez</th>
+                          <th>Uzunluk</th>
+                          <th style={{ width: 100 }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {effectiveBarRows.map((row) => {
+                          const overrides = barEdits[row.key];
+                          const vals = { xStart: row.xStart, yCenter: row.yCenter, zCenter: row.zCenter, length: row.length };
+                          const isEditing = editingBarKey === row.key;
+                          const phaseIdx = PHASE_LABELS.indexOf(row.phase);
+                          const dotColor = PHASE_COLORS[phaseIdx] ?? "#888";
+
+                          const numInput = (field: keyof typeof vals) => (
+                            <input
+                              type="number" step={0.5}
+                              value={vals[field]}
+                              onChange={(e) =>
+                                setBarEdits((prev) => ({
+                                  ...prev,
+                                  [row.key]: { ...vals, [field]: Number(e.target.value) },
+                                }))
+                              }
+                              style={{
+                                width: 70, padding: "0.2rem 0.35rem",
+                                fontSize: "0.8rem", lineHeight: 1.2,
+                                border: "1px solid var(--line)", borderRadius: 6,
+                                background: "var(--bg-input)", color: "var(--text)",
+                                boxSizing: "border-box",
+                              }}
+                            />
+                          );
+
+                          return (
+                            <tr key={row.key} style={{ verticalAlign: "middle" }}>
+                              <td>
+                                <span style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
+                                  <span style={{ fontFamily: "monospace", fontWeight: 600 }}>{row.key}</span>
+                                </span>
+                              </td>
+                              <td style={{ fontWeight: 700, color: dotColor }}>{row.phase}</td>
+                              {isEditing ? (
+                                <>
+                                  <td>{numInput("xStart")}</td>
+                                  <td>{numInput("yCenter")}</td>
+                                  <td>{numInput("zCenter")}</td>
+                                  <td>{numInput("length")}</td>
+                                </>
+                              ) : (
+                                <>
+                                  <td style={{ fontFamily: "monospace" }}>{vals.xStart}</td>
+                                  <td style={{ fontFamily: "monospace" }}>{vals.yCenter}</td>
+                                  <td style={{ fontFamily: "monospace" }}>{vals.zCenter}</td>
+                                  <td style={{ fontFamily: "monospace" }}>{vals.length}</td>
+                                </>
+                              )}
+                              <td>
+                                <div className="actions-cell">
+                                  {isEditing ? (
+                                    <>
+                                      <button type="button" className="btn-primary"
+                                        style={{ padding: "0.18rem 0.55rem", fontSize: "0.76rem" }}
+                                        onClick={() => setEditingBarKey(null)}>
+                                        Tamam
+                                      </button>
+                                      <button type="button"
+                                        style={{ padding: "0.18rem 0.55rem", fontSize: "0.76rem" }}
+                                        onClick={() => {
+                                          setBarEdits((prev) => { const n = { ...prev }; delete n[row.key]; return n; });
+                                          setEditingBarKey(null);
+                                        }}>
+                                        İptal
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <button type="button"
+                                      style={{ padding: "0.18rem 0.55rem", fontSize: "0.76rem" }}
                                       onClick={() => {
-                                        setBarEdits((prev) => {
-                                          const next = { ...prev };
-                                          delete next[row.key];
-                                          return next;
-                                        });
-                                        setEditingBarKey(null);
-                                      }}
-                                    >
-                                      İptal
+                                        setBarEdits((prev) => ({ ...prev, [row.key]: { ...vals, ...prev[row.key] } }));
+                                        setEditingBarKey(row.key);
+                                      }}>
+                                      Düzenle
                                     </button>
-                                  </>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    style={{ padding: "0.2rem 0.6rem", fontSize: "0.78rem" }}
-                                    onClick={() => {
-                                      setBarEdits((prev) => ({
-                                        ...prev,
-                                        [row.key]: { xStart: row.xStart, yCenter: row.yCenter, zCenter: row.zCenter, length: row.length, ...prev[row.key] },
-                                      }));
-                                      setEditingBarKey(row.key);
-                                    }}
-                                  >
-                                    Düzenle
-                                  </button>
-                                )}
-                                {overrides && !isEditing && (
-                                  <span style={{ fontSize: "0.72rem", color: "var(--accent)" }}>✎</span>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              );
-            })()}
+                                  )}
+                                  {overrides && !isEditing && (
+                                    <span style={{ fontSize: "0.7rem", color: "var(--accent)", fontWeight: 700 }}>✎</span>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Live front view with busbar overlay */}
             <DeviceFrontView
@@ -678,12 +643,14 @@ export function CopperSelectionTab({ projectId }: CopperSelectionTabProps) {
                 projectPanels={projectPanels}
                 devices={devices}
                 copperSettings={previewSettings}
+                barRows={Object.keys(barEdits).length > 0 ? effectiveBarRows : undefined}
               />
               <PanelTopView
                 panel={panel}
                 projectPanels={projectPanels}
                 devices={devices}
                 copperSettings={previewSettings}
+                barRows={Object.keys(barEdits).length > 0 ? effectiveBarRows : undefined}
               />
             </div>
           </>
