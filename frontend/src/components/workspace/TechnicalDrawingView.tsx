@@ -14,6 +14,7 @@
  *   Ön ↔ Üst  : aynı X ekseni (genişlik)
  */
 
+import { useState } from "react";
 import type { Busbar, CopperSettings, Panel, ProjectDevice, ProjectPanel } from "../../types";
 import {
   buildCabinetLayouts,
@@ -64,15 +65,42 @@ export function TechnicalDrawingView({
     );
   }
 
-  const { layouts, totalWidth: TW, maxHeight: MH, maxDepth: rawMD } =
+  // ── Tüm kabin/cihaz verisi ───────────────────────────────────────────────
+  const { layouts: allLayouts, maxHeight: allMH } =
     buildCabinetLayouts(projectPanels, panel);
-  const MD = rawMD > 0 ? rawMD : 300;
+  const allBoxes = deviceBoxes(devices, allLayouts);
 
-  const boxes = deviceBoxes(devices, layouts);
+  // ── Kabin filtresi ────────────────────────────────────────────────────────
+  const [selectedId, setSelectedId] = useState<number | "all">("all");
+
+  // Seçime göre filtrelenmiş layout ve kutular
+  const filteredLayouts = selectedId === "all"
+    ? allLayouts
+    : allLayouts.filter((l) => l.id === selectedId);
+
+  // Tekil kabin seçilince assemblyX sıfırlanır (kabin soldan başlar)
+  const xOffset = filteredLayouts.length === 1 ? filteredLayouts[0].assemblyX : 0;
+  const layouts = filteredLayouts.map((l) => ({
+    ...l,
+    assemblyX: l.assemblyX - xOffset,
+    intLeft:   l.intLeft   - xOffset,
+  }));
+
+  const boxes = selectedId === "all"
+    ? allBoxes.map((b) => ({ ...b, x: b.x - xOffset }))
+    : allBoxes
+        .filter((b) => b.projectPanelId === selectedId)
+        .map((b)  => ({ ...b, x: b.x - xOffset }));
+
+  // Filtrelenmiş boyutlar
+  const TW  = layouts.reduce((acc, l) => Math.max(acc, l.assemblyX + l.cW), 0);
+  const MH  = layouts.length > 0 ? Math.max(...layouts.map((l) => l.cH)) : allMH;
+  const rawMD = layouts.length > 0 ? Math.max(...layouts.map((l) => l.cD)) : 0;
+  const MD  = rawMD > 0 ? rawMD : 300;
 
   // ── Ölçek — üç görünüm aynı ölçeği paylaşır ──────────────────────────────
-  const horizAvail = SVG_W - PAD_L - PAD_R - GAP;   // drawW + drawD
-  const vertMax    = 480;                            // drawH + GAP + drawD maks
+  const horizAvail = SVG_W - PAD_L - PAD_R - GAP;
+  const vertMax    = 480;
 
   const scaleH = TW + MD > 0 ? horizAvail / (TW + MD) : 1;
   const scaleV = MH + MD > 0 ? (vertMax - GAP) / (MH + MD) : 1;
@@ -85,21 +113,13 @@ export function TechnicalDrawingView({
   const SVG_H = PAD_T + VIEW_LABEL_H + drawH + GAP + drawD + PAD_B;
 
   // ── Koordinat fonksiyonları ────────────────────────────────────────────────
-  // Ön ve Üst görünüm: X ekseni (yatay, sola doğru)
   const fvX = (x: number) => PAD_L + x * scale;
-  // Ön ve Yan görünüm: Y ekseni (dikey, yukarı = küçük SVG y)
   const fvY = (y: number) => PAD_T + VIEW_LABEL_H + (MH - y) * scale;
-  // Yan görünüm: Z ekseni (yatay, sağa)
   const svX = (z: number) => PAD_L + drawW + GAP + z * scale;
-  // Üst görünüm: Z ekseni (dikey, aşağı)
   const tvY = (z: number) => PAD_T + VIEW_LABEL_H + drawH + GAP + z * scale;
 
-  // Referans y (zemin): fvY(0)
-  const groundY = fvY(0);
-  // Ön görünüm sağ kenarı
+  const groundY    = fvY(0);
   const frontRight = fvX(TW);
-  // Üst görünüm alt kenarı
-  const topBottom  = tvY(MD);
 
   // ── Bakır barları (CS overlay veya hesaplanmış) ───────────────────────────
   const cs = copperSettings;
@@ -107,7 +127,7 @@ export function TechnicalDrawingView({
   const effectiveBarRows: BarRow[] = barRowsProp ??
     (cs ? computeBarTable(cs) : []);
 
-  const barW = Number(cs?.main_width_mm   ?? 40);
+  const barW = Number(cs?.main_width_mm    ?? 40);
   const barT = Number(cs?.main_thickness_mm ?? 5);
   const firstLayout = layouts[0];
 
@@ -115,9 +135,29 @@ export function TechnicalDrawingView({
     <section className="table-card" style={{ marginTop: 0 }}>
       <div className="section-header" style={{ marginBottom: "0.5rem" }}>
         <h3>{title}</h3>
-        <span className="helper-text" style={{ fontSize: "0.82rem" }}>
-          Aynı ölçek · Ön–Yan–Üst ortografik projeksiyon
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          {/* Kabin filtresi */}
+          {allLayouts.length > 1 && (
+            <select
+              className="input"
+              value={selectedId}
+              onChange={(e) =>
+                setSelectedId(e.target.value === "all" ? "all" : Number(e.target.value))
+              }
+              style={{ fontSize: "0.85rem", padding: "0.3rem 0.6rem", minWidth: 160 }}
+            >
+              <option value="all">Tüm Kabinler</option>
+              {allLayouts.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
+          )}
+          <span className="helper-text" style={{ fontSize: "0.82rem" }}>
+            Aynı ölçek · Ön–Yan–Üst
+          </span>
+        </div>
       </div>
 
       <svg
