@@ -35,6 +35,8 @@ const EMPTY_SETTINGS: Omit<CopperSettings, "id" | "project_id"> = {
   busbar_orientation: "horizontal",
   busbar_length_mm: null,
   busbar_phase_count: 3,
+  busbar_plane: "XY",
+  phase_stack_axis: "Y",
 };
 
 function buildUpsertPayload(s: CopperSettings): Omit<CopperSettings, "id" | "project_id"> {
@@ -61,6 +63,8 @@ function buildUpsertPayload(s: CopperSettings): Omit<CopperSettings, "id" | "pro
     busbar_orientation:       s.busbar_orientation ?? "horizontal",
     busbar_length_mm:         s.busbar_length_mm ?? null,
     busbar_phase_count:       s.busbar_phase_count ?? 3,
+    busbar_plane:             s.busbar_plane ?? "XY",
+    phase_stack_axis:         s.phase_stack_axis ?? "Y",
   };
 }
 
@@ -166,6 +170,8 @@ export function CopperSelectionTab({ projectId }: CopperSelectionTabProps) {
   const [placOrient, setPlacOrient] = useState<string>(() => settings.busbar_orientation ?? "horizontal");
   const [placLen, setPlacLen] = useState<number>(() => Number(settings.busbar_length_mm ?? 0));
   const [placPhase, setPlacPhase] = useState<number>(() => Number(settings.busbar_phase_count ?? 3));
+  const [placPlane, setPlacPlane] = useState<string>(() => settings.busbar_plane ?? "XY");
+  const [placStackAxis, setPlacStackAxis] = useState<string>(() => settings.phase_stack_axis ?? "Y");
 
   // Sync from server when settings load
   const serverLoaded = !settingsQuery.isLoading && settingsQuery.data !== undefined;
@@ -179,6 +185,8 @@ export function CopperSelectionTab({ projectId }: CopperSelectionTabProps) {
     busbar_orientation: placOrient,
     busbar_length_mm: placLen,
     busbar_phase_count: placPhase,
+    busbar_plane: placPlane,
+    phase_stack_axis: placStackAxis,
   };
 
   // ── Card helper ───────────────────────────────────────────────────────────────
@@ -343,6 +351,20 @@ export function CopperSelectionTab({ projectId }: CopperSelectionTabProps) {
                   <option value={4}>4 (L1, L2, L3, N)</option>
                 </select>
               </label>
+              <label className="field">
+                <span>Bakır Düzlemi</span>
+                <select className="input" value={placPlane} onChange={(e) => setPlacPlane(e.target.value)}>
+                  <option value="XY">XY — Ön/Arka yüzey (derinlik sabit)</option>
+                  <option value="XZ">XZ — Yatay düzlem (yükseklik sabit)</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>Faz İstif Yönü</span>
+                <select className="input" value={placStackAxis} onChange={(e) => setPlacStackAxis(e.target.value)}>
+                  <option value="Y">Y — Fazlar dikey istifli (yukarı)</option>
+                  <option value="Z">Z — Fazlar derinlik yönünde istifli</option>
+                </select>
+              </label>
 
               <div className="form-actions" style={{ gridColumn: "1 / -1", marginTop: 0 }}>
                 <button
@@ -357,6 +379,8 @@ export function CopperSelectionTab({ projectId }: CopperSelectionTabProps) {
                       busbar_orientation: placOrient,
                       busbar_length_mm: placLen,
                       busbar_phase_count: placPhase,
+                      busbar_plane: placPlane,
+                      phase_stack_axis: placStackAxis,
                     })
                   }
                 >

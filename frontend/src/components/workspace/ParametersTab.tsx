@@ -91,6 +91,8 @@ export function ParametersTab({ projectId }: ParametersTabProps) {
       busbar_orientation:       s?.busbar_orientation ?? "horizontal",
       busbar_length_mm:         s?.busbar_length_mm ?? null,
       busbar_phase_count:       s?.busbar_phase_count ?? 3,
+      busbar_plane:             s?.busbar_plane ?? "XY",
+      phase_stack_axis:         s?.phase_stack_axis ?? "Y",
       // calculation params (editable here)
       bend_inner_radius_mm:     bendRadius,
       k_factor:                 kFactor,

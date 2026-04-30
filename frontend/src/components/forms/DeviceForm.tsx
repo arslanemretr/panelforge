@@ -12,6 +12,8 @@ const defaultTerminal = (terminalName: string, phase: string, x: number): Device
   phase,
   x_mm: x,
   y_mm: 20,
+  z_mm: 0,
+  terminal_face: null,
   hole_diameter_mm: 11,
   slot_width_mm: null,
   slot_length_mm: null,
@@ -33,6 +35,8 @@ export function DeviceForm({ initialValue, onSubmit }: DeviceFormProps) {
           phase: t.phase,
           x_mm: Number(t.x_mm),
           y_mm: Number(t.y_mm),
+          z_mm: t.z_mm != null ? Number(t.z_mm) : 0,
+          terminal_face: t.terminal_face ?? null,
           hole_diameter_mm: t.hole_diameter_mm != null ? Number(t.hole_diameter_mm) : null,
           slot_width_mm: t.slot_width_mm != null ? Number(t.slot_width_mm) : null,
           slot_length_mm: t.slot_length_mm != null ? Number(t.slot_length_mm) : null,
@@ -140,19 +144,42 @@ export function DeviceForm({ initialValue, onSubmit }: DeviceFormProps) {
                 type="number"
                 value={terminal.x_mm}
                 onChange={(event) => updateTerminal(index, "x_mm", Number(event.target.value))}
-                placeholder="X"
+                placeholder="X (mm)"
+                title="X — cihaz sol kenarından"
               />
               <input
                 type="number"
                 value={terminal.y_mm}
                 onChange={(event) => updateTerminal(index, "y_mm", Number(event.target.value))}
-                placeholder="Y"
+                placeholder="Y (mm)"
+                title="Y — cihaz alt kenarından"
               />
+              <input
+                type="number"
+                value={terminal.z_mm ?? 0}
+                onChange={(event) => updateTerminal(index, "z_mm", Number(event.target.value))}
+                placeholder="Z (mm)"
+                title="Z — cihaz ön yüzeyinden derinlik"
+              />
+              <select
+                value={terminal.terminal_face ?? ""}
+                onChange={(event) => updateTerminal(index, "terminal_face", event.target.value || null)}
+                title="Terminal yüzeyi"
+              >
+                <option value="">— Yüzey —</option>
+                <option value="front">Ön</option>
+                <option value="back">Arka</option>
+                <option value="left">Sol</option>
+                <option value="right">Sağ</option>
+                <option value="top">Üst</option>
+                <option value="bottom">Alt</option>
+              </select>
               <input
                 type="number"
                 value={terminal.hole_diameter_mm ?? 0}
                 onChange={(event) => updateTerminal(index, "hole_diameter_mm", Number(event.target.value))}
-                placeholder="Cap"
+                placeholder="Çap (mm)"
+                title="Delik çapı"
               />
             </div>
           ))}

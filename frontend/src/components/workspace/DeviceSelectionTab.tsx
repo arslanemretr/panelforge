@@ -27,6 +27,7 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
   const [configLabel, setConfigLabel] = useState("");
   const [configX, setConfigX] = useState(0);   // mm, soldan
   const [configY, setConfigY] = useState(0);   // mm, alttan
+  const [configZ, setConfigZ] = useState(0);   // mm, derinlik (ön yüzeyden)
   const [configRotation, setConfigRotation] = useState(0);
 
   // ── Queries ──────────────────────────────────────────────────────────────────
@@ -98,6 +99,7 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
     setConfigLabel(`${device.brand}_${device.model}`);
     setConfigX(0);
     setConfigY(0);
+    setConfigZ(0);
     setConfigRotation(0);
     setSelectedPanel(projectPanels.length === 1 ? projectPanels[0] : null);
     setConfigStep(projectPanels.length === 1 ? "enter-coords" : "pick-cabinet");
@@ -110,6 +112,7 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
     setConfigLabel(pd.label);
     setConfigX(pd.x_mm);
     setConfigY(pd.y_mm);
+    setConfigZ(pd.z_mm ?? 0);
     setConfigRotation(pd.rotation_deg);
     setConfigStep("enter-coords");
   }
@@ -127,6 +130,7 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
       label: configLabel,
       x_mm: configX,
       y_mm: configY,
+      z_mm: configZ,
       rotation_deg: configRotation,
       quantity: 1,
     });
@@ -142,6 +146,7 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
         label: configLabel,
         x_mm: configX,
         y_mm: configY,
+        z_mm: configZ,
         rotation_deg: configRotation,
         quantity: editingDevice.quantity,
       },
@@ -397,6 +402,18 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
                     step={1}
                     value={configY}
                     onChange={(e) => setConfigY(Number(e.target.value))}
+                  />
+                </label>
+
+                <label className="field">
+                  <span>Z — Derinlik (mm, ön yüzeyden)</span>
+                  <input
+                    className="input"
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={configZ}
+                    onChange={(e) => setConfigZ(Number(e.target.value))}
                   />
                 </label>
 
