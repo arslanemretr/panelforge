@@ -167,9 +167,10 @@ def _rail_center_3d(
     copper: models.CopperSettings,
     phase_index: int,
     base_offset: Point3D,
+    bar_index: int = 0,
 ) -> Point3D:
     """
-    Verilen faz indeksi için ana bakır rayının merkez noktası.
+    Verilen faz ve bar indeksi için ana bakır rayının merkez noktası.
 
     Koordinat sistemi (panel-iç, sol-alt-ön köşe = orijin):
       busbar_x_mm : sol iç köşeden ray grubunun sol kenarına mesafe
@@ -179,22 +180,28 @@ def _rail_center_3d(
     phase_stack_axis:
       "Y"  → fazlar Y ekseninde (yukarı) istifli   (varsayılan)
       "Z"  → fazlar Z ekseninde (derinlik) istifli
+
+    bars_per_phase > 1 ise aynı faz içindeki barlar, kalınlık + bar_gap_mm
+    adımıyla istif ekseni yönünde sıralanır.
     """
-    bx       = _to_float(copper.busbar_x_mm, 50.0)
-    by       = _to_float(copper.busbar_y_mm, 100.0)
-    bz       = _to_float(copper.busbar_z_mm)
-    spacing  = _to_float(copper.main_phase_spacing_mm, 60.0)
-    bar_w    = _to_float(copper.main_width_mm, 40.0)
-    stack_ax = (copper.phase_stack_axis or "Y").upper()
+    bx         = _to_float(copper.busbar_x_mm, 50.0)
+    by         = _to_float(copper.busbar_y_mm, 100.0)
+    bz         = _to_float(copper.busbar_z_mm)
+    spacing    = _to_float(copper.main_phase_spacing_mm, 60.0)
+    bar_w      = _to_float(copper.main_width_mm, 40.0)
+    bar_t      = _to_float(copper.main_thickness_mm, 5.0)
+    bar_gap    = _to_float(copper.bar_gap_mm, 0.0)
+    stack_ax   = (copper.phase_stack_axis or "Y").upper()
+    bar_step   = bar_t + bar_gap          # bar kalınlığı + hava boşluğu
 
     center_x = base_offset.x + bx
     center_y = base_offset.y + by + bar_w / 2.0
     center_z = base_offset.z + bz
 
     if stack_ax == "Z":
-        center_z += phase_index * spacing
+        center_z += phase_index * spacing + bar_index * bar_step
     else:   # "Y"
-        center_y += phase_index * spacing
+        center_y += phase_index * spacing + bar_index * bar_step
 
     return Point3D(x=center_x, y=center_y, z=center_z)
 
@@ -203,9 +210,10 @@ def _main_busbar_seg_3d(
     copper: models.CopperSettings,
     phase_index: int,
     base_offset: Point3D,
+    bar_index: int = 0,
 ) -> Segment3D:
     """Ana bakır için Segment3D oluşturur (X ekseni boyunca = yatay)."""
-    rail   = _rail_center_3d(copper, phase_index, base_offset)
+    rail   = _rail_center_3d(copper, phase_index, base_offset, bar_index)
     length = _to_float(copper.busbar_length_mm, 1000.0)
     bx     = _to_float(copper.busbar_x_mm, 50.0)
     by     = _to_float(copper.busbar_y_mm, 100.0)
@@ -450,10 +458,11 @@ def calculate_project(db: Session, project_id: int) -> CalculationResponse:
     default_hole = _to_float(copper.default_hole_diameter_mm, 11.0)
     k_flatwise   = _to_float(copper.k_factor, K_FLATWISE_DEFAULT)
     k_edgewise   = K_EDGEWISE_DEFAULT   # Faz 4'te CopperSettings'e alan eklenecek
-    main_w       = _to_float(copper.main_width_mm, 40.0)
-    main_t       = _to_float(copper.main_thickness_mm, 5.0)
-    branch_w     = _to_float(copper.branch_width_mm, 30.0) or main_w
-    branch_t     = _to_float(copper.branch_thickness_mm, 5.0) or main_t
+    main_w        = _to_float(copper.main_width_mm, 40.0)
+    main_t        = _to_float(copper.main_thickness_mm, 5.0)
+    branch_w      = _to_float(copper.branch_width_mm, 30.0) or main_w
+    branch_t      = _to_float(copper.branch_thickness_mm, 5.0) or main_t
+    bars_per_phase = int(copper.bars_per_phase or 1)
 
     busbars: list[BusbarPart] = []
 
@@ -470,29 +479,36 @@ def calculate_project(db: Session, project_id: int) -> CalculationResponse:
         if not device_terminals:
             continue   # bu faz için cihaz yok → ana bakır da oluşturma
 
-        # Ana bakır ───────────────────────────────────────────────────────────
-        main_seg  = _main_busbar_seg_3d(copper, phase_index, default_offset_3d)
-        junctions = [_junction_3d(main_seg, tw) for (_, _, tw) in device_terminals]
-        main_holes = _holes_for_main_busbar_3d(copper, main_seg, junctions, default_hole)
+        # Ana bakırlar: faz başına bars_per_phase adet paralel bar ────────────
+        # Referans bar (bar_index=0) üzerinden tali bağlantılar hesaplanır.
+        ref_junctions: list[Point3D] = []
+        for bar_index in range(bars_per_phase):
+            main_seg   = _main_busbar_seg_3d(copper, phase_index, default_offset_3d, bar_index)
+            junctions  = [_junction_3d(main_seg, tw) for (_, _, tw) in device_terminals]
+            main_holes = _holes_for_main_busbar_3d(copper, main_seg, junctions, default_hole)
 
-        busbars.append(BusbarPart(
-            part_no=f"MB-{phase}-{phase_index + 1:03d}",
-            name=f"Ana Bara {phase}",
-            busbar_type="main",
-            phase=phase,
-            width=main_w,
-            thickness=main_t,
-            material=copper.main_material or "Cu",
-            quantity=1,
-            connected_device_label=None,
-            segments=[main_seg],
-            holes=main_holes,
-            bends=[],
-        ))
+            bar_suffix = f"-B{bar_index + 1}" if bars_per_phase > 1 else ""
+            busbars.append(BusbarPart(
+                part_no=f"MB-{phase}-{phase_index + 1:03d}{bar_suffix}",
+                name=f"Ana Bara {phase}" + (f" (Bar {bar_index + 1})" if bars_per_phase > 1 else ""),
+                busbar_type="main",
+                phase=phase,
+                width=main_w,
+                thickness=main_t,
+                material=copper.main_material or "Cu",
+                quantity=1,
+                connected_device_label=None,
+                segments=[main_seg],
+                holes=main_holes,
+                bends=[],
+            ))
 
-        # Tali bakırlar (her cihaz için bir adet) ─────────────────────────────
+            if bar_index == 0:
+                ref_junctions = junctions  # tali bakırlar referans bar'a bağlanır
+
+        # Tali bakırlar: referans bar (bar_index=0) üzerindeki kavşaklara ─────
         for branch_index, (pd, term, tw) in enumerate(device_terminals, start=1):
-            junc = junctions[branch_index - 1]
+            junc = ref_junctions[branch_index - 1]
             segments, bends = _route_3d(
                 junc, tw, bend_radius, branch_t, k_flatwise, k_edgewise
             )
