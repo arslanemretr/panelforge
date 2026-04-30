@@ -104,8 +104,13 @@ def _world_terminal_3d(
     rz = _to_float(placement.rotation_deg)
     rotated = rotate_xyz(local, rx, ry, rz)
 
+    # placement.x_mm = cihazın yatay merkezi (alt-orta referans noktası)
+    # Terminal koordinatları cihazın sol-alt köşesine göre tanımlı olduğundan
+    # merkezi sol kenara çevirmek için -width/2 offset uygulanır.
+    dw = _to_float(placement.device.width_mm) if placement.device else 0.0
+
     return Point3D(
-        x=_to_float(placement.x_mm) + rotated.x,
+        x=_to_float(placement.x_mm) - dw / 2.0 + rotated.x,
         y=_to_float(placement.y_mm) + rotated.y,
         z=_to_float(placement.z_mm) + rotated.z,
     )

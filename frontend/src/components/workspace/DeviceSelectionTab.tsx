@@ -354,8 +354,8 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
               >
                 <span>📐</span>
                 <span>
-                  <strong>X=0</strong> sol iç kenar &nbsp;·&nbsp;
-                  <strong>Y=0</strong> alt iç kenar (zemin) &nbsp;·&nbsp;
+                  <strong>X</strong> = cihaz yatay merkezi &nbsp;·&nbsp;
+                  <strong>Y=0</strong> = alt iç kenar (zemin) &nbsp;·&nbsp;
                   <strong>Kabin {selectedPanel.seq}</strong>
                 </span>
                 {/* Back button if multiple cabinets */}
@@ -382,7 +382,7 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
                 </label>
 
                 <label className="field">
-                  <span>X — Soldan mesafe (mm)</span>
+                  <span>X — Yatay merkez (mm)</span>
                   <input
                     className="input"
                     type="number"

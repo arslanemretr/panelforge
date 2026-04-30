@@ -239,9 +239,9 @@ export function deviceBoxes(
 
     return [
       {
-        x: layout.intLeft + Number(pd.x_mm),
-        y: layout.bm + Number(pd.y_mm), // Y from assembly absolute bottom
-        z: Number((pd as { z_mm?: number }).z_mm ?? 0),
+        x: layout.intLeft + Number(pd.x_mm) - dW / 2, // X = yatay merkez
+        y: layout.bm + Number(pd.y_mm),               // Y = alt kenar
+        z: Number((pd as { z_mm?: number }).z_mm ?? 0), // Z = ön yüzeyden derinlik
         w: dW,
         h: dH,
         d: dD,
