@@ -199,9 +199,11 @@ def _rail_center_3d(
     center_z = base_offset.z + bz
 
     if stack_ax == "Z":
+        # Fazlar Z'de istifli; aynı faz içi barlar da Z'de devam eder
         center_z += phase_index * spacing + bar_index * bar_step
-    else:   # "Y"
-        center_y += phase_index * spacing + bar_index * bar_step
+    else:   # "Y" — fazlar Y'de istifli; faz içi barlar her zaman Z yönünde
+        center_y += phase_index * spacing
+        center_z += bar_index * bar_step
 
     return Point3D(x=center_x, y=center_y, z=center_z)
 
