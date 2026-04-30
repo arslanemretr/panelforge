@@ -81,16 +81,19 @@ export function PanelTopView({
   const svgZ = (z: number) => PAD_T + z * scale;
 
   // ── CopperSettings overlay parametreleri ──────────────────────────────────
-  const cs         = copperSettings;
-  const hasSegments = (busbars?.length ?? 0) > 0;
-  const phaseCount = Math.min(Number(cs?.busbar_phase_count ?? 3), 5);
-  const barT       = Number(cs?.main_thickness_mm ?? 5);  // Z yönünde kalınlık
-  const spacing    = Number(cs?.main_phase_spacing_mm ?? 60);
-  const stackAxis  = (cs?.phase_stack_axis ?? "Y").toUpperCase();
-  const busX       = Number(cs?.busbar_x_mm ?? 0);
-  const busZ       = Number(cs?.busbar_z_mm ?? 0);
-  const busLen     = Number(cs?.busbar_length_mm ?? 0);
-  const firstLayout = layouts[0];
+  const cs           = copperSettings;
+  const hasSegments  = (busbars?.length ?? 0) > 0;
+  const phaseCount   = Math.min(Number(cs?.busbar_phase_count ?? 3), 5);
+  const barsPerPhase = Math.max(1, Number(cs?.bars_per_phase ?? 1));
+  const barGap       = Number(cs?.bar_gap_mm ?? 0);
+  const barT         = Number(cs?.main_thickness_mm ?? 5);  // Z yönünde kalınlık
+  const barStep      = barT + barGap;   // faz içi adım
+  const spacing      = Number(cs?.main_phase_spacing_mm ?? 60);
+  const stackAxis    = (cs?.phase_stack_axis ?? "Y").toUpperCase();
+  const busX         = Number(cs?.busbar_x_mm ?? 0);
+  const busZ         = Number(cs?.busbar_z_mm ?? 0);
+  const busLen       = Number(cs?.busbar_length_mm ?? 0);
+  const firstLayout  = layouts[0];
 
   return (
     <section className="table-card" style={{ marginTop: 0 }}>
@@ -186,48 +189,50 @@ export function PanelTopView({
         {/* ── CopperSettings overlay (segment yoksa) ───────────────────── */}
         {cs && !hasSegments && cs.busbar_x_mm != null && cs.busbar_z_mm != null && busLen > 0 &&
           firstLayout &&
-          Array.from({ length: phaseCount }, (_, pi) => {
-            const color = PHASE_COLORS[pi] ?? PHASE_COLORS[0];
+          Array.from({ length: phaseCount }, (_, pi) =>
+            Array.from({ length: barsPerPhase }, (__, bi) => {
+              const color = PHASE_COLORS[pi] ?? PHASE_COLORS[0];
 
-            // Üst görünümde ana bakır: X boyunca şerit
-            // Bar kalınlığı Z yönünde (barT), uzunluğu X yönünde (busLen)
-            const barStartX = svgX(firstLayout.intLeft + busX);
-            const barWidth  = Math.max(busLen * scale, 4);
+              // Üst görünümde ana bakır: X boyunca şerit
+              // Bar kalınlığı Z yönünde (barT), uzunluğu X yönünde (busLen)
+              const barStartX = svgX(firstLayout.intLeft + busX);
+              const barWidth  = Math.max(busLen * scale, 4);
 
-            // Faz konumu:
-            // phase_stack_axis = "Z" → fazlar Z'de (aşağı) istifli
-            // phase_stack_axis = "Y" → tüm fazlar aynı Z → Y'de çakışır → küçük offset ile göster
-            let barZ = busZ;
-            if (stackAxis === "Z") {
-              barZ = busZ + pi * spacing;
-            } else {
-              // Y'de istifli → üst görünümde aynı Z konumunda → görsel ayrım için küçük Z offset
-              barZ = busZ + pi * (barT + 1); // 1px boşluk
-            }
+              // Faz grubu + faz içi bar konumu (Z ekseninde)
+              let barZ: number;
+              if (stackAxis === "Z") {
+                // Fazlar Z'de istifli: faz grubu başlangıcı + bar offset
+                barZ = busZ + pi * spacing + bi * barStep;
+              } else {
+                // Y'de istifli → üst görünümde aynı Z → görsel ayrım için barStep offset
+                barZ = busZ + pi * barStep + bi * barStep;
+              }
 
-            const barH = Math.max(barT * scale, 2);
+              const barH = Math.max(barT * scale, 2);
+              const label = barsPerPhase > 1 ? `L${pi + 1}·${bi + 1}` : `L${pi + 1}`;
 
-            return (
-              <g key={`cs-${pi}`}>
-                <rect
-                  x={barStartX} y={svgZ(barZ)}
-                  width={barWidth} height={barH}
-                  fill={color} opacity={0.75}
-                  rx={1} stroke={color} strokeWidth={0.5}
-                />
-                {barH > 8 && (
-                  <text
-                    x={barStartX + 4} y={svgZ(barZ) + barH / 2}
-                    dominantBaseline="middle"
-                    fontSize={Math.min(7, barH * 0.7)}
-                    fill="#fff" fontWeight="700" fontFamily="monospace"
-                  >
-                    L{pi + 1}
-                  </text>
-                )}
-              </g>
-            );
-          })}
+              return (
+                <g key={`cs-${pi}-${bi}`}>
+                  <rect
+                    x={barStartX} y={svgZ(barZ)}
+                    width={barWidth} height={barH}
+                    fill={color} opacity={barsPerPhase > 1 ? 0.65 - bi * 0.08 : 0.75}
+                    rx={1} stroke={color} strokeWidth={0.5}
+                  />
+                  {barH > 8 && bi === 0 && (
+                    <text
+                      x={barStartX + 4} y={svgZ(barZ) + barH / 2}
+                      dominantBaseline="middle"
+                      fontSize={Math.min(7, barH * 0.7)}
+                      fill="#fff" fontWeight="700" fontFamily="monospace"
+                    >
+                      {label}
+                    </text>
+                  )}
+                </g>
+              );
+            })
+          )}
 
         {/* ── Hesaplanmış busbar segmentleri (XZ projeksiyonu) ─────────── */}
         {hasSegments && busbars!.flatMap((b) => {

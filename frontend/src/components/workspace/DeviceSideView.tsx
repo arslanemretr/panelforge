@@ -83,16 +83,19 @@ export function DeviceSideView({
     PAD_T + (MH - yFromBottom - objH) * scale;
 
   // ── CopperSettings overlay parametreleri ──────────────────────────────────
-  const cs         = copperSettings;
-  const hasSegments = (busbars?.length ?? 0) > 0;
-  const phaseCount = Math.min(Number(cs?.busbar_phase_count ?? 3), 5);
-  const barW       = Number(cs?.main_width_mm    ?? 40);
-  const barT       = Number(cs?.main_thickness_mm ?? 5);
-  const spacing    = Number(cs?.main_phase_spacing_mm ?? 60);
-  const stackAxis  = (cs?.phase_stack_axis ?? "Y").toUpperCase();
-  const busZ       = Number(cs?.busbar_z_mm ?? 0);
-  const busY       = Number(cs?.busbar_y_mm ?? 0);
-  const firstBm    = layouts[0]?.bm ?? 0;
+  const cs           = copperSettings;
+  const hasSegments  = (busbars?.length ?? 0) > 0;
+  const phaseCount   = Math.min(Number(cs?.busbar_phase_count ?? 3), 5);
+  const barsPerPhase = Math.max(1, Number(cs?.bars_per_phase ?? 1));
+  const barGap       = Number(cs?.bar_gap_mm ?? 0);
+  const barW         = Number(cs?.main_width_mm    ?? 40);
+  const barT         = Number(cs?.main_thickness_mm ?? 5);
+  const barStep      = barT + barGap;   // faz içi adım: kalınlık + boşluk
+  const spacing      = Number(cs?.main_phase_spacing_mm ?? 60);
+  const stackAxis    = (cs?.phase_stack_axis ?? "Y").toUpperCase();
+  const busZ         = Number(cs?.busbar_z_mm ?? 0);
+  const busY         = Number(cs?.busbar_y_mm ?? 0);
+  const firstBm      = layouts[0]?.bm ?? 0;
 
   // ── İç alan sınırları (ilk kabin referanslı) ──────────────────────────────
   const firstLayout = layouts[0];
@@ -176,43 +179,43 @@ export function DeviceSideView({
 
         {/* ── CopperSettings overlay (segment yoksa) ───────────────────── */}
         {cs && !hasSegments && cs.busbar_z_mm != null && cs.busbar_y_mm != null &&
-          Array.from({ length: phaseCount }, (_, pi) => {
-            const color = PHASE_COLORS[pi] ?? PHASE_COLORS[0];
+          Array.from({ length: phaseCount }, (_, pi) =>
+            Array.from({ length: barsPerPhase }, (__, bi) => {
+              const color = PHASE_COLORS[pi] ?? PHASE_COLORS[0];
 
-            // Bar'ın sol-alt köşesi (Z, Y from bottom)
-            let rectZ = busZ;
-            let rectY = firstBm + busY + pi * spacing; // fazlar Y'de istifli
-            if (stackAxis === "Z") {
-              rectZ = busZ + pi * spacing;
-              rectY = firstBm + busY;
-            }
+              // Faz grubu başlangıcı + bar offset
+              let rectZ = busZ + (stackAxis === "Z" ? pi * spacing + bi * barStep : bi * barStep);
+              let rectY = firstBm + busY + (stackAxis === "Z" ? 0 : pi * spacing + bi * barStep);
 
-            // Yan görünümde bar: Z ekseni boyunca kalınlık (barT), Y boyunca genişlik (barW)
-            const sx = svgX(rectZ);
-            const sy = svgY(rectY, barW);
-            const sw = Math.max(barT * scale, 2);   // Z yönünde kalınlık
-            const sh = Math.max(barW * scale, 3);   // Y yönünde genişlik
+              // Yan görünümde bar: Z ekseni boyunca kalınlık (barT), Y boyunca genişlik (barW)
+              const sx = svgX(rectZ);
+              const sy = svgY(rectY, barW);
+              const sw = Math.max(barT * scale, 2);   // Z yönünde kalınlık
+              const sh = Math.max(barW * scale, 3);   // Y yönünde genişlik
 
-            return (
-              <g key={`cs-${pi}`}>
-                <rect
-                  x={sx} y={sy} width={sw} height={sh}
-                  fill={color} opacity={0.75}
-                  rx={1} stroke={color} strokeWidth={0.5}
-                />
-                {sh > 8 && (
-                  <text
-                    x={sx + sw / 2} y={sy + sh / 2}
-                    textAnchor="middle" dominantBaseline="middle"
-                    fontSize={Math.min(7, sh * 0.55)}
-                    fill="#fff" fontWeight="700" fontFamily="monospace"
-                  >
-                    L{pi + 1}
-                  </text>
-                )}
-              </g>
-            );
-          })}
+              const label = barsPerPhase > 1 ? `L${pi + 1}·${bi + 1}` : `L${pi + 1}`;
+
+              return (
+                <g key={`cs-${pi}-${bi}`}>
+                  <rect
+                    x={sx} y={sy} width={sw} height={sh}
+                    fill={color} opacity={barsPerPhase > 1 ? 0.65 - bi * 0.08 : 0.75}
+                    rx={1} stroke={color} strokeWidth={0.5}
+                  />
+                  {sh > 8 && bi === 0 && (
+                    <text
+                      x={sx + sw / 2} y={sy + sh / 2}
+                      textAnchor="middle" dominantBaseline="middle"
+                      fontSize={Math.min(7, sh * 0.55)}
+                      fill="#fff" fontWeight="700" fontFamily="monospace"
+                    >
+                      {label}
+                    </text>
+                  )}
+                </g>
+              );
+            })
+          )}
 
         {/* ── Hesaplanmış busbar segmentleri (ZY projeksiyonu) ─────────── */}
         {hasSegments && busbars!.flatMap((b) => {

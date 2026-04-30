@@ -37,6 +37,8 @@ const EMPTY_SETTINGS: Omit<CopperSettings, "id" | "project_id"> = {
   busbar_orientation: "horizontal",
   busbar_length_mm: null,
   busbar_phase_count: 3,
+  bars_per_phase: 1,
+  bar_gap_mm: 0,
   busbar_plane: "XY",
   phase_stack_axis: "Y",
 };
@@ -65,6 +67,8 @@ function buildUpsertPayload(s: CopperSettings): Omit<CopperSettings, "id" | "pro
     busbar_orientation:       s.busbar_orientation ?? "horizontal",
     busbar_length_mm:         s.busbar_length_mm ?? null,
     busbar_phase_count:       s.busbar_phase_count ?? 3,
+    bars_per_phase:           s.bars_per_phase ?? 1,
+    bar_gap_mm:               s.bar_gap_mm ?? 0,
     busbar_plane:             s.busbar_plane ?? "XY",
     phase_stack_axis:         s.phase_stack_axis ?? "Y",
   };
@@ -172,6 +176,8 @@ export function CopperSelectionTab({ projectId }: CopperSelectionTabProps) {
   const [placOrient, setPlacOrient] = useState<string>(() => settings.busbar_orientation ?? "horizontal");
   const [placLen, setPlacLen] = useState<number>(() => Number(settings.busbar_length_mm ?? 0));
   const [placPhase, setPlacPhase] = useState<number>(() => Number(settings.busbar_phase_count ?? 3));
+  const [placBarsPerPhase, setPlacBarsPerPhase] = useState<number>(() => Number(settings.bars_per_phase ?? 1));
+  const [placBarGap, setPlacBarGap] = useState<number>(() => Number(settings.bar_gap_mm ?? 0));
   const [placPlane, setPlacPlane] = useState<string>(() => settings.busbar_plane ?? "XY");
   const [placStackAxis, setPlacStackAxis] = useState<string>(() => settings.phase_stack_axis ?? "Y");
 
@@ -187,6 +193,8 @@ export function CopperSelectionTab({ projectId }: CopperSelectionTabProps) {
     busbar_orientation: placOrient,
     busbar_length_mm: placLen,
     busbar_phase_count: placPhase,
+    bars_per_phase: placBarsPerPhase,
+    bar_gap_mm: placBarGap,
     busbar_plane: placPlane,
     phase_stack_axis: placStackAxis,
   };
@@ -351,7 +359,30 @@ export function CopperSelectionTab({ projectId }: CopperSelectionTabProps) {
                   <option value={2}>2 (L1, L2)</option>
                   <option value={3}>3 (L1, L2, L3)</option>
                   <option value={4}>4 (L1, L2, L3, N)</option>
+                  <option value={5}>5 (L1, L2, L3, N, PE)</option>
                 </select>
+              </label>
+              <label className="field">
+                <span>Faz Başına Bar Adedi</span>
+                <input
+                  className="input" type="number" min={1} max={6} step={1}
+                  value={placBarsPerPhase}
+                  onChange={(e) => setPlacBarsPerPhase(Math.max(1, Number(e.target.value)))}
+                />
+                <small style={{ color: "var(--muted)", fontSize: "0.76rem" }}>
+                  Toplam bar = {placPhase} faz × {placBarsPerPhase} = {placPhase * placBarsPerPhase} adet
+                </small>
+              </label>
+              <label className="field">
+                <span>Bar Arası Boşluk (mm)</span>
+                <input
+                  className="input" type="number" min={0} step={0.5}
+                  value={placBarGap}
+                  onChange={(e) => setPlacBarGap(Number(e.target.value))}
+                />
+                <small style={{ color: "var(--muted)", fontSize: "0.76rem" }}>
+                  Aynı fazdaki barlar arasındaki hava boşluğu — 0 = bitişik
+                </small>
               </label>
               <label className="field">
                 <span>Bakır Düzlemi</span>
@@ -381,6 +412,8 @@ export function CopperSelectionTab({ projectId }: CopperSelectionTabProps) {
                       busbar_orientation: placOrient,
                       busbar_length_mm: placLen,
                       busbar_phase_count: placPhase,
+                      bars_per_phase: placBarsPerPhase,
+                      bar_gap_mm: placBarGap,
                       busbar_plane: placPlane,
                       phase_stack_axis: placStackAxis,
                     })
