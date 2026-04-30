@@ -13,6 +13,20 @@ Ardindan:
 - Frontend: http://localhost:5174
 - Backend API: http://localhost:8001/docs
 
+## Production Deploy
+
+Production ortaminda frontend'in dev server ile yayinlanmasi onerilmez. Bunun yerine:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+Bu kurulumda:
+
+- frontend statik build olarak sunulur
+- `/api` istekleri ayni domain altindan backend'e proxylanir
+- `localhost:8001` bagimliligi ortadan kalkar
+
 ## Servisler
 
 - `frontend`: React + TypeScript + Vite
