@@ -50,17 +50,6 @@ def validate_project(db: Session, project_id: int) -> ValidationResult:
     if not placements:
         missing_fields.append("Cihazlar yerlestirilmedi")
     else:
-        main_like = [
-            item
-            for item in placements
-            if "main" in item.label.lower()
-            or "ana" in item.label.lower()
-            or "main" in item.device.device_type.lower()
-            or "ana" in item.device.device_type.lower()
-        ]
-        if not main_like:
-            warnings.append("Ana salter acik secilmedigi icin ilk cihaz ana salter kabul edilecek")
-
         for placement in placements:
             if not placement.device.terminals:
                 missing_fields.append(f"Terminal olculeri yok: {placement.label}")
