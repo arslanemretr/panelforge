@@ -29,6 +29,8 @@ class CopperSettingsBase(BaseModel):
     busbar_orientation: str | None = "horizontal"
     busbar_length_mm: Decimal | None = None
     busbar_phase_count: int | None = 3
+    busbar_plane: str | None = "XY"       # XY = yatay düzlem | XZ = derinlik düzlemi
+    phase_stack_axis: str | None = "Y"    # Y = fazlar dikey istifli | Z = fazlar derinlik ekseninde
 
 
 class CopperSettingsUpsert(CopperSettingsBase):

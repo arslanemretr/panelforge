@@ -51,6 +51,8 @@ export interface DeviceTerminal {
   phase: string;
   x_mm: number;
   y_mm: number;
+  z_mm?: number;
+  terminal_face?: string | null;   // "front" | "back" | "left" | "right" | "top" | "bottom"
   hole_diameter_mm?: number | null;
   slot_width_mm?: number | null;
   slot_length_mm?: number | null;
@@ -77,7 +79,10 @@ export interface ProjectDevice {
   label: string;
   x_mm: number;
   y_mm: number;
-  rotation_deg: number;
+  z_mm?: number;
+  rotation_deg: number;        // = rotation_z_deg
+  rotation_x_deg?: number;
+  rotation_y_deg?: number;
   quantity: number;
   device: Device;
 }
@@ -142,6 +147,8 @@ export interface CopperSettings {
   busbar_orientation?: string | null;
   busbar_length_mm?: number | null;
   busbar_phase_count?: number | null;
+  busbar_plane?: string | null;       // "XY" | "XZ"
+  phase_stack_axis?: string | null;   // "Y" | "Z"
 }
 
 export interface ValidationResult {
@@ -154,8 +161,10 @@ export interface BusbarSegment {
   seq: number;
   start_x_mm: number;
   start_y_mm: number;
+  start_z_mm?: number;
   end_x_mm: number;
   end_y_mm: number;
+  end_z_mm?: number;
 }
 
 export interface BusbarHole {
@@ -165,6 +174,7 @@ export interface BusbarHole {
   diameter_mm?: number | null;
   slot_width_mm?: number | null;
   slot_length_mm?: number | null;
+  face?: string | null;            // "front" | "back" | "left" | "right" | "top" | "bottom"
   description?: string | null;
 }
 
@@ -174,6 +184,9 @@ export interface BusbarBend {
   angle_deg: number;
   direction: string;
   inner_radius_mm: number;
+  bend_axis?: string | null;       // "X" | "Y" | "Z"
+  bend_type?: string | null;       // "flatwise" | "edgewise"
+  bend_allowance_mm?: number | null;
   description?: string | null;
 }
 

@@ -21,8 +21,10 @@ class SegmentRead(BaseModel):
     seq: int
     start_x_mm: Decimal
     start_y_mm: Decimal
+    start_z_mm: Decimal = Decimal("0")
     end_x_mm: Decimal
     end_y_mm: Decimal
+    end_z_mm: Decimal = Decimal("0")
 
 
 class HoleRead(BaseModel):
@@ -32,6 +34,7 @@ class HoleRead(BaseModel):
     diameter_mm: Decimal | None = None
     slot_width_mm: Decimal | None = None
     slot_length_mm: Decimal | None = None
+    face: str | None = None          # front|back|left|right|top|bottom
     description: str | None = None
 
 
@@ -41,6 +44,9 @@ class BendRead(BaseModel):
     angle_deg: Decimal
     direction: str
     inner_radius_mm: Decimal
+    bend_axis: str | None = None     # X | Y | Z
+    bend_type: str | None = None     # flatwise | edgewise
+    bend_allowance_mm: Decimal | None = None
     description: str | None = None
 
 

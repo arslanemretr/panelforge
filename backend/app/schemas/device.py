@@ -10,6 +10,8 @@ class DeviceTerminalBase(BaseModel):
     phase: str
     x_mm: Decimal
     y_mm: Decimal
+    z_mm: Decimal = Decimal("0")
+    terminal_face: str | None = None   # front|back|left|right|top|bottom — boş ise front varsayılır
     hole_diameter_mm: Decimal | None = None
     slot_width_mm: Decimal | None = None
     slot_length_mm: Decimal | None = None
@@ -54,7 +56,10 @@ class ProjectDeviceBase(BaseModel):
     label: str
     x_mm: Decimal
     y_mm: Decimal
-    rotation_deg: Decimal = Decimal("0")
+    z_mm: Decimal = Decimal("0")
+    rotation_deg: Decimal = Decimal("0")      # = rotation_z_deg
+    rotation_x_deg: Decimal = Decimal("0")
+    rotation_y_deg: Decimal = Decimal("0")
     quantity: int = 1
 
 

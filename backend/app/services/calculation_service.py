@@ -433,13 +433,17 @@ def calculate_project(db: Session, project_id: int) -> CalculationResponse:
         db.flush()
 
         for seq, seg in enumerate(part.segments, start=1):
+            sz = round(getattr(seg.start, "z", 0.0), 2)
+            ez = round(getattr(seg.end,   "z", 0.0), 2)
             db.add(models.BusbarSegment(
                 busbar_id=bm.id,
                 seq=seq,
                 start_x_mm=Decimal(str(round(seg.start.x, 2))),
                 start_y_mm=Decimal(str(round(seg.start.y, 2))),
+                start_z_mm=Decimal(str(sz)),
                 end_x_mm=Decimal(str(round(seg.end.x, 2))),
                 end_y_mm=Decimal(str(round(seg.end.y, 2))),
+                end_z_mm=Decimal(str(ez)),
             ))
 
         for hole_no, hole in enumerate(part.holes, start=1):
@@ -451,6 +455,7 @@ def calculate_project(db: Session, project_id: int) -> CalculationResponse:
                 diameter_mm=Decimal(str(hole.diameter)) if hole.diameter is not None else None,
                 slot_width_mm=Decimal(str(hole.slot_width))   if hole.slot_width  else None,
                 slot_length_mm=Decimal(str(hole.slot_length)) if hole.slot_length else None,
+                face=getattr(hole, "face", None),
                 description=hole.description,
             ))
 
@@ -462,6 +467,9 @@ def calculate_project(db: Session, project_id: int) -> CalculationResponse:
                 angle_deg=Decimal(str(bend.angle_deg)),
                 direction=bend.direction,
                 inner_radius_mm=Decimal(str(bend.inner_radius)),
+                bend_axis=getattr(bend, "bend_axis", None),
+                bend_type=getattr(bend, "bend_type", None),
+                bend_allowance_mm=Decimal(str(round(bend.bend_allowance, 4))) if bend.bend_allowance else None,
                 description=bend.description,
             ))
 
@@ -513,31 +521,37 @@ def get_results(db: Session, project_id: int) -> CalculationResults:
                     "seq":          s.seq,
                     "start_x_mm":   s.start_x_mm,
                     "start_y_mm":   s.start_y_mm,
+                    "start_z_mm":   s.start_z_mm,
                     "end_x_mm":     s.end_x_mm,
                     "end_y_mm":     s.end_y_mm,
+                    "end_z_mm":     s.end_z_mm,
                 }
                 for s in sorted(b.segments, key=lambda s: s.seq)
             ],
             holes=[
                 {
-                    "hole_no":      h.hole_no,
-                    "x_mm":         h.x_mm,
-                    "y_mm":         h.y_mm,
-                    "diameter_mm":  h.diameter_mm,
+                    "hole_no":        h.hole_no,
+                    "x_mm":           h.x_mm,
+                    "y_mm":           h.y_mm,
+                    "diameter_mm":    h.diameter_mm,
                     "slot_width_mm":  h.slot_width_mm,
                     "slot_length_mm": h.slot_length_mm,
-                    "description":  h.description,
+                    "face":           h.face,
+                    "description":    h.description,
                 }
                 for h in sorted(b.holes, key=lambda h: h.hole_no)
             ],
             bends=[
                 {
-                    "bend_no":                  bend.bend_no,
-                    "distance_from_start_mm":   bend.distance_from_start_mm,
-                    "angle_deg":                bend.angle_deg,
-                    "direction":                bend.direction,
-                    "inner_radius_mm":          bend.inner_radius_mm,
-                    "description":              bend.description,
+                    "bend_no":                bend.bend_no,
+                    "distance_from_start_mm": bend.distance_from_start_mm,
+                    "angle_deg":              bend.angle_deg,
+                    "direction":              bend.direction,
+                    "inner_radius_mm":        bend.inner_radius_mm,
+                    "bend_axis":              bend.bend_axis,
+                    "bend_type":              bend.bend_type,
+                    "bend_allowance_mm":      bend.bend_allowance_mm,
+                    "description":            bend.description,
                 }
                 for bend in sorted(b.bends, key=lambda bd: bd.bend_no)
             ],

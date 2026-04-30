@@ -142,6 +142,8 @@ class DeviceTerminal(Base):
     phase: Mapped[str] = mapped_column(Text, nullable=False)
     x_mm: Mapped[Decimal] = mapped_column(Numeric, nullable=False)
     y_mm: Mapped[Decimal] = mapped_column(Numeric, nullable=False)
+    z_mm: Mapped[Decimal] = mapped_column(Numeric, default=Decimal("0"))
+    terminal_face: Mapped[str | None] = mapped_column(Text)          # front|back|left|right|top|bottom
     hole_diameter_mm: Mapped[Decimal | None] = mapped_column(Numeric)
     slot_width_mm: Mapped[Decimal | None] = mapped_column(Numeric)
     slot_length_mm: Mapped[Decimal | None] = mapped_column(Numeric)
@@ -159,7 +161,10 @@ class ProjectDevice(Base):
     label: Mapped[str] = mapped_column(Text, nullable=False)
     x_mm: Mapped[Decimal] = mapped_column(Numeric, nullable=False)
     y_mm: Mapped[Decimal] = mapped_column(Numeric, nullable=False)
-    rotation_deg: Mapped[Decimal] = mapped_column(Numeric, default=0)
+    z_mm: Mapped[Decimal] = mapped_column(Numeric, default=Decimal("0"))
+    rotation_deg: Mapped[Decimal] = mapped_column(Numeric, default=0)   # = rotation_z_deg
+    rotation_x_deg: Mapped[Decimal] = mapped_column(Numeric, default=Decimal("0"))
+    rotation_y_deg: Mapped[Decimal] = mapped_column(Numeric, default=Decimal("0"))
     quantity: Mapped[int] = mapped_column(Integer, default=1)
 
     project: Mapped["Project"] = relationship(back_populates="placed_devices")
@@ -194,6 +199,8 @@ class CopperSettings(Base):
     busbar_orientation: Mapped[str | None] = mapped_column(Text, default="horizontal")
     busbar_length_mm: Mapped[Decimal | None] = mapped_column(Numeric)
     busbar_phase_count: Mapped[int | None] = mapped_column(Integer, default=3)
+    busbar_plane: Mapped[str | None] = mapped_column(Text, default="XY")   # XY | XZ
+    phase_stack_axis: Mapped[str | None] = mapped_column(Text, default="Y") # Y | Z
 
     project: Mapped["Project"] = relationship(back_populates="copper_settings")
 
@@ -260,8 +267,10 @@ class BusbarSegment(Base):
     seq: Mapped[int] = mapped_column(Integer, nullable=False)
     start_x_mm: Mapped[Decimal] = mapped_column(Numeric, nullable=False)
     start_y_mm: Mapped[Decimal] = mapped_column(Numeric, nullable=False)
+    start_z_mm: Mapped[Decimal] = mapped_column(Numeric, default=Decimal("0"))
     end_x_mm: Mapped[Decimal] = mapped_column(Numeric, nullable=False)
     end_y_mm: Mapped[Decimal] = mapped_column(Numeric, nullable=False)
+    end_z_mm: Mapped[Decimal] = mapped_column(Numeric, default=Decimal("0"))
 
     busbar: Mapped["Busbar"] = relationship(back_populates="segments")
 
@@ -277,6 +286,7 @@ class BusbarHole(Base):
     diameter_mm: Mapped[Decimal | None] = mapped_column(Numeric)
     slot_width_mm: Mapped[Decimal | None] = mapped_column(Numeric)
     slot_length_mm: Mapped[Decimal | None] = mapped_column(Numeric)
+    face: Mapped[str | None] = mapped_column(Text)                   # front|back|left|right|top|bottom
     description: Mapped[str | None] = mapped_column(Text)
 
     busbar: Mapped["Busbar"] = relationship(back_populates="holes")
@@ -292,6 +302,9 @@ class BusbarBend(Base):
     angle_deg: Mapped[Decimal] = mapped_column(Numeric, nullable=False)
     direction: Mapped[str] = mapped_column(Text, nullable=False)
     inner_radius_mm: Mapped[Decimal] = mapped_column(Numeric, nullable=False)
+    bend_axis: Mapped[str | None] = mapped_column(Text)              # X | Y | Z
+    bend_type: Mapped[str | None] = mapped_column(Text)              # flatwise | edgewise
+    bend_allowance_mm: Mapped[Decimal | None] = mapped_column(Numeric)
     description: Mapped[str | None] = mapped_column(Text)
 
     busbar: Mapped["Busbar"] = relationship(back_populates="bends")
