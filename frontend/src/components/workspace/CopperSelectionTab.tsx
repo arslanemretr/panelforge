@@ -194,21 +194,6 @@ export function CopperSelectionTab({ projectId }: CopperSelectionTabProps) {
     upsertMutation.mutate(buildUpsertPayload({ ...settings, ...placement }));
   }
 
-  function handleRecalculate() {
-    const computed = computeBarTable(previewSettings);
-    const newEdits: BarEdits = {};
-    for (const row of computed) {
-      newEdits[row.key] = {
-        xStart: row.xStart,
-        yCenter: row.yCenter,
-        zCenter: row.zCenter,
-        length: row.length,
-      };
-    }
-    setBarEdits(newEdits);
-    setBarTableOpen(true);
-  }
-
   // ── Placement form local state ────────────────────────────────────────────────
   const [placX, setPlacX] = useState<number>(0);
   const [placY, setPlacY] = useState<number>(0);
@@ -274,6 +259,22 @@ export function CopperSelectionTab({ projectId }: CopperSelectionTabProps) {
     busbar_plane: placPlane,
     phase_stack_axis: placStackAxis,
   };
+
+  // Yeniden Hesapla: previewSettings tabanlı koordinatları barEdits'e yazar
+  function handleRecalculate() {
+    const computed = computeBarTable(previewSettings);
+    const newEdits: BarEdits = {};
+    for (const row of computed) {
+      newEdits[row.key] = {
+        xStart: row.xStart,
+        yCenter: row.yCenter,
+        zCenter: row.zCenter,
+        length: row.length,
+      };
+    }
+    setBarEdits(newEdits);
+    setBarTableOpen(true);
+  }
 
   // Düzenlenmiş bar koordinatları (formül bazı + override)
   // previewSettings kullanılır — form değişince tablo da güncellenir
@@ -544,7 +545,7 @@ export function CopperSelectionTab({ projectId }: CopperSelectionTabProps) {
             </div>
 
             {/* ── Bar koordinat tablosu (açılır/kapanır) ────────────────── */}
-            {settings.busbar_length_mm && effectiveBarRows.length > 0 && (
+            {placLen > 0 && effectiveBarRows.length > 0 && (
               <div style={{ marginBottom: "1.25rem", border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden" }}>
                 {/* Başlık / toggle */}
                 <button
