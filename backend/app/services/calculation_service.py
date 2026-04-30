@@ -174,36 +174,28 @@ def _rail_center_3d(
 
     Koordinat sistemi (panel-iç, sol-alt-ön köşe = orijin):
       busbar_x_mm : sol iç köşeden ray grubunun sol kenarına mesafe
-      busbar_y_mm : alt iç köşeden faz-0 rayının alt kenarına mesafe
-      busbar_z_mm : ön yüzeyden arka yöne mesafe
+      busbar_y_mm : alt iç köşeden tüm barların ortak alt kenarına mesafe
+      busbar_z_mm : ön yüzeyden ilk barın ön yüzüne mesafe
 
-    phase_stack_axis:
-      "Y"  → fazlar Y ekseninde (yukarı) istifli   (varsayılan)
-      "Z"  → fazlar Z ekseninde (derinlik) istifli
-
-    bars_per_phase > 1 ise aynı faz içindeki barlar, kalınlık + bar_gap_mm
-    adımıyla istif ekseni yönünde sıralanır.
+    Tüm barlar (phaseCount × bars_per_phase) Z ekseninde ard arda dizilir;
+    Y merkezi hepsi için aynıdır. main_phase_spacing_mm yalnızca tali bara
+    bağlantı hesabında kullanılır, başlangıç yerleşimini etkilemez.
     """
     bx         = _to_float(copper.busbar_x_mm, 50.0)
     by         = _to_float(copper.busbar_y_mm, 100.0)
     bz         = _to_float(copper.busbar_z_mm)
-    spacing    = _to_float(copper.main_phase_spacing_mm, 60.0)
     bar_w      = _to_float(copper.main_width_mm, 40.0)
     bar_t      = _to_float(copper.main_thickness_mm, 5.0)
     bar_gap    = _to_float(copper.bar_gap_mm, 0.0)
-    stack_ax   = (copper.phase_stack_axis or "Y").upper()
-    bar_step   = bar_t + bar_gap          # bar kalınlığı + hava boşluğu
+    bars_per_phase = int(copper.bars_per_phase or 1)
+    bar_step   = bar_t + bar_gap   # bir barın kapladığı Z derinliği
+
+    # Global sıra: faz grubundaki toplam bar sayısı × faz + bar içi sıra
+    global_index = phase_index * bars_per_phase + bar_index
 
     center_x = base_offset.x + bx
-    center_y = base_offset.y + by + bar_w / 2.0
-    center_z = base_offset.z + bz
-
-    if stack_ax == "Z":
-        # Fazlar Z'de istifli; aynı faz içi barlar da Z'de devam eder
-        center_z += phase_index * spacing + bar_index * bar_step
-    else:   # "Y" — fazlar Y'de istifli; faz içi barlar her zaman Z yönünde
-        center_y += phase_index * spacing
-        center_z += bar_index * bar_step
+    center_y = base_offset.y + by + bar_w / 2.0   # tüm barlar aynı Y
+    center_z = base_offset.z + bz + global_index * bar_step + bar_t / 2.0
 
     return Point3D(x=center_x, y=center_y, z=center_z)
 

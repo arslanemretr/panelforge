@@ -4,8 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { client } from "../../api/client";
 import type { PanelDefinition, ProjectPanel } from "../../types";
 import { Modal } from "../Modal";
-import { PanelAssemblyPreview } from "../PanelAssemblyPreview";
 import { LibraryPickerModal } from "./LibraryPickerModal";
+import { TechnicalDrawingView } from "./TechnicalDrawingView";
 
 interface PanelSelectionTabProps {
   projectId: number;
@@ -20,6 +20,11 @@ export function PanelSelectionTab({ projectId }: PanelSelectionTabProps) {
   const projectPanelsQuery = useQuery({
     queryKey: ["project-panels", projectId],
     queryFn: () => client.listProjectPanels(projectId),
+  });
+
+  const panelQuery = useQuery({
+    queryKey: ["panel", projectId],
+    queryFn: () => client.getPanel(projectId),
   });
 
   const panelDefinitionsQuery = useQuery({
@@ -70,6 +75,7 @@ export function PanelSelectionTab({ projectId }: PanelSelectionTabProps) {
 
   const items = projectPanelsQuery.data ?? [];
   const definitions = panelDefinitionsQuery.data ?? [];
+  const panel = panelQuery.data ?? null;
 
   return (
     <div className="stack">
@@ -168,7 +174,11 @@ export function PanelSelectionTab({ projectId }: PanelSelectionTabProps) {
         )}
       </section>
 
-      <PanelAssemblyPreview items={items} />
+      <TechnicalDrawingView
+        panel={panel}
+        projectPanels={items}
+        title="Kabin Teknik Görünümü"
+      />
 
       {/* ── Kabin kütüphane seçici ── */}
       <LibraryPickerModal

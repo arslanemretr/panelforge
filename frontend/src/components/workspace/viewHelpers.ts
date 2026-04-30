@@ -42,30 +42,23 @@ export function computeBarTable(cs: CopperSettings): BarRow[] {
   const barGap       = Number(cs.bar_gap_mm ?? 0);
   const barW         = Number(cs.main_width_mm ?? 40);
   const barT         = Number(cs.main_thickness_mm ?? 5);
-  const barStep      = barT + barGap;        // faz-içi Z adımı
-  const spacing      = Number(cs.main_phase_spacing_mm ?? 60);
-  const stackAxis    = (cs.phase_stack_axis ?? "Y").toUpperCase();
+  const barStep      = barT + barGap;   // bir barın kapladığı Z derinliği
   const xStart       = Number(cs.busbar_x_mm ?? 0);
-  const baseY        = Number(cs.busbar_y_mm ?? 0);   // bar grubunun alt kenarı
-  const baseZ        = Number(cs.busbar_z_mm ?? 0);   // faz-0, bar-0 ön yüzü
+  const baseY        = Number(cs.busbar_y_mm ?? 0);
+  const baseZ        = Number(cs.busbar_z_mm ?? 0);
   const length       = Number(cs.busbar_length_mm);
+
+  // Tüm barlar Z ekseninde ard arda dizilir; Y hepsi aynı.
+  // main_phase_spacing_mm tali bara hesabında kullanılır, başlangıç
+  // yerleşimini etkilemez.
+  const yCenter = baseY + barW / 2;
 
   const rows: BarRow[] = [];
 
   for (let pi = 0; pi < phaseCount; pi++) {
     for (let bi = 0; bi < barsPerPhase; bi++) {
-      let yCenter: number;
-      let zCenter: number;
-
-      if (stackAxis === "Z") {
-        // Fazlar Z'de istifli; faz-içi barlar da Z'de devam eder
-        yCenter = baseY + barW / 2;
-        zCenter = baseZ + barT / 2 + pi * spacing + bi * barStep;
-      } else {
-        // Fazlar Y'de istifli; faz-içi barlar her zaman Z yönünde
-        yCenter = baseY + barW / 2 + pi * spacing;
-        zCenter = baseZ + barT / 2 + bi * barStep;
-      }
+      const globalIndex = pi * barsPerPhase + bi;
+      const zCenter = baseZ + barT / 2 + globalIndex * barStep;
 
       rows.push({
         key:     `${PHASE_LABELS[pi]}-B${bi + 1}`,
