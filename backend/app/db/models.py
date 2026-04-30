@@ -203,6 +203,8 @@ class CopperSettings(Base):
     bar_gap_mm: Mapped[Decimal | None] = mapped_column(Numeric, default=Decimal("0"))
     busbar_plane: Mapped[str | None] = mapped_column(Text, default="XY")   # XY | XZ
     phase_stack_axis: Mapped[str | None] = mapped_column(Text, default="Y") # Y | Z
+    main_density_g_cm3: Mapped[Decimal | None] = mapped_column(Numeric)   # g/cm³, None → malzeme varsayılanı
+    branch_density_g_cm3: Mapped[Decimal | None] = mapped_column(Numeric) # g/cm³, None → malzeme varsayılanı
 
     project: Mapped["Project"] = relationship(back_populates="copper_settings")
 
@@ -229,6 +231,7 @@ class CopperDefinition(Base):
     use_slot_holes: Mapped[bool] = mapped_column(Boolean, default=False)
     slot_width_mm: Mapped[Decimal | None] = mapped_column(Numeric)
     slot_length_mm: Mapped[Decimal | None] = mapped_column(Numeric)
+    density_g_cm3: Mapped[Decimal | None] = mapped_column(Numeric)  # g/cm³ — Cu≈8.96, Al≈2.70
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,

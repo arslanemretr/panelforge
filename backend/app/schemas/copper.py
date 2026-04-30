@@ -33,6 +33,8 @@ class CopperSettingsBase(BaseModel):
     bar_gap_mm: Decimal | None = Decimal("0")  # Aynı fazdaki barlar arası hava boşluğu
     busbar_plane: str | None = "XY"       # XY = yatay düzlem | XZ = derinlik düzlemi
     phase_stack_axis: str | None = "Y"    # Y = fazlar dikey istifli | Z = fazlar derinlik ekseninde
+    main_density_g_cm3: Decimal | None = None    # g/cm³, None → malzeme varsayılanı (Cu:8.96, Al:2.70)
+    branch_density_g_cm3: Decimal | None = None  # g/cm³, None → malzeme varsayılanı
 
 
 class CopperSettingsUpsert(CopperSettingsBase):

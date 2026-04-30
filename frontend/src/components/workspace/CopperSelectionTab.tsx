@@ -66,6 +66,8 @@ const EMPTY_SETTINGS: Omit<CopperSettings, "id" | "project_id"> = {
   bar_gap_mm: 0,
   busbar_plane: "XY",
   phase_stack_axis: "Y",
+  main_density_g_cm3: null,
+  branch_density_g_cm3: null,
 };
 
 function buildUpsertPayload(s: CopperSettings): Omit<CopperSettings, "id" | "project_id"> {
@@ -96,6 +98,8 @@ function buildUpsertPayload(s: CopperSettings): Omit<CopperSettings, "id" | "pro
     bar_gap_mm:               s.bar_gap_mm ?? 0,
     busbar_plane:             s.busbar_plane ?? "XY",
     phase_stack_axis:         s.phase_stack_axis ?? "Y",
+    main_density_g_cm3:       s.main_density_g_cm3 ?? null,
+    branch_density_g_cm3:     s.branch_density_g_cm3 ?? null,
   };
 }
 
@@ -175,6 +179,7 @@ export function CopperSelectionTab({ projectId }: CopperSelectionTabProps) {
         main_thickness_mm:     Number(def.main_thickness_mm ?? prev.main_thickness_mm ?? null) || null,
         main_material:         def.main_material ?? prev.main_material ?? "Cu",
         main_phase_spacing_mm: Number(def.main_phase_spacing_mm ?? prev.main_phase_spacing_mm ?? null) || null,
+        main_density_g_cm3:    def.density_g_cm3 != null ? Number(def.density_g_cm3) : prev.main_density_g_cm3 ?? null,
       }));
     } else {
       setDraft((prev) => ({
@@ -182,6 +187,7 @@ export function CopperSelectionTab({ projectId }: CopperSelectionTabProps) {
         branch_width_mm:         Number(def.branch_width_mm ?? def.main_width_mm ?? prev.branch_width_mm ?? null) || null,
         branch_thickness_mm:     Number(def.branch_thickness_mm ?? def.main_thickness_mm ?? prev.branch_thickness_mm ?? null) || null,
         branch_material:         def.branch_material ?? def.main_material ?? prev.branch_material ?? "Cu",
+        branch_density_g_cm3:    def.density_g_cm3 != null ? Number(def.density_g_cm3) : prev.branch_density_g_cm3 ?? null,
       }));
     }
   }
@@ -762,6 +768,17 @@ export function CopperSelectionTab({ projectId }: CopperSelectionTabProps) {
                       <option value="Al">Alüminyum (Al)</option>
                     </select>
                   </label>
+                  <label className="field">
+                    <span>Özkütle (g/cm³)</span>
+                    <input className="input" type="number" min={0.1} step={0.01}
+                      placeholder={draft.main_material === "Al" ? "2.70" : "8.96"}
+                      value={draft.main_density_g_cm3 ?? ""}
+                      onChange={(e) => setDraft((p) => ({ ...p, main_density_g_cm3: Number(e.target.value) || null }))}
+                    />
+                    <small style={{ color: "var(--muted)", fontSize: "0.75rem" }}>
+                      Boş bırakılırsa: Cu=8.96 · Al=2.70
+                    </small>
+                  </label>
                 </>
               ) : (
                 <>
@@ -786,6 +803,17 @@ export function CopperSelectionTab({ projectId }: CopperSelectionTabProps) {
                       <option value="Cu">Bakır (Cu)</option>
                       <option value="Al">Alüminyum (Al)</option>
                     </select>
+                  </label>
+                  <label className="field">
+                    <span>Özkütle (g/cm³)</span>
+                    <input className="input" type="number" min={0.1} step={0.01}
+                      placeholder={draft.branch_material === "Al" ? "2.70" : "8.96"}
+                      value={draft.branch_density_g_cm3 ?? ""}
+                      onChange={(e) => setDraft((p) => ({ ...p, branch_density_g_cm3: Number(e.target.value) || null }))}
+                    />
+                    <small style={{ color: "var(--muted)", fontSize: "0.75rem" }}>
+                      Boş bırakılırsa: Cu=8.96 · Al=2.70
+                    </small>
                   </label>
                   <div style={{ gridColumn: "1 / -1", padding: "0.5rem 0.75rem", background: "var(--accent-soft)", borderRadius: "8px", fontSize: "0.83rem", color: "var(--muted)" }}>
                     ℹ Tali bakırlar cihaza göre sistem tarafından otomatik üretilir. Bu standarttaki ölçüler tüm tali bağlantılara uygulanır.

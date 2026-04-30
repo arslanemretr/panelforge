@@ -602,6 +602,20 @@ def calculate_project(db: Session, project_id: int) -> CalculationResponse:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Malzeme tipine göre varsayılan özkütleler (g/cm³)
+_DEFAULT_DENSITY: dict[str, float] = {
+    "Cu": 8.96,
+    "Al": 2.70,
+}
+
+
+def _material_density(material: str | None, override: Decimal | None) -> float:
+    """Özkütleyi döndürür: önce override, sonra malzeme varsayılanı, sonra Cu."""
+    if override is not None:
+        return float(override)
+    return _DEFAULT_DENSITY.get((material or "Cu").upper(), 8.96)
+
+
 def get_results(db: Session, project_id: int) -> CalculationResults:
     busbars = (
         db.query(models.Busbar)
@@ -615,15 +629,28 @@ def get_results(db: Session, project_id: int) -> CalculationResults:
         .all()
     )
 
+    # Proje bakır ayarlarından özkütle override'larını al
+    cs = db.query(models.CopperSettings).filter(
+        models.CopperSettings.project_id == project_id
+    ).first()
+    main_density   = _material_density(cs.main_material   if cs else None, cs.main_density_g_cm3   if cs else None)
+    branch_density = _material_density(cs.branch_material if cs else None, cs.branch_density_g_cm3 if cs else None)
+
     serialized: list[BusbarRead] = []
-    total_cut   = Decimal("0")
-    total_holes = 0
-    total_bends = 0
+    total_cut    = Decimal("0")
+    total_holes  = 0
+    total_bends  = 0
+    total_weight = Decimal("0")  # kg
 
     for b in busbars:
         total_cut   += b.cut_length_mm
         total_holes += len(b.holes)
         total_bends += len(b.bends)
+
+        # Ağırlık: length(mm) × width(mm) × thickness(mm) × density(g/cm³) / 1_000_000 = kg
+        density = main_density if b.busbar_type == "main" else branch_density
+        vol_mm3 = float(b.cut_length_mm) * float(b.width_mm) * float(b.thickness_mm)
+        total_weight += Decimal(str(round(vol_mm3 * density / 1_000_000, 4)))
 
         serialized.append(BusbarRead(
             id=b.id,
@@ -684,5 +711,6 @@ def get_results(db: Session, project_id: int) -> CalculationResults:
         total_cut_length_mm=total_cut,
         total_hole_count=total_holes,
         total_bend_count=total_bends,
+        total_weight_kg=total_weight,
     )
     return CalculationResults(summary=summary, busbars=serialized, warnings=[])

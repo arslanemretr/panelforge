@@ -107,6 +107,7 @@ export interface CopperDefinition {
   use_slot_holes: boolean;
   slot_width_mm?: number | null;
   slot_length_mm?: number | null;
+  density_g_cm3?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -151,6 +152,8 @@ export interface CopperSettings {
   bar_gap_mm?: number | null;         // Aynı fazdaki barlar arası boşluk (mm)
   busbar_plane?: string | null;       // "XY" | "XZ"
   phase_stack_axis?: string | null;   // "Y" | "Z"
+  main_density_g_cm3?: number | null;    // g/cm³ override; null → malzeme varsayılanı
+  branch_density_g_cm3?: number | null;  // g/cm³ override; null → malzeme varsayılanı
 }
 
 export interface ValidationResult {
@@ -215,6 +218,7 @@ export interface CalculationSummary {
   total_cut_length_mm: number;
   total_hole_count: number;
   total_bend_count: number;
+  total_weight_kg: number;
 }
 
 export interface CalculationResults {

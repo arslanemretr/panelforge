@@ -36,13 +36,19 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
       sub: "adet",
       accent: "#880e4f",
     },
+    {
+      label: "Toplam Ağırlık",
+      value: Number(summary.total_weight_kg).toFixed(2),
+      sub: "kg",
+      accent: "#00695c",
+    },
   ];
 
   return (
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(5, 1fr)",
+        gridTemplateColumns: "repeat(6, 1fr)",
         gap: "0.75rem",
       }}
     >

@@ -15,6 +15,7 @@ class SummaryRead(BaseModel):
     total_cut_length_mm: Decimal
     total_hole_count: int
     total_bend_count: int
+    total_weight_kg: Decimal = Decimal("0")  # toplam bakır kütlesi (kg)
 
 
 class SegmentRead(BaseModel):

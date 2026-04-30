@@ -25,6 +25,7 @@ class CopperDefinitionBase(BaseModel):
     use_slot_holes: bool = False
     slot_width_mm: Decimal | None = None
     slot_length_mm: Decimal | None = None
+    density_g_cm3: Decimal | None = None  # g/cm³ — Cu≈8.96, Al≈2.70
 
 
 class CopperDefinitionCreate(CopperDefinitionBase):
