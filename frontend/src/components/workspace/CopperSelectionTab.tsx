@@ -4,9 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { client } from "../../api/client";
 import type { CopperDefinition, CopperSettings } from "../../types";
 import { Modal } from "../Modal";
-import { DeviceFrontView } from "./DeviceFrontView";
-import { DeviceSideView } from "./DeviceSideView";
-import { PanelTopView } from "./PanelTopView";
+import { TechnicalDrawingView } from "./TechnicalDrawingView";
 import {
   computeBarTable,
   PHASE_COLORS,
@@ -627,32 +625,14 @@ export function CopperSelectionTab({ projectId }: CopperSelectionTabProps) {
               </div>
             )}
 
-            {/* Live front view with busbar overlay */}
-            <DeviceFrontView
+            {/* Teknik Resim Görünümü (Ön + Yan + Üst) */}
+            <TechnicalDrawingView
               panel={panel}
               projectPanels={projectPanels}
               devices={devices}
               copperSettings={previewSettings}
-              title="Ana Bakır Yerleşimi — Ön Görünüş"
+              barRows={Object.keys(barEdits).length > 0 ? effectiveBarRows : undefined}
             />
-
-            {/* Side + Top views with live overlay */}
-            <div className="view-pair-grid">
-              <DeviceSideView
-                panel={panel}
-                projectPanels={projectPanels}
-                devices={devices}
-                copperSettings={previewSettings}
-                barRows={Object.keys(barEdits).length > 0 ? effectiveBarRows : undefined}
-              />
-              <PanelTopView
-                panel={panel}
-                projectPanels={projectPanels}
-                devices={devices}
-                copperSettings={previewSettings}
-                barRows={Object.keys(barEdits).length > 0 ? effectiveBarRows : undefined}
-              />
-            </div>
           </>
         )}
       </section>

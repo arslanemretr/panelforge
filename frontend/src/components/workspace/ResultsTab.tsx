@@ -9,9 +9,7 @@ import { BusbarDrawing } from "../results/BusbarDrawing";
 import { BusbarTable } from "../results/BusbarTable";
 import { HoleTable } from "../results/HoleTable";
 import { SummaryCards } from "../results/SummaryCards";
-import { DeviceFrontView } from "./DeviceFrontView";
-import { DeviceSideView } from "./DeviceSideView";
-import { PanelTopView } from "./PanelTopView";
+import { TechnicalDrawingView } from "./TechnicalDrawingView";
 import type { Busbar } from "../../types";
 
 interface ResultsTabProps {
@@ -272,32 +270,14 @@ export function ResultsTab({ projectId }: ResultsTabProps) {
         )}
 
         {hasResults && (
-          <DeviceFrontView
+          <TechnicalDrawingView
             panel={panelQuery.data}
             projectPanels={projectPanelsQuery.data ?? []}
             devices={devicesQuery.data ?? []}
             copperSettings={copperSettingsQuery.data}
-            title="Genel Pano Gorunumu - Cihaz ve Bakir Yerlesimi"
+            busbars={results!.busbars}
+            title="Pano Teknik Görünümü"
           />
-        )}
-
-        {hasResults && (
-          <Collapsible title="Pano Gorunum — Yan ve Ust" defaultOpen={false}>
-            <div className="view-pair-grid">
-              <DeviceSideView
-                panel={panelQuery.data}
-                projectPanels={projectPanelsQuery.data ?? []}
-                devices={devicesQuery.data ?? []}
-                busbars={results!.busbars}
-              />
-              <PanelTopView
-                panel={panelQuery.data}
-                projectPanels={projectPanelsQuery.data ?? []}
-                devices={devicesQuery.data ?? []}
-                busbars={results!.busbars}
-              />
-            </div>
-          </Collapsible>
         )}
 
         {results && !hasResults && (

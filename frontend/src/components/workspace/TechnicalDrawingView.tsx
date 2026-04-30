@@ -1,0 +1,500 @@
+/**
+ * TechnicalDrawingView — Klasik Teknik Resim (Üç Görünüm)
+ *
+ * Tek SVG içinde üç ortografik projeksiyon — tüm görünümler aynı ölçekte:
+ *
+ *   ┌─────────────┬─────────────┐
+ *   │  ÖN (XY)    │  YAN (ZY)   │
+ *   ├─────────────┼─────────────┤
+ *   │  ÜST (XZ)   │             │
+ *   └─────────────┴─────────────┘
+ *
+ * Hizalama:
+ *   Ön ↔ Yan  : aynı Y ekseni (yükseklik)
+ *   Ön ↔ Üst  : aynı X ekseni (genişlik)
+ */
+
+import type { Busbar, CopperSettings, Panel, ProjectDevice, ProjectPanel } from "../../types";
+import {
+  buildCabinetLayouts,
+  computeBarTable,
+  deviceBoxes,
+  DEVICE_COLORS,
+  PHASE_COLORS,
+  PHASE_LABELS,
+  phaseColorIndex,
+  type BarRow,
+} from "./viewHelpers";
+
+interface TechnicalDrawingViewProps {
+  panel?: Panel | null;
+  projectPanels?: ProjectPanel[];
+  devices?: ProjectDevice[];
+  copperSettings?: CopperSettings | null;
+  busbars?: Busbar[];
+  barRows?: BarRow[];
+  title?: string;
+}
+
+// ── Sabitler ──────────────────────────────────────────────────────────────────
+const SVG_W    = 840;
+const PAD_L    = 48;
+const PAD_R    = 20;
+const PAD_T    = 36;
+const PAD_B    = 44;
+const GAP      = 20;   // görünümler arası boşluk (px)
+const VIEW_LABEL_H = 16; // görünüm etiketi için alan (üstünde)
+
+export function TechnicalDrawingView({
+  panel,
+  projectPanels = [],
+  devices = [],
+  copperSettings,
+  busbars,
+  barRows: barRowsProp,
+  title = "Teknik Görünüm",
+}: TechnicalDrawingViewProps) {
+  if (!panel) {
+    return (
+      <section className="table-card" style={{ marginTop: 0 }}>
+        <div className="empty-state" style={{ padding: "2rem 0" }}>
+          Görünüm için kabin bilgisi gerekiyor.
+        </div>
+      </section>
+    );
+  }
+
+  const { layouts, totalWidth: TW, maxHeight: MH, maxDepth: rawMD } =
+    buildCabinetLayouts(projectPanels, panel);
+  const MD = rawMD > 0 ? rawMD : 300;
+
+  const boxes = deviceBoxes(devices, layouts);
+
+  // ── Ölçek — üç görünüm aynı ölçeği paylaşır ──────────────────────────────
+  const horizAvail = SVG_W - PAD_L - PAD_R - GAP;   // drawW + drawD
+  const vertMax    = 480;                            // drawH + GAP + drawD maks
+
+  const scaleH = TW + MD > 0 ? horizAvail / (TW + MD) : 1;
+  const scaleV = MH + MD > 0 ? (vertMax - GAP) / (MH + MD) : 1;
+  const scale  = Math.min(scaleH, scaleV, 1.2);
+
+  const drawW = TW * scale;
+  const drawH = MH * scale;
+  const drawD = MD * scale;
+
+  const SVG_H = PAD_T + VIEW_LABEL_H + drawH + GAP + drawD + PAD_B;
+
+  // ── Koordinat fonksiyonları ────────────────────────────────────────────────
+  // Ön ve Üst görünüm: X ekseni (yatay, sola doğru)
+  const fvX = (x: number) => PAD_L + x * scale;
+  // Ön ve Yan görünüm: Y ekseni (dikey, yukarı = küçük SVG y)
+  const fvY = (y: number) => PAD_T + VIEW_LABEL_H + (MH - y) * scale;
+  // Yan görünüm: Z ekseni (yatay, sağa)
+  const svX = (z: number) => PAD_L + drawW + GAP + z * scale;
+  // Üst görünüm: Z ekseni (dikey, aşağı)
+  const tvY = (z: number) => PAD_T + VIEW_LABEL_H + drawH + GAP + z * scale;
+
+  // Referans y (zemin): fvY(0)
+  const groundY = fvY(0);
+  // Ön görünüm sağ kenarı
+  const frontRight = fvX(TW);
+  // Üst görünüm alt kenarı
+  const topBottom  = tvY(MD);
+
+  // ── Bakır barları (CS overlay veya hesaplanmış) ───────────────────────────
+  const cs = copperSettings;
+  const hasSegments = (busbars?.length ?? 0) > 0;
+  const effectiveBarRows: BarRow[] = barRowsProp ??
+    (cs ? computeBarTable(cs) : []);
+
+  const barW = Number(cs?.main_width_mm   ?? 40);
+  const barT = Number(cs?.main_thickness_mm ?? 5);
+  const firstLayout = layouts[0];
+
+  return (
+    <section className="table-card" style={{ marginTop: 0 }}>
+      <div className="section-header" style={{ marginBottom: "0.5rem" }}>
+        <h3>{title}</h3>
+        <span className="helper-text" style={{ fontSize: "0.82rem" }}>
+          Aynı ölçek · Ön–Yan–Üst ortografik projeksiyon
+        </span>
+      </div>
+
+      <svg
+        viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+        width="100%"
+        style={{
+          display: "block",
+          background: "#fff",
+          border: "1px solid #ccc",
+          borderRadius: "8px",
+        }}
+      >
+        {/* ────────────────────────────────────────────────────────────────
+            Projeksiyon yardım çizgileri (ince kesik)
+        ──────────────────────────────────────────────────────────────── */}
+        {/* Ön → Yan yatay hizalama çizgisi (zemin) */}
+        <line x1={frontRight} y1={groundY}
+              x2={frontRight + GAP} y2={groundY}
+              stroke="#bbb" strokeWidth={0.6} strokeDasharray="3 2" />
+        {/* Ön → Üst dikey hizalama çizgisi (sol kenar) */}
+        <line x1={fvX(0)} y1={groundY}
+              x2={fvX(0)} y2={groundY + GAP}
+              stroke="#bbb" strokeWidth={0.6} strokeDasharray="3 2" />
+        {/* Ön → Üst dikey hizalama çizgisi (sağ kenar) */}
+        <line x1={frontRight} y1={groundY}
+              x2={frontRight} y2={groundY + GAP}
+              stroke="#bbb" strokeWidth={0.6} strokeDasharray="3 2" />
+
+        {/* ────────────────────────────────────────────────────────────────
+            Görünüm etiketleri
+        ──────────────────────────────────────────────────────────────── */}
+        {[
+          { label: "ÖN (XY)",  x: PAD_L + drawW / 2 },
+          { label: "YAN (ZY)", x: PAD_L + drawW + GAP + drawD / 2 },
+        ].map(({ label, x }) => (
+          <text key={label} x={x}
+            y={PAD_T + VIEW_LABEL_H - 3}
+            textAnchor="middle" fontSize={9} fill="#999"
+            fontFamily="monospace" fontWeight="700" letterSpacing="1">
+            {label}
+          </text>
+        ))}
+        <text x={PAD_L + drawW / 2}
+          y={PAD_T + VIEW_LABEL_H + drawH + GAP + drawD / 2}
+          textAnchor="middle" fontSize={9} fill="#999"
+          fontFamily="monospace" fontWeight="700" letterSpacing="1"
+          transform={`rotate(-90, ${PAD_L + drawW / 2}, ${PAD_T + VIEW_LABEL_H + drawH + GAP + drawD / 2})`}>
+        </text>
+        <text x={PAD_L - 6}
+          y={PAD_T + VIEW_LABEL_H + drawH + GAP + drawD / 2}
+          textAnchor="middle" fontSize={9} fill="#999"
+          fontFamily="monospace" fontWeight="700" letterSpacing="1"
+          transform={`rotate(-90, ${PAD_L - 6}, ${PAD_T + VIEW_LABEL_H + drawH + GAP + drawD / 2})`}>
+          ÜST (XZ)
+        </text>
+
+        {/* ════════════════════════════════════════════════════════════════
+            ÖN GÖRÜNÜM (XY)
+        ════════════════════════════════════════════════════════════════ */}
+
+        {/* Kabin gövdeleri */}
+        {layouts.map((cl) => {
+          const cx  = fvX(cl.assemblyX);
+          const cy  = fvY(cl.cH);
+          const cWp = cl.cW * scale;
+          const cHp = cl.cH * scale;
+          const wall = Math.max(3, Math.min(12, 20 * scale));
+          const intX = fvX(cl.assemblyX + cl.lm);
+          const intY = fvY(cl.cH - cl.tm);
+          const intW = (cl.cW - cl.lm - cl.rm) * scale;
+          const intH = (cl.cH - cl.tm - cl.bm) * scale;
+          return (
+            <g key={`fv-cab-${cl.id}`}>
+              <rect x={cx} y={cy} width={cWp} height={cHp} fill="#d6d6d6" stroke="#1a1a1a" strokeWidth={2} />
+              <rect x={cx}           y={cy} width={cWp} height={wall} fill="#e4e4e4" />
+              <rect x={cx}           y={cy} width={wall}   height={cHp} fill="#e4e4e4" />
+              <rect x={cx+cWp-wall}  y={cy} width={wall}   height={cHp} fill="#e4e4e4" />
+              <rect x={cx} y={cy+cHp-wall} width={cWp} height={wall}  fill="#c8c8c8" />
+              <rect x={intX} y={intY} width={intW} height={intH}
+                fill="#f0f6ff" stroke="#3366cc" strokeWidth={0.8} strokeDasharray="4 3" />
+              <rect x={cx} y={cy} width={cWp} height={cHp} fill="none" stroke="#1a1a1a" strokeWidth={2} />
+              <text x={cx + cWp / 2} y={cy - 4}
+                textAnchor="middle" fontSize={8} fill="#666" fontFamily="'Segoe UI', sans-serif">
+                {cl.label}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Cihazlar — ön görünüm (XY) */}
+        {boxes.map((box, i) => {
+          const { fill, stroke } = DEVICE_COLORS[box.colorIndex % DEVICE_COLORS.length];
+          const sx = fvX(box.x);
+          const sy = fvY(box.y + box.h);
+          const sw = Math.max(box.w * scale, 2);
+          const sh = Math.max(box.h * scale, 2);
+          const fs = Math.min(8, sh * 0.38, sw * 0.18);
+          return (
+            <g key={`fv-dev-${i}`}>
+              <rect x={sx} y={sy} width={sw} height={sh}
+                fill={fill} stroke={stroke} strokeWidth={1} rx={1} opacity={0.9} />
+              {fs >= 4 && sh > 10 && sw > 14 && (
+                <text x={sx + sw / 2} y={sy + sh / 2}
+                  textAnchor="middle" dominantBaseline="middle"
+                  fontSize={fs} fill={stroke} fontWeight="600"
+                  fontFamily="'Segoe UI', sans-serif">
+                  {box.label}
+                </text>
+              )}
+            </g>
+          );
+        })}
+
+        {/* Bakır barları — ön görünüm (XY): Y konumunda yatay şerit */}
+        {cs && !hasSegments && firstLayout && effectiveBarRows.map((row) => {
+          const phaseIdx = PHASE_LABELS.indexOf(row.phase);
+          const color = PHASE_COLORS[phaseIdx] ?? PHASE_COLORS[0];
+          const rx = fvX(firstLayout.intLeft + row.xStart - Number(cs.busbar_x_mm ?? 0) + Number(cs.busbar_x_mm ?? 0));
+          const ry = fvY(row.yCenter + barW / 2);
+          const rw = Math.max(row.length * scale, 4);
+          const rh = Math.max(barW * scale, 3);
+          return (
+            <g key={`fv-bar-${row.key}`}>
+              <rect x={rx} y={ry} width={rw} height={rh}
+                fill={color} opacity={0.75} rx={1} stroke={color} strokeWidth={0.5} />
+              {rh > 8 && (
+                <text x={rx + 4} y={ry + rh / 2} dominantBaseline="middle"
+                  fontSize={Math.min(7, rh * 0.6)} fill="#fff" fontWeight="700" fontFamily="monospace">
+                  {row.key}
+                </text>
+              )}
+            </g>
+          );
+        })}
+
+        {/* Bakır segmentleri — ön görünüm (XY) */}
+        {hasSegments && busbars!.flatMap((b) => {
+          const color = PHASE_COLORS[phaseColorIndex(b.phase)];
+          const sw = b.busbar_type === "main" ? 2.5 : 1.5;
+          return b.segments.flatMap((seg, si) => {
+            const x1 = fvX(Number(seg.start_x_mm ?? 0));
+            const y1 = fvY(Number(seg.start_y_mm ?? 0));
+            const x2 = fvX(Number(seg.end_x_mm   ?? 0));
+            const y2 = fvY(Number(seg.end_y_mm   ?? 0));
+            if (Math.abs(x1 - x2) < 0.4 && Math.abs(y1 - y2) < 0.4) return [];
+            return [<line key={`fv-seg-${b.id}-${si}`} x1={x1} y1={y1} x2={x2} y2={y2}
+              stroke={color} strokeWidth={sw} opacity={b.busbar_type === "main" ? 0.95 : 0.75}
+              strokeLinecap="round" />];
+          });
+        })}
+
+        {/* Zemin çizgisi */}
+        <line x1={fvX(0) - 6} y1={groundY} x2={fvX(TW) + 6} y2={groundY}
+          stroke="#1a1a1a" strokeWidth={2.5} />
+
+        {/* Ön görünüm boyutları */}
+        {/* Genişlik — alt */}
+        <line x1={fvX(0)}  y1={groundY + 8} x2={fvX(0)}  y2={groundY + 13} stroke="#555" strokeWidth={1} />
+        <line x1={fvX(TW)} y1={groundY + 8} x2={fvX(TW)} y2={groundY + 13} stroke="#555" strokeWidth={1} />
+        <line x1={fvX(0)} y1={groundY + 10} x2={fvX(TW)} y2={groundY + 10} stroke="#555" strokeWidth={1} />
+        <rect x={fvX(TW / 2) - 22} y={groundY + 4} width={44} height={12} fill="white" />
+        <text x={fvX(TW / 2)} y={groundY + 13} textAnchor="middle" fontSize={9} fill="#333" fontFamily="monospace">
+          {Math.round(TW)} mm
+        </text>
+        {/* Yükseklik — sol */}
+        <line x1={fvX(0) - 8}  y1={fvY(MH)}  x2={fvX(0) - 13} y2={fvY(MH)}  stroke="#555" strokeWidth={1} />
+        <line x1={fvX(0) - 8}  y1={groundY}  x2={fvX(0) - 13} y2={groundY}  stroke="#555" strokeWidth={1} />
+        <line x1={fvX(0) - 10} y1={fvY(MH)}  x2={fvX(0) - 10} y2={groundY}  stroke="#555" strokeWidth={1} />
+        <text x={fvX(0) - 13} y={fvY(MH / 2)} textAnchor="middle" fontSize={9} fill="#333" fontFamily="monospace"
+          transform={`rotate(-90, ${fvX(0) - 13}, ${fvY(MH / 2)})`}>
+          {Math.round(MH)} mm
+        </text>
+
+        {/* ════════════════════════════════════════════════════════════════
+            YAN GÖRÜNÜM (ZY) — ön görünümün sağında
+        ════════════════════════════════════════════════════════════════ */}
+
+        {/* Kabin yan kesiti */}
+        <rect x={svX(0)} y={fvY(MH)} width={drawD} height={drawH}
+          fill="#d8d8d8" stroke="#1a1a1a" strokeWidth={2} />
+        {/* Ön yüzey vurgusu */}
+        <rect x={svX(0)} y={fvY(MH)} width={Math.max(3, 3 * scale)} height={drawH}
+          fill="#b0b0b0" />
+        {/* İç montaj alanı */}
+        {firstLayout && (
+          <rect x={svX(0)} y={fvY(MH - firstLayout.tm)}
+            width={drawD} height={(MH - firstLayout.tm - firstLayout.bm) * scale}
+            fill="#f0f6ff" stroke="#3366cc" strokeWidth={0.5} strokeDasharray="4 3" />
+        )}
+
+        {/* Cihazlar — yan görünüm (ZY) */}
+        {boxes.map((box, i) => {
+          const { fill, stroke } = DEVICE_COLORS[box.colorIndex % DEVICE_COLORS.length];
+          const sx = svX(box.z);
+          const sy = fvY(box.y + box.h);
+          const sw = Math.max(box.d * scale, 2);
+          const sh = Math.max(box.h * scale, 2);
+          const fs = Math.min(7, sh * 0.35, sw * 0.2);
+          return (
+            <g key={`sv-dev-${i}`}>
+              <rect x={sx} y={sy} width={sw} height={sh}
+                fill={fill} stroke={stroke} strokeWidth={1} rx={1} opacity={0.85} />
+              {fs >= 4 && sh > 9 && sw > 9 && (
+                <text x={sx + sw / 2} y={sy + sh / 2}
+                  textAnchor="middle" dominantBaseline="middle"
+                  fontSize={fs} fill={stroke} fontWeight="600" fontFamily="'Segoe UI', sans-serif">
+                  {box.label}
+                </text>
+              )}
+            </g>
+          );
+        })}
+
+        {/* Bakır barları — yan görünüm (ZY) */}
+        {cs && !hasSegments && effectiveBarRows.map((row) => {
+          const phaseIdx = PHASE_LABELS.indexOf(row.phase);
+          const color = PHASE_COLORS[phaseIdx] ?? PHASE_COLORS[0];
+          const sx = svX(row.zCenter - barT / 2);
+          const sy = fvY(row.yCenter + barW / 2);
+          const sw = Math.max(barT * scale, 2);
+          const sh = Math.max(barW * scale, 3);
+          return (
+            <g key={`sv-bar-${row.key}`}>
+              <rect x={sx} y={sy} width={sw} height={sh}
+                fill={color} opacity={0.75} rx={1} stroke={color} strokeWidth={0.5} />
+              {sh > 8 && (
+                <text x={sx + sw / 2} y={sy + sh / 2}
+                  textAnchor="middle" dominantBaseline="middle"
+                  fontSize={Math.min(6, sh * 0.5)} fill="#fff" fontWeight="700" fontFamily="monospace">
+                  {row.key}
+                </text>
+              )}
+            </g>
+          );
+        })}
+
+        {/* Bakır segmentleri — yan görünüm (ZY) */}
+        {hasSegments && busbars!.flatMap((b) => {
+          const color = PHASE_COLORS[phaseColorIndex(b.phase)];
+          const sw = b.busbar_type === "main" ? 2.5 : 1.5;
+          return b.segments.flatMap((seg, si) => {
+            const x1 = svX(Number(seg.start_z_mm ?? 0));
+            const y1 = fvY(Number(seg.start_y_mm ?? 0));
+            const x2 = svX(Number(seg.end_z_mm   ?? 0));
+            const y2 = fvY(Number(seg.end_y_mm   ?? 0));
+            if (Math.abs(x1 - x2) < 0.4 && Math.abs(y1 - y2) < 0.4) return [];
+            return [<line key={`sv-seg-${b.id}-${si}`} x1={x1} y1={y1} x2={x2} y2={y2}
+              stroke={color} strokeWidth={sw} opacity={b.busbar_type === "main" ? 0.95 : 0.75}
+              strokeLinecap="round" />];
+          });
+        })}
+
+        {/* Yan görünüm boyutları */}
+        <line x1={svX(0)}  y1={groundY + 8} x2={svX(0)}  y2={groundY + 13} stroke="#555" strokeWidth={1} />
+        <line x1={svX(MD)} y1={groundY + 8} x2={svX(MD)} y2={groundY + 13} stroke="#555" strokeWidth={1} />
+        <line x1={svX(0)} y1={groundY + 10} x2={svX(MD)} y2={groundY + 10} stroke="#555" strokeWidth={1} />
+        <rect x={svX(MD / 2) - 22} y={groundY + 4} width={44} height={12} fill="white" />
+        <text x={svX(MD / 2)} y={groundY + 13} textAnchor="middle" fontSize={9} fill="#333" fontFamily="monospace">
+          {Math.round(MD)} mm
+        </text>
+
+        {/* Yön etiketleri — yan görünüm */}
+        <text x={svX(0) + 3} y={fvY(MH) + VIEW_LABEL_H - 2}
+          fontSize={7} fill="#aaa" fontFamily="monospace">Ön</text>
+        <text x={svX(MD) - 3} y={fvY(MH) + VIEW_LABEL_H - 2}
+          textAnchor="end" fontSize={7} fill="#aaa" fontFamily="monospace">Arka</text>
+
+        {/* ════════════════════════════════════════════════════════════════
+            ÜST GÖRÜNÜM (XZ) — ön görünümün altında
+        ════════════════════════════════════════════════════════════════ */}
+
+        {/* Kabin gövdeleri — üst görünüm */}
+        {layouts.map((cl) => {
+          const cx = fvX(cl.assemblyX);
+          const cw = cl.cW * scale;
+          const cd = cl.cD * scale;
+          return (
+            <g key={`tv-cab-${cl.id}`}>
+              <rect x={cx} y={tvY(0)} width={cw} height={cd}
+                fill="#d8d8d8" stroke="#1a1a1a" strokeWidth={1.5} />
+              {/* Ön yüzey vurgusu (SVG'de üst kenar) */}
+              <rect x={cx} y={tvY(0)} width={cw} height={Math.max(3, 3 * scale)} fill="#b0b0b0" />
+              {/* İç alan */}
+              <rect x={fvX(cl.assemblyX + cl.lm)} y={tvY(0)}
+                width={(cl.cW - cl.lm - cl.rm) * scale} height={cd}
+                fill="#f0f6ff" stroke="#3366cc" strokeWidth={0.5} strokeDasharray="4 3" />
+            </g>
+          );
+        })}
+
+        {/* Cihazlar — üst görünüm (XZ) */}
+        {boxes.map((box, i) => {
+          const { fill, stroke } = DEVICE_COLORS[box.colorIndex % DEVICE_COLORS.length];
+          const sx = fvX(box.x);
+          const sy = tvY(box.z);
+          const sw = Math.max(box.w * scale, 2);
+          const sh = Math.max(box.d * scale, 2);
+          return (
+            <g key={`tv-dev-${i}`}>
+              <rect x={sx} y={sy} width={sw} height={sh}
+                fill={fill} stroke={stroke} strokeWidth={1} rx={1} opacity={0.8} />
+            </g>
+          );
+        })}
+
+        {/* Bakır barları — üst görünüm (XZ): Z konumunda yatay şerit */}
+        {cs && !hasSegments && firstLayout && effectiveBarRows.map((row) => {
+          const phaseIdx = PHASE_LABELS.indexOf(row.phase);
+          const color = PHASE_COLORS[phaseIdx] ?? PHASE_COLORS[0];
+          const rx = fvX(firstLayout.intLeft + row.xStart - Number(cs.busbar_x_mm ?? 0) + Number(cs.busbar_x_mm ?? 0));
+          const ry = tvY(row.zCenter - barT / 2);
+          const rw = Math.max(row.length * scale, 4);
+          const rh = Math.max(barT * scale, 2);
+          return (
+            <g key={`tv-bar-${row.key}`}>
+              <rect x={rx} y={ry} width={rw} height={rh}
+                fill={color} opacity={0.75} rx={1} stroke={color} strokeWidth={0.5} />
+              {rh > 7 && (
+                <text x={rx + 4} y={ry + rh / 2} dominantBaseline="middle"
+                  fontSize={Math.min(6, rh * 0.7)} fill="#fff" fontWeight="700" fontFamily="monospace">
+                  {row.key}
+                </text>
+              )}
+            </g>
+          );
+        })}
+
+        {/* Bakır segmentleri — üst görünüm (XZ) */}
+        {hasSegments && busbars!.flatMap((b) => {
+          const color = PHASE_COLORS[phaseColorIndex(b.phase)];
+          const sw = b.busbar_type === "main" ? 2.5 : 1.5;
+          return b.segments.flatMap((seg, si) => {
+            const x1 = fvX(Number(seg.start_x_mm ?? 0));
+            const y1 = tvY(Number(seg.start_z_mm ?? 0));
+            const x2 = fvX(Number(seg.end_x_mm   ?? 0));
+            const y2 = tvY(Number(seg.end_z_mm   ?? 0));
+            if (Math.abs(x1 - x2) < 0.4 && Math.abs(y1 - y2) < 0.4) return [];
+            return [<line key={`tv-seg-${b.id}-${si}`} x1={x1} y1={y1} x2={x2} y2={y2}
+              stroke={color} strokeWidth={sw} opacity={b.busbar_type === "main" ? 0.95 : 0.75}
+              strokeLinecap="round" />];
+          });
+        })}
+
+        {/* Üst görünüm boyutları */}
+        <line x1={fvX(0) - 8}  y1={tvY(0)}  x2={fvX(0) - 13} y2={tvY(0)}  stroke="#555" strokeWidth={1} />
+        <line x1={fvX(0) - 8}  y1={tvY(MD)} x2={fvX(0) - 13} y2={tvY(MD)} stroke="#555" strokeWidth={1} />
+        <line x1={fvX(0) - 10} y1={tvY(0)}  x2={fvX(0) - 10} y2={tvY(MD)} stroke="#555" strokeWidth={1} />
+        <text x={fvX(0) - 13} y={tvY(MD / 2)} textAnchor="middle" fontSize={9} fill="#333" fontFamily="monospace"
+          transform={`rotate(-90, ${fvX(0) - 13}, ${tvY(MD / 2)})`}>
+          {Math.round(MD)} mm
+        </text>
+
+        {/* Yön etiketleri — üst görünüm */}
+        <text x={fvX(0) + 3} y={tvY(0) + 10}
+          fontSize={7} fill="#aaa" fontFamily="monospace">Ön</text>
+        <text x={fvX(0) + 3} y={tvY(MD) - 3}
+          fontSize={7} fill="#aaa" fontFamily="monospace">Arka</text>
+
+        {/* ── Koordinat eksenleri (ön görünüm alt-sol köşesi) ─────────── */}
+        <line x1={fvX(0)} y1={groundY} x2={fvX(0) + 22} y2={groundY}
+          stroke="#e53935" strokeWidth={1} />
+        <path d={`M${fvX(0) + 22},${groundY}L${fvX(0) + 17},${groundY - 3} M${fvX(0) + 22},${groundY}L${fvX(0) + 17},${groundY + 3}`}
+          stroke="#e53935" strokeWidth={1} fill="none" />
+        <text x={fvX(0) + 25} y={groundY + 4} fontSize={8} fill="#e53935" fontFamily="monospace">X</text>
+
+        <line x1={fvX(0)} y1={groundY} x2={fvX(0)} y2={groundY - 22}
+          stroke="#e53935" strokeWidth={1} />
+        <path d={`M${fvX(0)},${groundY - 22}L${fvX(0) - 3},${groundY - 17} M${fvX(0)},${groundY - 22}L${fvX(0) + 3},${groundY - 17}`}
+          stroke="#e53935" strokeWidth={1} fill="none" />
+        <text x={fvX(0) + 2} y={groundY - 24} fontSize={8} fill="#e53935" fontFamily="monospace">Y</text>
+
+        <line x1={svX(0)} y1={groundY} x2={svX(0) + 22} y2={groundY}
+          stroke="#e53935" strokeWidth={1} />
+        <path d={`M${svX(0) + 22},${groundY}L${svX(0) + 17},${groundY - 3} M${svX(0) + 22},${groundY}L${svX(0) + 17},${groundY + 3}`}
+          stroke="#e53935" strokeWidth={1} fill="none" />
+        <text x={svX(0) + 25} y={groundY + 4} fontSize={8} fill="#e53935" fontFamily="monospace">Z</text>
+      </svg>
+    </section>
+  );
+}
