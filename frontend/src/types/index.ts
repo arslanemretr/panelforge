@@ -147,6 +147,8 @@ export interface CopperSettings {
   busbar_orientation?: string | null;
   busbar_length_mm?: number | null;
   busbar_phase_count?: number | null;
+  bars_per_phase?: number | null;     // Faz başına paralel bar sayısı (varsayılan 1)
+  bar_gap_mm?: number | null;         // Aynı fazdaki barlar arası boşluk (mm)
   busbar_plane?: string | null;       // "XY" | "XZ"
   phase_stack_axis?: string | null;   // "Y" | "Z"
 }
