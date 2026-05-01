@@ -168,6 +168,10 @@ export interface CopperSettings {
   phase_stack_axis?: string | null;   // "Y" | "Z"
   main_density_g_cm3?: number | null;    // g/cm³ override; null → malzeme varsayılanı
   branch_density_g_cm3?: number | null;  // g/cm³ override; null → malzeme varsayılanı
+  k_factor_edgewise?: number | null;         // edgewise büküm K faktörü (varsayılan 0.40)
+  busbar_clearance_mm?: number | null;       // ana bara-bara arası min. hava boşluğu
+  branch_clearance_mm?: number | null;       // tali bara-bara arası min. hava boşluğu
+  min_hole_hole_distance_mm?: number | null; // delik merkezi-merkezi arası min. mesafe
 }
 
 export interface ValidationResult {

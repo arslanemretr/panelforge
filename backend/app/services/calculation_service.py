@@ -556,7 +556,7 @@ def calculate_project(db: Session, project_id: int) -> CalculationResponse:
     bend_radius  = _to_float(copper.bend_inner_radius_mm, 10.0)
     default_hole = _to_float(copper.default_hole_diameter_mm, 11.0)
     k_flatwise   = _to_float(copper.k_factor, K_FLATWISE_DEFAULT)
-    k_edgewise   = K_EDGEWISE_DEFAULT   # Faz 4'te CopperSettings'e alan eklenecek
+    k_edgewise   = _to_float(copper.k_factor_edgewise, K_EDGEWISE_DEFAULT)
     main_w        = _to_float(copper.main_width_mm, 40.0)
     main_t        = _to_float(copper.main_thickness_mm, 5.0)
     branch_w      = _to_float(copper.branch_width_mm, 30.0) or main_w

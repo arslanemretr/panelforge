@@ -239,6 +239,10 @@ class CopperSettings(Base):
     phase_stack_axis: Mapped[str | None] = mapped_column(Text, default="Y") # Y | Z
     main_density_g_cm3: Mapped[Decimal | None] = mapped_column(Numeric)   # g/cm³, None → malzeme varsayılanı
     branch_density_g_cm3: Mapped[Decimal | None] = mapped_column(Numeric) # g/cm³, None → malzeme varsayılanı
+    k_factor_edgewise: Mapped[Decimal | None] = mapped_column(Numeric, default=Decimal("0.40"))  # edgewise K faktörü
+    busbar_clearance_mm: Mapped[Decimal | None] = mapped_column(Numeric)   # ana bara-bara arası min. mesafe
+    branch_clearance_mm: Mapped[Decimal | None] = mapped_column(Numeric)   # tali bara-bara arası min. mesafe
+    min_hole_hole_distance_mm: Mapped[Decimal | None] = mapped_column(Numeric)  # delik merkezi arası min. mesafe
 
     project: Mapped["Project"] = relationship(back_populates="copper_settings")
 

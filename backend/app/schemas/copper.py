@@ -35,6 +35,10 @@ class CopperSettingsBase(BaseModel):
     phase_stack_axis: str | None = "Y"    # Y = fazlar dikey istifli | Z = fazlar derinlik ekseninde
     main_density_g_cm3: Decimal | None = None    # g/cm³, None → malzeme varsayılanı (Cu:8.96, Al:2.70)
     branch_density_g_cm3: Decimal | None = None  # g/cm³, None → malzeme varsayılanı
+    k_factor_edgewise: Decimal | None = Decimal("0.40")  # edgewise büküm K faktörü
+    busbar_clearance_mm: Decimal | None = None            # ana bara-bara arası min. hava boşluğu
+    branch_clearance_mm: Decimal | None = None            # tali bara-bara arası min. hava boşluğu
+    min_hole_hole_distance_mm: Decimal | None = None      # delik merkezi-merkezi arası min. mesafe
 
 
 class CopperSettingsUpsert(CopperSettingsBase):

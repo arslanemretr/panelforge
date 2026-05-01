@@ -96,7 +96,7 @@ export function CopperSettingsForm({ initialValue, onSubmit }: CopperSettingsFor
         />
       </label>
       <label>
-        <span>K faktoru (bakir: 0.33)</span>
+        <span>K faktoru flatwise (0.33)</span>
         <input
           type="number"
           step="0.01"
@@ -104,6 +104,44 @@ export function CopperSettingsForm({ initialValue, onSubmit }: CopperSettingsFor
           max="0.5"
           value={value.k_factor ?? 0.33}
           onChange={(event) => update("k_factor", Number(event.target.value))}
+        />
+      </label>
+      <label>
+        <span>K faktoru edgewise (0.40)</span>
+        <input
+          type="number"
+          step="0.01"
+          min="0"
+          max="0.5"
+          value={value.k_factor_edgewise ?? 0.40}
+          onChange={(event) => update("k_factor_edgewise", Number(event.target.value))}
+        />
+      </label>
+      <label>
+        <span>Ana bara bogazi (mm)</span>
+        <input
+          type="number"
+          value={value.busbar_clearance_mm ?? ""}
+          placeholder="opsiyonel"
+          onChange={(event) => update("busbar_clearance_mm", event.target.value === "" ? null : Number(event.target.value))}
+        />
+      </label>
+      <label>
+        <span>Tali bara bogazi (mm)</span>
+        <input
+          type="number"
+          value={value.branch_clearance_mm ?? ""}
+          placeholder="opsiyonel"
+          onChange={(event) => update("branch_clearance_mm", event.target.value === "" ? null : Number(event.target.value))}
+        />
+      </label>
+      <label>
+        <span>Min. delik-delik mesafesi (mm)</span>
+        <input
+          type="number"
+          value={value.min_hole_hole_distance_mm ?? ""}
+          placeholder="opsiyonel"
+          onChange={(event) => update("min_hole_hole_distance_mm", event.target.value === "" ? null : Number(event.target.value))}
         />
       </label>
       <label>
