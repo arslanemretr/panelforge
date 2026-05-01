@@ -186,20 +186,49 @@ export function ResultsTab({ projectId }: ResultsTabProps) {
         {hasResults && (
           <section className="table-card">
             <div className="section-header" style={{ marginBottom: "1rem" }}>
-              <div>
-                <h3 style={{ marginBottom: "0.2rem" }}>Hesaplama Ozeti</h3>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <h3 style={{ marginBottom: 0 }}>Hesaplama Ozeti</h3>
+                {results!.warnings.length > 0 && (
+                  <span
+                    style={{
+                      background: "rgba(220,38,38,0.12)",
+                      color: "#dc2626",
+                      borderRadius: 20,
+                      padding: "2px 10px",
+                      fontSize: "0.78rem",
+                      fontWeight: 700,
+                    }}
+                  >
+                    ⚠ {results!.warnings.length} geometri ihlali
+                  </span>
+                )}
               </div>
             </div>
             <SummaryCards summary={results!.summary} />
 
             {results!.warnings.length > 0 && (
-              <div className="alert alert-warning" style={{ marginTop: "1rem" }}>
-                <strong>Hesaplama uyarilari:</strong>
-                <ul style={{ margin: "0.25rem 0 0 1rem", paddingLeft: 0 }}>
+              <div
+                style={{
+                  marginTop: "1rem",
+                  border: "1px solid rgba(220,38,38,0.30)",
+                  borderRadius: 8,
+                  background: "rgba(220,38,38,0.06)",
+                  padding: "0.8rem 1rem",
+                }}
+              >
+                <strong style={{ color: "#dc2626", display: "block", marginBottom: "0.4rem" }}>
+                  ⚠ Geometri dogrulama ihlalleri
+                </strong>
+                <ul style={{ margin: 0, paddingLeft: "1.2rem" }}>
                   {results!.warnings.map((warning, index) => (
-                    <li key={index}>{warning}</li>
+                    <li key={index} style={{ marginBottom: "0.2rem", fontSize: "0.88rem", color: "var(--text)" }}>
+                      {warning}
+                    </li>
                   ))}
                 </ul>
+                <p style={{ margin: "0.6rem 0 0", fontSize: "0.8rem", color: "var(--muted)" }}>
+                  Parametreler sekmesinden bogaz mesafelerini artirarak bu ihlalleri giderin.
+                </p>
               </div>
             )}
           </section>
