@@ -29,13 +29,22 @@ def _sync_aggregate_panel(db: Session, project_id: int) -> None:
             db.commit()
         return
 
-    definitions = [item.panel_definition for item in items]
-    first = definitions[0]
-    total_width = sum((definition.width_mm for definition in definitions), Decimal("0"))
-    max_height = max((definition.height_mm for definition in definitions), default=Decimal("0"))
-    max_depth = max((definition.depth_mm or Decimal("0") for definition in definitions), default=Decimal("0"))
-    total_mounting_width = sum((definition.mounting_plate_width_mm or Decimal("0") for definition in definitions), Decimal("0"))
-    max_mounting_height = max((definition.mounting_plate_height_mm or Decimal("0") for definition in definitions), default=Decimal("0"))
+    first = items[0].panel_definition
+    total_width = sum(
+        (item.panel_definition.width_mm * item.quantity for item in items), Decimal("0")
+    )
+    max_height = max(
+        (item.panel_definition.height_mm for item in items), default=Decimal("0")
+    )
+    max_depth = max(
+        (item.panel_definition.depth_mm or Decimal("0") for item in items), default=Decimal("0")
+    )
+    total_mounting_width = sum(
+        ((item.panel_definition.mounting_plate_width_mm or Decimal("0")) * item.quantity for item in items), Decimal("0")
+    )
+    max_mounting_height = max(
+        (item.panel_definition.mounting_plate_height_mm or Decimal("0") for item in items), default=Decimal("0")
+    )
 
     payload = PanelUpsert(
         width_mm=total_width,
@@ -97,6 +106,7 @@ def create_project_panel(
         panel_definition_id=payload.panel_definition_id,
         label=payload.label or definition.name,
         seq=next_seq + 1,
+        quantity=max(1, payload.quantity),
     )
     db.add(item)
     db.commit()
