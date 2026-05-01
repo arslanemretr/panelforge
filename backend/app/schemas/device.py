@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, Field
@@ -59,6 +60,8 @@ class DeviceUpdate(DeviceCreate):
 class DeviceRead(DeviceBase, ORMModel):
     id: int
     terminals: list[DeviceTerminalRead] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
 
 
 class ProjectDeviceBase(BaseModel):

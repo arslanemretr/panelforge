@@ -76,6 +76,7 @@ class ProjectPanel(Base):
     panel_definition_id: Mapped[int] = mapped_column(ForeignKey("panel_definitions.id"))
     label: Mapped[str | None] = mapped_column(Text)
     seq: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
     project: Mapped["Project"] = relationship(back_populates="panel_layout_items")
     panel_definition: Mapped["PanelDefinition"] = relationship(back_populates="project_layout_items")
@@ -130,6 +131,8 @@ class Device(Base):
     width_mm: Mapped[Decimal] = mapped_column(Numeric, nullable=False)
     height_mm: Mapped[Decimal] = mapped_column(Numeric, nullable=False)
     depth_mm: Mapped[Decimal | None] = mapped_column(Numeric)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
 
     terminals: Mapped[list["DeviceTerminal"]] = relationship(back_populates="device", cascade="all, delete-orphan")
     placements: Mapped[list["ProjectDevice"]] = relationship(back_populates="device")
@@ -252,6 +255,9 @@ class CopperSettings(Base):
     busbar_clearance_mm: Mapped[Decimal | None] = mapped_column(Numeric)   # ana bara-bara arası min. mesafe
     branch_clearance_mm: Mapped[Decimal | None] = mapped_column(Numeric)   # tali bara-bara arası min. mesafe
     min_hole_hole_distance_mm: Mapped[Decimal | None] = mapped_column(Numeric)  # delik merkezi arası min. mesafe
+    coating_type: Mapped[str | None] = mapped_column(Text)              # "Kaplamasız" | "Kalay Kaplı" | vb.
+    main_phase_center_mm: Mapped[Decimal | None] = mapped_column(Numeric)   # ana faz merkez-merkez mesafesi
+    branch_phase_center_mm: Mapped[Decimal | None] = mapped_column(Numeric) # tali faz merkez-merkez mesafesi
 
     project: Mapped["Project"] = relationship(back_populates="copper_settings")
 
@@ -287,6 +293,7 @@ class CopperDefinition(Base):
         nullable=False,
     )
     project_layout_items: Mapped[list["ProjectCopper"]] = relationship(back_populates="copper_definition")
+    coating_type: Mapped[str | None] = mapped_column(Text)            # "Kaplamasız" | "Kalay Kaplı" | vb.
 
 
 class Busbar(Base):

@@ -7,6 +7,7 @@ from app.schemas.panel_definition import PanelDefinitionRead
 class ProjectPanelCreate(BaseModel):
     panel_definition_id: int
     label: str | None = None
+    quantity: int = 1
 
 
 class ProjectPanelRead(ORMModel):
@@ -15,4 +16,5 @@ class ProjectPanelRead(ORMModel):
     panel_definition_id: int
     label: str | None = None
     seq: int
+    quantity: int
     panel_definition: PanelDefinitionRead

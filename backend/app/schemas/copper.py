@@ -39,6 +39,9 @@ class CopperSettingsBase(BaseModel):
     busbar_clearance_mm: Decimal | None = None            # ana bara-bara arası min. hava boşluğu
     branch_clearance_mm: Decimal | None = None            # tali bara-bara arası min. hava boşluğu
     min_hole_hole_distance_mm: Decimal | None = None      # delik merkezi-merkezi arası min. mesafe
+    coating_type: str | None = None                       # "Kaplamasız" | "Kalay Kaplı" | vb.
+    main_phase_center_mm: Decimal | None = None           # ana faz merkez-merkez mesafesi (L1↔L2)
+    branch_phase_center_mm: Decimal | None = None         # tali faz merkez-merkez mesafesi
 
 
 class CopperSettingsUpsert(CopperSettingsBase):
