@@ -36,6 +36,7 @@ class Project(Base):
     )
     copper_layout_items: Mapped[list["ProjectCopper"]] = relationship(back_populates="project", cascade="all, delete-orphan")
     busbars: Mapped[list["Busbar"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    device_connections: Mapped[list["DeviceConnection"]] = relationship(back_populates="project", cascade="all, delete-orphan")
 
 
 class PanelDefinition(Base):
@@ -147,6 +148,8 @@ class DeviceTerminal(Base):
     hole_diameter_mm: Mapped[Decimal | None] = mapped_column(Numeric)
     slot_width_mm: Mapped[Decimal | None] = mapped_column(Numeric)
     slot_length_mm: Mapped[Decimal | None] = mapped_column(Numeric)
+    terminal_role: Mapped[str | None] = mapped_column(Text)          # input | output
+    terminal_group: Mapped[str | None] = mapped_column(Text)         # line | load | bus | branch
 
     device: Mapped["Device"] = relationship(back_populates="terminals")
 
@@ -169,6 +172,37 @@ class ProjectDevice(Base):
 
     project: Mapped["Project"] = relationship(back_populates="placed_devices")
     device: Mapped["Device"] = relationship(back_populates="placements")
+
+
+class DeviceConnection(Base):
+    """
+    Explicit kaynak → hedef bağlantı modeli.
+
+    source_type = "busbar"  → kaynak ana bara (source_device_id / source_terminal_id = NULL)
+    source_type = "device"  → kaynak cihaz terminali
+    """
+    __tablename__ = "device_connections"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+
+    # Kaynak
+    source_type: Mapped[str] = mapped_column(Text, nullable=False)           # "busbar" | "device"
+    source_device_id: Mapped[int | None] = mapped_column(ForeignKey("project_devices.id", ondelete="CASCADE"))
+    source_terminal_id: Mapped[int | None] = mapped_column(ForeignKey("device_terminals.id", ondelete="CASCADE"))
+
+    # Hedef
+    target_device_id: Mapped[int] = mapped_column(ForeignKey("project_devices.id", ondelete="CASCADE"), nullable=False)
+    target_terminal_id: Mapped[int] = mapped_column(ForeignKey("device_terminals.id", ondelete="CASCADE"), nullable=False)
+
+    phase: Mapped[str] = mapped_column(Text, nullable=False)                 # L1 | L2 | L3 | N | PE
+    connection_type: Mapped[str] = mapped_column(Text, nullable=False)       # "main_to_device" | "device_to_device"
+
+    project: Mapped["Project"] = relationship(back_populates="device_connections")
+    source_device: Mapped["ProjectDevice | None"] = relationship(foreign_keys=[source_device_id])
+    target_device: Mapped["ProjectDevice"] = relationship(foreign_keys=[target_device_id])
+    source_terminal: Mapped["DeviceTerminal | None"] = relationship(foreign_keys=[source_terminal_id])
+    target_terminal: Mapped["DeviceTerminal"] = relationship(foreign_keys=[target_terminal_id])
 
 
 class CopperSettings(Base):
