@@ -1,28 +1,33 @@
 /**
- * DeviceTechDrawing — 3-görünümlü ortografik teknik çizim bileşeni
+ * DeviceTechDrawing — Mühendislik teknik çizim bileşeni
  *
- * CSS grid ile mühendislik çizimi yerleşimi:
- *   [Ön Görünüm]  [Yan Görünüm]
- *   [Üst Görünüm] [Lejant      ]
+ * Tek SVG içinde 3 hizalı ortografik görünüm:
+ *   [Ön Görünüm  ]  [Sağ Yan Görünüm]
+ *   [Alt Plan    ]
  *
- * Grid satır/sütun oranları cihaz boyutuna (W, H, D) göre hesaplanır.
- * Toplam yükseklik sabit (460px) — sayfaya sığar.
- * Her SVG width+height=%100 + preserveAspectRatio ile ölçeklenir.
+ * Görünümler birbirine projeksiyon çizgileriyle hizalı.
+ * Delik sembolü, boyut okları, merkez çizgileri, lejant.
  */
 
-const PHASE_COLOR: Record<string, string> = {
-  L1: "#e53935",
-  L2: "#f9a825",
-  L3: "#1e88e5",
-  N:  "#78909c",
-  PE: "#43a047",
+const COLORS = {
+  paper:      "#f4f6f8",   // kağıt zemin
+  border:     "#c8d4e0",   // kağıt kenarlığı
+  grid:       "#dce6ef",   // faint grid
+  object:     "#1a2e3d",   // kalın nesne çizgisi
+  dim:        "#2d5a8e",   // boyut çizgisi / ok
+  dimText:    "#1e3a5f",
+  center:     "#b03030",   // merkez çizgisi
+  hidden:     "#7a8fa8",   // gizli çizgi
+  projection: "#aabbd0",   // projeksiyon bağlantı çizgisi
+  viewBg:     "#ffffff",   // görünüm zemin
+  labelBg:    "#e0eaf6",
+  labelText:  "#1a2e3d",
 };
 
-const PAD = 36;          // SVG içi kenar boşluğu (boyut okları için)
-const TERMINAL_R = 6;
-const DIM_FONT = 10;
-const DIM_OFFSET = 13;
-const DIM_TICK = 6;
+const OBJ_W  = 1.6;   // nesne çizgisi kalınlığı
+const DIM_W  = 0.7;
+const HID_W  = 0.6;
+const CTR_W  = 0.5;
 
 interface TechTerminal {
   terminal_name: string;
@@ -34,283 +39,399 @@ interface TechTerminal {
   terminal_width_mm?: number | null;
   terminal_height_mm?: number | null;
   terminal_depth_mm?: number | null;
+  hole_diameter_mm?: number | null;
   bolt_type?: string | null;
   bolt_count?: number | null;
   bolt_center_distance_mm?: number | null;
 }
 
-interface DeviceTechDrawingProps {
+export interface DeviceTechDrawingProps {
   widthMm: number;
   heightMm: number;
   depthMm: number;
   terminals: TechTerminal[];
-  /** Toplam panel yüksekliği (px). Varsayılan 460. */
+  /** Bileşen display yüksekliği (px). Varsayılan 480. */
   height?: number;
 }
 
-interface ViewTerminal {
-  name: string;
-  phase: string;
-  cx: number;
-  cy: number;
-  bw?: number;
-  bh?: number;
-  boltDist?: number;
-  boltCount?: number;
-  boltType?: string | null;
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Yardımcı çizim fonksiyonları
+// ─────────────────────────────────────────────────────────────────────────────
 
-// ── Boyut oku ────────────────────────────────────────────────────────────────
-
-function DimArrow({ x1, y1, x2, y2, value, vertical = false }: {
+/** Çift-ok boyut çizgisi */
+function DimLine({
+  x1, y1, x2, y2, text, offset = 0, vertical = false, id,
+}: {
   x1: number; y1: number; x2: number; y2: number;
-  value: number; vertical?: boolean;
+  text: string; offset?: number; vertical?: boolean; id: string;
 }) {
   const mx = (x1 + x2) / 2;
   const my = (y1 + y2) / 2;
-  const stroke = "rgba(173,196,226,0.5)";
+  const arrowId = `arr-${id}`;
+  const arrowBackId = `arrb-${id}`;
+  const ARR = 4; // ok başı boyutu
   return (
     <g>
-      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={stroke} strokeWidth={1} />
-      <line x1={x1} y1={y1 - DIM_TICK / 2} x2={x1} y2={y1 + DIM_TICK / 2} stroke={stroke} strokeWidth={1} />
-      <line x1={x2} y1={y2 - DIM_TICK / 2} x2={x2} y2={y2 + DIM_TICK / 2} stroke={stroke} strokeWidth={1} />
+      <defs>
+        <marker id={arrowId} viewBox={`0 0 ${ARR*2} ${ARR*2}`}
+          refX={ARR*2} refY={ARR} markerWidth={ARR} markerHeight={ARR} orient="auto">
+          <path d={`M0,0 L${ARR*2},${ARR} L0,${ARR*2} Z`} fill={COLORS.dim} />
+        </marker>
+        <marker id={arrowBackId} viewBox={`0 0 ${ARR*2} ${ARR*2}`}
+          refX={0} refY={ARR} markerWidth={ARR} markerHeight={ARR} orient="auto-start-reverse">
+          <path d={`M0,0 L${ARR*2},${ARR} L0,${ARR*2} Z`} fill={COLORS.dim} />
+        </marker>
+      </defs>
+      {/* uzatma çizgileri */}
       {vertical ? (
-        <text x={mx} y={my} fill="#97adc8" fontSize={DIM_FONT} textAnchor="middle"
-          dominantBaseline="central" transform={`rotate(-90,${mx},${my})`}>
-          {value}
-        </text>
+        <>
+          <line x1={x1 - 3} y1={y1} x2={x1 + offset + 8} y2={y1} stroke={COLORS.dim} strokeWidth={DIM_W * 0.6} />
+          <line x1={x2 - 3} y1={y2} x2={x2 + offset + 8} y2={y2} stroke={COLORS.dim} strokeWidth={DIM_W * 0.6} />
+          <line
+            x1={x1 + offset} y1={y1} x2={x2 + offset} y2={y2}
+            stroke={COLORS.dim} strokeWidth={DIM_W}
+            markerEnd={`url(#${arrowId})`}
+            markerStart={`url(#${arrowBackId})`}
+          />
+          <text x={x1 + offset + 4} y={my} fill={COLORS.dimText}
+            fontSize={7} textAnchor="start" dominantBaseline="central"
+            transform={`rotate(-90,${x1 + offset + 4},${my})`}>
+            {text}
+          </text>
+        </>
       ) : (
-        <text x={mx} y={y1 - 4} fill="#97adc8" fontSize={DIM_FONT} textAnchor="middle">
-          {value}
-        </text>
+        <>
+          <line x1={x1} y1={y1 - 3} x2={x1} y2={y1 + offset + 8} stroke={COLORS.dim} strokeWidth={DIM_W * 0.6} />
+          <line x1={x2} y1={y2 - 3} x2={x2} y2={y2 + offset + 8} stroke={COLORS.dim} strokeWidth={DIM_W * 0.6} />
+          <line
+            x1={x1} y1={y1 + offset} x2={x2} y2={y2 + offset}
+            stroke={COLORS.dim} strokeWidth={DIM_W}
+            markerEnd={`url(#${arrowId})`}
+            markerStart={`url(#${arrowBackId})`}
+          />
+          <text x={mx} y={y1 + offset - 3} fill={COLORS.dimText}
+            fontSize={7} textAnchor="middle" dominantBaseline="auto">
+            {text}
+          </text>
+        </>
       )}
     </g>
   );
 }
 
-// ── Terminal çizimi ───────────────────────────────────────────────────────────
-
-function TerminalMark({ t, viewW, viewH }: { t: ViewTerminal; viewW: number; viewH: number }) {
-  const cx = PAD + Math.max(0, Math.min(t.cx, viewW));
-  const cy = PAD + Math.max(0, Math.min(t.cy, viewH));
-  const color = PHASE_COLOR[t.phase] ?? "#97adc8";
-  const hasBlock = t.bw && t.bw > 0 && t.bh && t.bh > 0;
-  const labelRight = cx + (t.bw ?? TERMINAL_R * 2) / 2 + 10 > PAD + viewW - 16;
-  const labelX = labelRight
-    ? cx - (t.bw ? t.bw / 2 : TERMINAL_R) - 3
-    : cx + (t.bw ? t.bw / 2 : TERMINAL_R) + 3;
-  const labelY = cy - (t.bh ? t.bh / 2 : TERMINAL_R) - 4;
-
+/** Delik sembolü: daire + yatay/dikey merkez çizgileri */
+function HoleSymbol({
+  cx, cy, r, label, dimR,
+}: {
+  cx: number; cy: number; r: number; label?: string; dimR?: number;
+}) {
+  const ext = r * 1.6;
   return (
     <g>
-      {hasBlock ? (
-        <>
-          <rect x={cx - t.bw! / 2} y={cy - t.bh! / 2} width={t.bw} height={t.bh}
-            fill={`${color}1a`} stroke={color} strokeWidth={1.2} rx={2} />
-          {t.boltDist && t.boltDist > 0 && (
-            <>
-              {([-1, 1] as const).map((sign, i) => {
-                if (i === 1 && (t.boltCount ?? 2) < 2) return null;
-                const bx = cx + sign * t.boltDist! / 2;
-                return (
-                  <g key={i}>
-                    <circle cx={bx} cy={cy} r={2.5} fill="none" stroke={color} strokeWidth={1} opacity={0.7} />
-                    <line x1={bx - 3} y1={cy} x2={bx + 3} y2={cy} stroke={color} strokeWidth={0.7} opacity={0.7} />
-                    <line x1={bx} y1={cy - 3} x2={bx} y2={cy + 3} stroke={color} strokeWidth={0.7} opacity={0.7} />
-                  </g>
-                );
-              })}
-            </>
-          )}
-          <text x={cx} y={cy + 3} fill={color} fontSize={7} textAnchor="middle" fontWeight={800} opacity={0.9}>
-            {t.phase}
-          </text>
-        </>
-      ) : (
-        <>
-          <circle cx={cx} cy={cy} r={TERMINAL_R + 3} fill="none" stroke={color} strokeWidth={0.6} opacity={0.3} />
-          <circle cx={cx} cy={cy} r={TERMINAL_R} fill={color} opacity={0.82} />
-          <text x={cx} y={cy + 3} fill="#fff" fontSize={7} textAnchor="middle" fontWeight={800}>
-            {t.phase === "PE" ? "PE" : t.phase.replace("L", "")}
-          </text>
-        </>
+      {/* dış boyut dairesi (varsa) */}
+      {dimR && dimR > r && (
+        <circle cx={cx} cy={cy} r={dimR}
+          fill="none" stroke={COLORS.hidden} strokeWidth={HID_W} strokeDasharray="3 2" />
       )}
-      <text x={labelX} y={labelY} fill="#c6d8ee" fontSize={8}
-        textAnchor={labelRight ? "end" : "start"}>
-        {t.name}{t.boltType ? ` ${t.boltType}` : ""}
+      {/* delik dairesi */}
+      <circle cx={cx} cy={cy} r={r}
+        fill="rgba(30,46,61,0.06)" stroke={COLORS.object} strokeWidth={OBJ_W * 0.7} />
+      {/* merkez çizgileri */}
+      <line x1={cx - ext} y1={cy} x2={cx + ext} y2={cy}
+        stroke={COLORS.center} strokeWidth={CTR_W} strokeDasharray="4 2 1 2" />
+      <line x1={cx} y1={cy - ext} x2={cx} y2={cy + ext}
+        stroke={COLORS.center} strokeWidth={CTR_W} strokeDasharray="4 2 1 2" />
+      {/* etiket */}
+      {label && (
+        <text x={cx + r + 3} y={cy - r - 2} fill={COLORS.dimText}
+          fontSize={6.5} textAnchor="start">
+          {label}
+        </text>
+      )}
+    </g>
+  );
+}
+
+/** Görünüm etiketi kutusu */
+function ViewLabel({ x, y, w, text }: { x: number; y: number; w: number; text: string }) {
+  return (
+    <g>
+      <rect x={x} y={y} width={w} height={11}
+        fill={COLORS.labelBg} stroke={COLORS.border} strokeWidth={0.5} />
+      <text x={x + w / 2} y={y + 7.5} fill={COLORS.labelText}
+        fontSize={7} textAnchor="middle" fontWeight={700} letterSpacing="0.5">
+        {text}
       </text>
     </g>
   );
 }
 
-// ── Tek ortografik görünüm SVG'si ────────────────────────────────────────────
-
-function OrthoView({ label, viewW, viewH, terminals }: {
-  label: string;
-  viewW: number;
-  viewH: number;
-  terminals: ViewTerminal[];
-}) {
-  const svgW = viewW + 2 * PAD;
-  const svgH = viewH + 2 * PAD;
-
-  return (
-    <svg
-      viewBox={`0 0 ${svgW} ${svgH}`}
-      width="100%"
-      height="100%"
-      preserveAspectRatio="xMidYMid meet"
-      style={{
-        display: "block",
-        borderRadius: 8,
-        background: "rgba(5,10,18,0.55)",
-        border: "1px solid rgba(161,188,220,0.1)",
-      }}
-    >
-      {/* Görünüm etiketi — SVG içinde sol alt köşe */}
-      <text x={PAD} y={svgH - PAD + 18} fill="rgba(161,188,220,0.45)"
-        fontSize={10} fontWeight={700} letterSpacing="0.5">
-        {label.toUpperCase()}
-      </text>
-
-      {/* Cihaz gövdesi */}
-      <rect x={PAD} y={PAD} width={viewW} height={viewH}
-        fill="rgba(255,138,61,0.06)" stroke="rgba(255,195,106,0.45)"
-        strokeWidth={1.5} rx={2} />
-
-      {/* Köşe işaretleri */}
-      {([[PAD, PAD], [PAD + viewW, PAD], [PAD, PAD + viewH], [PAD + viewW, PAD + viewH]] as [number,number][])
-        .map(([x, y], i) => <circle key={i} cx={x} cy={y} r={2} fill="rgba(255,195,106,0.22)" />)}
-
-      {/* Boyut — genişlik (üst) */}
-      <DimArrow x1={PAD} y1={PAD - DIM_OFFSET} x2={PAD + viewW} y2={PAD - DIM_OFFSET} value={viewW} />
-
-      {/* Boyut — yükseklik (sol) */}
-      <DimArrow x1={PAD - DIM_OFFSET} y1={PAD} x2={PAD - DIM_OFFSET} y2={PAD + viewH} value={viewH} vertical />
-
-      {/* Terminaller */}
-      {terminals.map((t, i) => <TerminalMark key={i} t={t} viewW={viewW} viewH={viewH} />)}
-
-      {terminals.length === 0 && (
-        <text x={svgW / 2} y={svgH / 2} fill="rgba(161,188,220,0.25)"
-          fontSize={11} textAnchor="middle" dominantBaseline="central">
-          —
-        </text>
-      )}
-    </svg>
-  );
-}
-
-// ── Ana bileşen ───────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Ana bileşen
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function DeviceTechDrawing({
-  widthMm, heightMm, depthMm, terminals, height = 460,
+  widthMm, heightMm, depthMm, terminals, height = 480,
 }: DeviceTechDrawingProps) {
-  const W = Math.max(widthMm || 1, 1);
+  const W = Math.max(widthMm  || 1, 1);
   const H = Math.max(heightMm || 1, 1);
-  const D = Math.max(depthMm || 1, 1);
+  const D = Math.max(depthMm  || 1, 1);
 
-  // Ön görünüm: face = front | null → x_mm / y_mm
-  const frontTerminals: ViewTerminal[] = terminals
-    .filter((t) => !t.terminal_face || t.terminal_face === "front")
-    .map((t) => ({
-      name: t.terminal_name, phase: t.phase, cx: t.x_mm, cy: t.y_mm,
-      bw: t.terminal_width_mm ?? undefined, bh: t.terminal_height_mm ?? undefined,
-      boltDist: t.bolt_center_distance_mm ?? undefined,
-      boltCount: t.bolt_count ?? undefined, boltType: t.bolt_type,
-    }));
+  // Çizim boşlukları (mm biriminde, SVG birimlerine doğrudan eşlenir)
+  const OUTER   = 12;  // kağıt kenar boşluğu
+  const DIM_OFF = 22;  // boyut oku boşluğu
+  const GAP     = 18;  // görünümler arası boşluk
+  const LBL_H   = 13;  // görünüm etiketi yüksekliği
 
-  // Yan görünüm: face = right|left|back → z_mm / y_mm
-  const sideTerminals: ViewTerminal[] = terminals
-    .filter((t) => t.terminal_face && ["right", "left", "back"].includes(t.terminal_face))
-    .map((t) => ({
-      name: t.terminal_name, phase: t.phase, cx: t.z_mm ?? 0, cy: t.y_mm,
-      bw: t.terminal_depth_mm ?? undefined, bh: t.terminal_height_mm ?? undefined,
-      boltDist: t.bolt_center_distance_mm ?? undefined,
-      boltCount: t.bolt_count ?? undefined, boltType: t.bolt_type,
-    }));
+  // Görünüm kök koordinatları
+  const frontX  = OUTER + DIM_OFF;
+  const frontY  = OUTER + DIM_OFF;
+  const sideX   = frontX + W + GAP;
+  const sideY   = frontY;
+  const topX    = frontX;
+  const topY    = frontY + H + GAP;
 
-  // Üst görünüm: face = top|bottom → x_mm / z_mm
-  const topTerminals: ViewTerminal[] = terminals
-    .filter((t) => t.terminal_face && ["top", "bottom"].includes(t.terminal_face))
-    .map((t) => ({
-      name: t.terminal_name, phase: t.phase, cx: t.x_mm, cy: t.z_mm ?? 0,
-      bw: t.terminal_width_mm ?? undefined, bh: t.terminal_depth_mm ?? undefined,
-      boltDist: t.bolt_center_distance_mm ?? undefined,
-      boltCount: t.bolt_count ?? undefined, boltType: t.bolt_type,
-    }));
+  // Toplam SVG iç boyutu (mm)
+  const svgW = sideX + D + DIM_OFF + OUTER;
+  const svgH = topY  + D + DIM_OFF + OUTER;
 
-  /**
-   * Grid oranları cihaz gerçek boyutlarına göre:
-   *   Sütunlar: W (ön genişliği) : D (yan genişliği)
-   *   Satırlar: H (ön/yan yüksekliği) : D (üst yüksekliği)
-   * Bu sayede görünümler sayfada gerçek orana yakın dağılır.
-   */
-  const colRatio = `${W}fr ${D}fr`;
-  const rowRatio = `${H}fr ${D}fr`;
+  // Grid çizgisi aralığı: 10mm veya büyük cihazlarda daha seyrek
+  const gridStep = Math.max(W, H, D) > 400 ? 50 : Math.max(W, H, D) > 200 ? 25 : 10;
+
+  // Terminal filtreleri
+  const frontTerminals = terminals.filter(
+    (t) => !t.terminal_face || t.terminal_face === "front"
+  );
+  const sideTerminals = terminals.filter(
+    (t) => t.terminal_face && ["right", "left", "back"].includes(t.terminal_face)
+  );
+  const topTerminals = terminals.filter(
+    (t) => t.terminal_face && ["top", "bottom"].includes(t.terminal_face)
+  );
+  // Ön terminallerden üst görünümde gizli çizgi olarak gösterilenler
+  const topHiddenTerminals = frontTerminals;
+
+  // Delik yarıçapı: hole_diameter_mm/2, yoksa varsayılan
+  const holeR = (t: TechTerminal) =>
+    t.hole_diameter_mm ? Number(t.hole_diameter_mm) / 2 : Math.min(W, H) * 0.04 + 2;
+
+  const dimId = (suffix: string) => `d-${suffix}-${W}-${H}-${D}`;
 
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateAreas: `"front side" "top legend"`,
-        gridTemplateColumns: colRatio,
-        gridTemplateRows: rowRatio,
-        gap: 6,
-        height,           // sabit yükseklik — sayfaya sığar
-        minHeight: 0,
-      }}
-    >
-      {/* Ön görünüm */}
-      <div style={{ gridArea: "front", minHeight: 0, minWidth: 0 }}>
-        <OrthoView label={`Ön  ${W}×${H}`} viewW={W} viewH={H} terminals={frontTerminals} />
-      </div>
-
-      {/* Yan görünüm */}
-      <div style={{ gridArea: "side", minHeight: 0, minWidth: 0 }}>
-        <OrthoView label={`Yan  ${D}×${H}`} viewW={D} viewH={H} terminals={sideTerminals} />
-      </div>
-
-      {/* Üst görünüm */}
-      <div style={{ gridArea: "top", minHeight: 0, minWidth: 0 }}>
-        <OrthoView label={`Üst  ${W}×${D}`} viewW={W} viewH={D} terminals={topTerminals} />
-      </div>
-
-      {/* Lejant */}
-      <div
-        style={{
-          gridArea: "legend",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          gap: "0.3rem",
-          padding: "0.5rem 0.75rem",
-          borderRadius: 8,
-          background: "rgba(5,10,18,0.4)",
-          border: "1px solid rgba(161,188,220,0.08)",
-          minHeight: 0,
-          overflow: "hidden",
-        }}
+    <div style={{ width: "100%", height, background: COLORS.border, borderRadius: 10, padding: 1 }}>
+      <svg
+        viewBox={`0 0 ${svgW} ${svgH}`}
+        width="100%"
+        height="100%"
+        preserveAspectRatio="xMidYMid meet"
+        style={{ display: "block", borderRadius: 9 }}
+        fontFamily="'Courier New', Consolas, monospace"
       >
-        <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--muted)",
-          textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "0.15rem" }}>
-          Faz
-        </div>
-        {Object.entries(PHASE_COLOR).map(([ph, color]) => (
-          <div key={ph} style={{ display: "flex", alignItems: "center",
-            gap: "0.4rem", fontSize: "0.72rem", color: "var(--muted)" }}>
-            <span style={{ width: 10, height: 10, borderRadius: "50%",
-              background: color, display: "inline-block", flexShrink: 0 }} />
-            {ph}
-          </div>
-        ))}
-        <div style={{ marginTop: "0.5rem", fontSize: "0.65rem",
-          color: "rgba(161,188,220,0.4)", lineHeight: 1.5 }}>
-          ▭ blok boyutu<br />
-          ✕ vida merkezi<br />
-          • koordinat noktası
-        </div>
-      </div>
+        {/* ── Kağıt zemini ─────────────────────────────────────────── */}
+        <rect x={0} y={0} width={svgW} height={svgH} fill={COLORS.paper} />
+
+        {/* ── Grid çizgileri ───────────────────────────────────────── */}
+        <g opacity={0.45}>
+          {Array.from({ length: Math.ceil(svgW / gridStep) + 1 }, (_, i) => i * gridStep).map((x) => (
+            <line key={`gv${x}`} x1={x} y1={0} x2={x} y2={svgH}
+              stroke={COLORS.grid} strokeWidth={0.4} />
+          ))}
+          {Array.from({ length: Math.ceil(svgH / gridStep) + 1 }, (_, i) => i * gridStep).map((y) => (
+            <line key={`gh${y}`} x1={0} y1={y} x2={svgW} y2={y}
+              stroke={COLORS.grid} strokeWidth={0.4} />
+          ))}
+        </g>
+
+        {/* ── Projeksiyon hizalama çizgileri (kesikli) ─────────────── */}
+        {/* Ön ← Üst hizası (dikey) */}
+        <line x1={frontX} y1={frontY + H} x2={topX} y2={topY}
+          stroke={COLORS.projection} strokeWidth={0.5} strokeDasharray="4 3" />
+        <line x1={frontX + W} y1={frontY + H} x2={topX + W} y2={topY}
+          stroke={COLORS.projection} strokeWidth={0.5} strokeDasharray="4 3" />
+        {/* Ön ← Sağ hizası (yatay) */}
+        <line x1={frontX + W} y1={frontY} x2={sideX} y2={sideY}
+          stroke={COLORS.projection} strokeWidth={0.5} strokeDasharray="4 3" />
+        <line x1={frontX + W} y1={frontY + H} x2={sideX} y2={sideY + H}
+          stroke={COLORS.projection} strokeWidth={0.5} strokeDasharray="4 3" />
+
+        {/* ── ÖN GÖRÜNÜM ───────────────────────────────────────────── */}
+        <g>
+          <rect x={frontX} y={frontY} width={W} height={H}
+            fill={COLORS.viewBg} stroke={COLORS.object} strokeWidth={OBJ_W} />
+
+          {/* Ön terminaller */}
+          {frontTerminals.map((t, i) => {
+            const cx = frontX + Number(t.x_mm);
+            const cy = frontY + Number(t.y_mm);
+            const r  = holeR(t);
+            const bw = t.terminal_width_mm  ? Number(t.terminal_width_mm)  : 0;
+            const bh = t.terminal_height_mm ? Number(t.terminal_height_mm) : 0;
+            return (
+              <g key={i}>
+                {bw > 0 && bh > 0 ? (
+                  // Terminal blok dikdörtgeni
+                  <>
+                    <rect x={cx - bw/2} y={cy - bh/2} width={bw} height={bh}
+                      fill="rgba(30,46,61,0.04)" stroke={COLORS.object} strokeWidth={OBJ_W * 0.7} />
+                    {/* merkez çizgileri */}
+                    <line x1={cx - bw/2 - 4} y1={cy} x2={cx + bw/2 + 4} y2={cy}
+                      stroke={COLORS.center} strokeWidth={CTR_W} strokeDasharray="4 2 1 2" />
+                    <line x1={cx} y1={cy - bh/2 - 4} x2={cx} y2={cy + bh/2 + 4}
+                      stroke={COLORS.center} strokeWidth={CTR_W} strokeDasharray="4 2 1 2" />
+                    {/* Vida delikleri */}
+                    {t.bolt_center_distance_mm && (
+                      <>
+                        <HoleSymbol cx={cx - Number(t.bolt_center_distance_mm)/2} cy={cy} r={r * 0.8} />
+                        {(t.bolt_count ?? 2) >= 2 && (
+                          <HoleSymbol cx={cx + Number(t.bolt_center_distance_mm)/2} cy={cy} r={r * 0.8} />
+                        )}
+                      </>
+                    )}
+                    <text x={cx + bw/2 + 3} y={cy - bh/2 - 2} fill={COLORS.dimText}
+                      fontSize={6.5}>{t.terminal_name}</text>
+                  </>
+                ) : (
+                  <HoleSymbol cx={cx} cy={cy} r={r} label={t.terminal_name} />
+                )}
+              </g>
+            );
+          })}
+
+          {/* Görünüm etiketi */}
+          <ViewLabel x={frontX} y={frontY + H + 4} w={W} text="ÖN GÖRÜNÜM" />
+        </g>
+
+        {/* ── SAĞ YAN GÖRÜNÜM ──────────────────────────────────────── */}
+        <g>
+          <rect x={sideX} y={sideY} width={D} height={H}
+            fill={COLORS.viewBg} stroke={COLORS.object} strokeWidth={OBJ_W} />
+
+          {sideTerminals.map((t, i) => {
+            const cx = sideX + Number(t.z_mm ?? 0);
+            const cy = sideY + Number(t.y_mm);
+            const r  = holeR(t);
+            return <HoleSymbol key={i} cx={cx} cy={cy} r={r} label={t.terminal_name} />;
+          })}
+
+          {/* Sağ yan görünümde ön terminaller gizli çizgi olarak */}
+          {frontTerminals.map((t, i) => {
+            const cx = sideX + Number(t.z_mm ?? D / 2);
+            const cy = sideY + Number(t.y_mm);
+            const r  = holeR(t);
+            return (
+              <circle key={`h${i}`} cx={cx} cy={cy} r={r}
+                fill="none" stroke={COLORS.hidden} strokeWidth={HID_W} strokeDasharray="3 2" />
+            );
+          })}
+
+          <ViewLabel x={sideX} y={sideY + H + 4} w={D} text="SAĞ YAN" />
+        </g>
+
+        {/* ── ALT PLAN (ÜST) GÖRÜNÜM ──────────────────────────────── */}
+        <g>
+          <rect x={topX} y={topY} width={W} height={D}
+            fill={COLORS.viewBg} stroke={COLORS.object} strokeWidth={OBJ_W} />
+
+          {/* Gizli çizgi — ön terminaller yukarıdan bakıldığında */}
+          {topHiddenTerminals.map((t, i) => {
+            const cx = topX + Number(t.x_mm);
+            const cy = topY + Number(t.z_mm ?? D / 2);
+            const r  = holeR(t);
+            return (
+              <g key={i}>
+                <circle cx={cx} cy={cy} r={r}
+                  fill="none" stroke={COLORS.hidden} strokeWidth={HID_W} strokeDasharray="3 2" />
+                <line x1={cx - r * 1.5} y1={cy} x2={cx + r * 1.5} y2={cy}
+                  stroke={COLORS.center} strokeWidth={CTR_W} strokeDasharray="4 2 1 2" opacity={0.6} />
+              </g>
+            );
+          })}
+
+          {/* Üst terminaller */}
+          {topTerminals.map((t, i) => {
+            const cx = topX + Number(t.x_mm);
+            const cy = topY + Number(t.z_mm ?? 0);
+            const r  = holeR(t);
+            return <HoleSymbol key={`top${i}`} cx={cx} cy={cy} r={r} label={t.terminal_name} />;
+          })}
+
+          <ViewLabel x={topX} y={topY + D + 4} w={W} text="ALT PLAN" />
+        </g>
+
+        {/* ── BOYUT OKLARI ─────────────────────────────────────────── */}
+
+        {/* Genişlik W — ön görünüm üstü */}
+        <DimLine
+          id={dimId("W")}
+          x1={frontX} y1={frontY} x2={frontX + W} y2={frontY}
+          text={`${W} mm`} offset={-DIM_OFF + 6}
+        />
+
+        {/* Yükseklik H — ön görünüm solu */}
+        <DimLine
+          id={dimId("H")}
+          x1={frontX} y1={frontY} x2={frontX} y2={frontY + H}
+          text={`${H} mm`} offset={-DIM_OFF + 6} vertical
+        />
+
+        {/* Derinlik D — yan görünüm üstü */}
+        <DimLine
+          id={dimId("D")}
+          x1={sideX} y1={sideY} x2={sideX + D} y2={sideY}
+          text={`${D} mm`} offset={-DIM_OFF + 6}
+        />
+
+        {/* Derinlik D tekrar — üst plan sağı */}
+        <DimLine
+          id={dimId("D2")}
+          x1={topX + W} y1={topY} x2={topX + W} y2={topY + D}
+          text={`${D} mm`} offset={DIM_OFF - 6} vertical
+        />
+
+        {/* ── LEJANT (sağ alt) ─────────────────────────────────────── */}
+        {(() => {
+          const lx = sideX;
+          const ly = topY;
+          const lw = D;
+          const lh = D;
+          return (
+            <g>
+              <rect x={lx} y={ly} width={lw} height={lh}
+                fill={COLORS.viewBg} stroke={COLORS.border} strokeWidth={0.7} />
+              <text x={lx + lw/2} y={ly + 11} fill={COLORS.labelText}
+                fontSize={7} textAnchor="middle" fontWeight={700}>
+                LEJANT
+              </text>
+              <line x1={lx} y1={ly + 14} x2={lx + lw} y2={ly + 14}
+                stroke={COLORS.border} strokeWidth={0.5} />
+              {/* Nesne çizgisi örneği */}
+              {[
+                { y: 20, stroke: COLORS.object, sw: OBJ_W, dash: "", label: "Nesne" },
+                { y: 28, stroke: COLORS.hidden,  sw: HID_W, dash: "3 2",  label: "Gizli" },
+                { y: 36, stroke: COLORS.center,  sw: CTR_W, dash: "4 2 1 2", label: "Merkez" },
+                { y: 44, stroke: COLORS.dim,     sw: DIM_W, dash: "",  label: "Ölçü" },
+                { y: 52, stroke: COLORS.projection, sw: 0.5, dash: "4 3", label: "Projeksiyon" },
+              ].map(({ y, stroke, sw, dash, label }) => (
+                <g key={label}>
+                  <line x1={lx + 4} y1={ly + y} x2={lx + 20} y2={ly + y}
+                    stroke={stroke} strokeWidth={sw}
+                    strokeDasharray={dash || undefined} />
+                  <text x={lx + 24} y={ly + y + 3} fill={COLORS.dimText}
+                    fontSize={5.5}>{label}</text>
+                </g>
+              ))}
+            </g>
+          );
+        })()}
+
+        {/* ── Dış çerçeve ──────────────────────────────────────────── */}
+        <rect x={1} y={1} width={svgW - 2} height={svgH - 2}
+          fill="none" stroke={COLORS.border} strokeWidth={1.2} rx={2} />
+        {/* İç çerçeve */}
+        <rect x={OUTER - 2} y={OUTER - 2}
+          width={svgW - 2 * (OUTER - 2)} height={svgH - 2 * (OUTER - 2)}
+          fill="none" stroke={COLORS.object} strokeWidth={0.8} />
+      </svg>
     </div>
   );
 }
