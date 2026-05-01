@@ -14,6 +14,8 @@ interface PanelSelectionTabProps {
 export function PanelSelectionTab({ projectId }: PanelSelectionTabProps) {
   const queryClient = useQueryClient();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [pendingDef, setPendingDef] = useState<PanelDefinition | null>(null);
+  const [pendingQuantity, setPendingQuantity] = useState(1);
   const [editingPanel, setEditingPanel] = useState<ProjectPanel | null>(null);
   const [editLabel, setEditLabel] = useState("");
 
@@ -33,11 +35,13 @@ export function PanelSelectionTab({ projectId }: PanelSelectionTabProps) {
   });
 
   const addMutation = useMutation({
-    mutationFn: (def: PanelDefinition) =>
-      client.createProjectPanel(projectId, { panel_definition_id: def.id }),
+    mutationFn: ({ def, quantity }: { def: PanelDefinition; quantity: number }) =>
+      client.createProjectPanel(projectId, { panel_definition_id: def.id, quantity }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["project-panels", projectId] });
       queryClient.invalidateQueries({ queryKey: ["panel", projectId] });
+      setPendingDef(null);
+      setPendingQuantity(1);
     },
   });
 
@@ -97,6 +101,7 @@ export function PanelSelectionTab({ projectId }: PanelSelectionTabProps) {
                 <th>Kabin Etiketi</th>
                 <th>Tip (Kütüphane Adı)</th>
                 <th>Boyutlar (G × Y × D)</th>
+                <th>Adet</th>
                 <th>İşlemler</th>
               </tr>
             </thead>
@@ -132,6 +137,7 @@ export function PanelSelectionTab({ projectId }: PanelSelectionTabProps) {
                     {item.panel_definition.width_mm} × {item.panel_definition.height_mm}
                     {item.panel_definition.depth_mm ? ` × ${item.panel_definition.depth_mm}` : ""} mm
                   </td>
+                  <td>{item.quantity}</td>
                   <td className="actions-cell">
                     <button
                       type="button"
@@ -195,9 +201,54 @@ export function PanelSelectionTab({ projectId }: PanelSelectionTabProps) {
             </td>
           </>
         )}
-        onSelect={(def) => addMutation.mutate(def)}
+        onSelect={(def) => {
+          setPickerOpen(false);
+          setPendingDef(def);
+          setPendingQuantity(1);
+        }}
         onClose={() => setPickerOpen(false)}
       />
+
+      {/* ── Adet onay modal'ı (picker'dan seçim sonrası) ── */}
+      <Modal
+        title={pendingDef ? `Kabin Ekle — ${pendingDef.name}` : ""}
+        open={!!pendingDef}
+        onClose={() => setPendingDef(null)}
+      >
+        {pendingDef && (
+          <div className="modal-body">
+            <p style={{ marginBottom: "1rem", color: "var(--muted)", fontSize: "0.9rem" }}>
+              {pendingDef.width_mm} × {pendingDef.height_mm}
+              {pendingDef.depth_mm ? ` × ${pendingDef.depth_mm}` : ""} mm
+            </p>
+            <label className="field" style={{ marginBottom: "1.25rem" }}>
+              <span>Adet</span>
+              <input
+                className="input"
+                type="number"
+                min={1}
+                step={1}
+                value={pendingQuantity}
+                onChange={(e) => setPendingQuantity(Math.max(1, Number(e.target.value)))}
+                autoFocus
+              />
+            </label>
+            <div className="form-actions">
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={addMutation.isPending}
+                onClick={() => addMutation.mutate({ def: pendingDef, quantity: pendingQuantity })}
+              >
+                {addMutation.isPending ? "Ekleniyor..." : "Kabin Ekle"}
+              </button>
+              <button type="button" className="ghost" onClick={() => setPendingDef(null)}>
+                İptal
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* ── Etiket düzenleme modal'ı ── */}
       <Modal

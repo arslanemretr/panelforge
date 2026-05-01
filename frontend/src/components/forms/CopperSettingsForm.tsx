@@ -163,6 +163,16 @@ export function CopperSettingsForm({ initialValue, onSubmit }: CopperSettingsFor
           onChange={(event) => update("main_phase_spacing_mm", Number(event.target.value))}
         />
       </label>
+      <label>
+        <span>Ana faz merkez mesafesi (mm)</span>
+        <input
+          type="number"
+          step="0.1"
+          value={value.main_phase_center_mm ?? ""}
+          placeholder="opsiyonel"
+          onChange={(event) => update("main_phase_center_mm", event.target.value === "" ? null : Number(event.target.value))}
+        />
+      </label>
       {/* ── Tali Bakır ───────────────────────────────────────────────────── */}
       <SectionTitle title="Tali Bara Kesiti" />
       <label>
@@ -183,6 +193,16 @@ export function CopperSettingsForm({ initialValue, onSubmit }: CopperSettingsFor
           type="number"
           value={value.branch_phase_spacing_mm ?? 0}
           onChange={(event) => update("branch_phase_spacing_mm", Number(event.target.value))}
+        />
+      </label>
+      <label>
+        <span>Tali faz merkez mesafesi (mm)</span>
+        <input
+          type="number"
+          step="0.1"
+          value={value.branch_phase_center_mm ?? ""}
+          placeholder="opsiyonel"
+          onChange={(event) => update("branch_phase_center_mm", event.target.value === "" ? null : Number(event.target.value))}
         />
       </label>
       {/* ── Büküm + Delik ────────────────────────────────────────────────── */}
@@ -275,6 +295,21 @@ export function CopperSettingsForm({ initialValue, onSubmit }: CopperSettingsFor
       <label className="checkbox-field">
         <input type="checkbox" checked={value.use_slot_holes} onChange={(event) => update("use_slot_holes", event.target.checked)} />
         <span>Slot delik kullan</span>
+      </label>
+      <label>
+        <span>Kaplama tipi</span>
+        <select
+          className="form-input"
+          value={value.coating_type ?? ""}
+          onChange={(event) => update("coating_type", event.target.value || null)}
+        >
+          <option value="">— Seçiniz —</option>
+          <option value="Kaplamasız">Kaplamasız</option>
+          <option value="Kalay Kaplı">Kalay Kaplı</option>
+          <option value="Makaron Kaplı">Makaron Kaplı</option>
+          <option value="Boyalı">Boyalı</option>
+          <option value="Üre Kaplamalı">Üre Kaplamalı</option>
+        </select>
       </label>
       {/* ── Koordinat Sistemi ─────────────────────────────────────────────── */}
       <SectionTitle title="Koordinat Sistemi" />

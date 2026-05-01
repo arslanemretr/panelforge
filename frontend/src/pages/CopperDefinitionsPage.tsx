@@ -39,7 +39,13 @@ function buildPayload(draft: DraftCopper): Omit<CopperDefinition, "id" | "create
     use_slot_holes: false,
     slot_width_mm: null,
     slot_length_mm: null,
+    coating_type: null,
   };
+}
+
+function fmtDate(s?: string): string {
+  if (!s) return "—";
+  return new Date(s).toLocaleDateString("tr-TR");
 }
 
 export function CopperDefinitionsPage() {
@@ -47,11 +53,27 @@ export function CopperDefinitionsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [draft, setDraft] = useState<DraftCopper>(emptyDraft);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [search, setSearch] = useState<string>(
+    localStorage.getItem("copper-def-search") ?? ""
+  );
 
   const definitionsQuery = useQuery({
     queryKey: ["copper-definitions"],
     queryFn: client.listCopperDefinitions,
   });
+
+  const allDefinitions = definitionsQuery.data ?? [];
+
+  const filtered = search.trim()
+    ? allDefinitions.filter((d) =>
+        d.name.toLowerCase().includes(search.trim().toLowerCase())
+      )
+    : allDefinitions;
+
+  function handleSearchChange(value: string) {
+    setSearch(value);
+    localStorage.setItem("copper-def-search", value);
+  }
 
   const createMutation = useMutation({
     mutationFn: () => client.createCopperDefinition(buildPayload(draft)),
@@ -59,6 +81,20 @@ export function CopperDefinitionsPage() {
       await queryClient.invalidateQueries({ queryKey: ["copper-definitions"] });
       setModalOpen(false);
       setDraft(emptyDraft);
+    },
+  });
+
+  const cloneMutation = useMutation({
+    mutationFn: (def: CopperDefinition) =>
+      client.createCopperDefinition(
+        buildPayload({
+          name: def.name + " (Kopya)",
+          main_thickness_mm: def.main_thickness_mm ?? 10,
+          main_width_mm: def.main_width_mm ?? 40,
+        })
+      ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["copper-definitions"] });
     },
   });
 
@@ -114,6 +150,22 @@ export function CopperDefinitionsPage() {
       )}
 
       <section className="card">
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem", flexWrap: "wrap" }}>
+          <input
+            type="search"
+            className="input"
+            placeholder="Bakır kodu ara..."
+            value={search}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            style={{ flex: 1, maxWidth: "320px" }}
+          />
+          {search.trim() && (
+            <span style={{ fontSize: "0.85rem", color: "var(--color-muted, #888)" }}>
+              {filtered.length} / {allDefinitions.length} kayıt
+            </span>
+          )}
+        </div>
+
         <div className="table-wrap">
           <table>
             <thead>
@@ -121,11 +173,12 @@ export function CopperDefinitionsPage() {
                 <th>Bakır Kodu</th>
                 <th>Kalınlık (mm)</th>
                 <th>En (mm)</th>
+                <th>Oluşturma / Revizyon</th>
                 <th>İşlem</th>
               </tr>
             </thead>
             <tbody>
-              {definitionsQuery.data?.map((definition) => (
+              {filtered.map((definition) => (
                 <tr key={definition.id}>
                   <td>
                     <strong>{definition.name}</strong>
@@ -133,6 +186,22 @@ export function CopperDefinitionsPage() {
                   <td>{definition.main_thickness_mm ?? "-"}</td>
                   <td>{definition.main_width_mm ?? "-"}</td>
                   <td>
+                    <div style={{ fontSize: "0.8rem", color: "var(--color-muted, #888)" }}>
+                      {fmtDate(definition.created_at)}
+                    </div>
+                    <div style={{ fontSize: "0.8rem", color: "var(--color-muted, #888)" }}>
+                      {fmtDate(definition.updated_at)}
+                    </div>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="ghost"
+                      disabled={cloneMutation.isPending}
+                      onClick={() => cloneMutation.mutate(definition)}
+                    >
+                      Kopyala
+                    </button>
                     <button
                       type="button"
                       className="ghost danger"
@@ -144,9 +213,9 @@ export function CopperDefinitionsPage() {
                   </td>
                 </tr>
               ))}
-              {!definitionsQuery.data?.length && (
+              {!filtered.length && (
                 <tr>
-                  <td colSpan={4}>
+                  <td colSpan={5}>
                     <div className="empty-state">Tanimli bakir yok.</div>
                   </td>
                 </tr>

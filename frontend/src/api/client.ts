@@ -38,7 +38,7 @@ export const client = {
     (await api.get<ProjectPanel[]>(`/projects/${projectId}/panel-layout`)).data,
   createProjectPanel: async (
     projectId: number,
-    payload: { panel_definition_id: number; label?: string | null },
+    payload: { panel_definition_id: number; label?: string | null; quantity?: number },
   ) => (await api.post<ProjectPanel>(`/projects/${projectId}/panel-layout`, payload)).data,
   deleteProjectPanel: async (projectId: number, projectPanelId: number) =>
     api.delete(`/projects/${projectId}/panel-layout/${projectPanelId}`),

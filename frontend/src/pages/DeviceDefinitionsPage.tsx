@@ -8,11 +8,20 @@ import { Modal } from "../components/Modal";
 import { DeviceTechDrawing } from "../components/DeviceTechDrawing";
 import type { Device } from "../types";
 
+function fmtDate(s?: string): string {
+  if (!s) return "—";
+  const d = new Date(s);
+  return d.toLocaleDateString("tr-TR");
+}
+
 export function DeviceDefinitionsPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [viewingDevice, setViewingDevice] = useState<Device | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [search, setSearch] = useState<string>(
+    localStorage.getItem("device-search") ?? ""
+  );
 
   const devicesQuery = useQuery({
     queryKey: ["devices"],
@@ -38,6 +47,20 @@ export function DeviceDefinitionsPage() {
     setDeleteError(null);
     deleteMutation.mutate(deviceId);
   }
+
+  function handleSearchChange(value: string) {
+    setSearch(value);
+    localStorage.setItem("device-search", value);
+  }
+
+  const allDevices = devicesQuery.data ?? [];
+  const filtered = allDevices.filter(
+    (d) =>
+      !search ||
+      [d.brand, d.model, d.device_type].some((v) =>
+        v.toLowerCase().includes(search.toLowerCase())
+      )
+  );
 
   return (
     <div className="stack">
@@ -80,6 +103,29 @@ export function DeviceDefinitionsPage() {
       )}
 
       <section className="card">
+        {/* Arama / Filtre satırı */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.75rem",
+            marginBottom: "0.75rem",
+          }}
+        >
+          <input
+            type="search"
+            placeholder="Marka, model veya tip ara…"
+            value={search}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            style={{ flex: 1, maxWidth: "320px" }}
+          />
+          {search && (
+            <span style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
+              {filtered.length} / {allDevices.length} kayıt
+            </span>
+          )}
+        </div>
+
         <div className="table-wrap">
           <table>
             <thead>
@@ -92,11 +138,12 @@ export function DeviceDefinitionsPage() {
                 <th>Akim (A)</th>
                 <th>Boyut W×H×D (mm)</th>
                 <th>Terminal</th>
+                <th>Oluşturma / Revizyon</th>
                 <th>İşlem</th>
               </tr>
             </thead>
             <tbody>
-              {devicesQuery.data?.map((device) => (
+              {filtered.map((device) => (
                 <tr key={device.id}>
                   <td>{device.brand}</td>
                   <td>{device.model}</td>
@@ -110,6 +157,10 @@ export function DeviceDefinitionsPage() {
                     {device.width_mm} × {device.height_mm} × {device.depth_mm ?? 0}
                   </td>
                   <td>{device.terminals.length}</td>
+                  <td style={{ fontSize: "0.82rem", color: "var(--muted)", lineHeight: 1.6 }}>
+                    <div>{fmtDate(device.created_at)}</div>
+                    <div>{fmtDate(device.updated_at)}</div>
+                  </td>
                   <td className="actions-cell">
                     <button
                       type="button"
@@ -118,6 +169,14 @@ export function DeviceDefinitionsPage() {
                       title="Teknik çizimi görüntüle"
                     >
                       Görüntüle
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost"
+                      onClick={() => navigate(`/definitions/devices/new?clone=${device.id}`)}
+                      title="Bu kaydı temel alarak yeni cihaz oluştur"
+                    >
+                      Kopyala
                     </button>
                     <button
                       type="button"
@@ -137,10 +196,12 @@ export function DeviceDefinitionsPage() {
                   </td>
                 </tr>
               ))}
-              {!devicesQuery.data?.length && (
+              {!filtered.length && (
                 <tr>
-                  <td colSpan={9}>
-                    <div className="empty-state">Tanimli cihaz yok.</div>
+                  <td colSpan={10}>
+                    <div className="empty-state">
+                      {search ? "Arama kriterine uyan cihaz bulunamadı." : "Tanimli cihaz yok."}
+                    </div>
                   </td>
                 </tr>
               )}

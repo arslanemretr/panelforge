@@ -21,10 +21,21 @@ const emptyPanelDefinition: Omit<PanelDefinition, "id" | "created_at" | "updated
   phase_system: "3P",
 };
 
+function fmtDate(s?: string) {
+  if (!s) return "—";
+  return new Date(s).toLocaleDateString("tr-TR");
+}
+
+const SEARCH_STORAGE_KEY = "panel-def-search";
+
 export function PanelDefinitionsPage() {
   const queryClient = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [draft, setDraft] = useState(emptyPanelDefinition);
+  const [cloningId, setCloningId] = useState<number | null>(null);
+  const [search, setSearch] = useState<string>(
+    () => localStorage.getItem(SEARCH_STORAGE_KEY) ?? ""
+  );
 
   const definitionsQuery = useQuery({
     queryKey: ["panel-definitions"],
@@ -40,6 +51,32 @@ export function PanelDefinitionsPage() {
     },
   });
 
+  const cloneMutation = useMutation({
+    mutationFn: (source: PanelDefinition) =>
+      client.createPanelDefinition({
+        name: source.name + " (Kopya)",
+        description: source.description,
+        width_mm: source.width_mm,
+        height_mm: source.height_mm,
+        depth_mm: source.depth_mm,
+        mounting_plate_width_mm: source.mounting_plate_width_mm,
+        mounting_plate_height_mm: source.mounting_plate_height_mm,
+        left_margin_mm: source.left_margin_mm,
+        right_margin_mm: source.right_margin_mm,
+        top_margin_mm: source.top_margin_mm,
+        bottom_margin_mm: source.bottom_margin_mm,
+        busbar_orientation: source.busbar_orientation,
+        phase_system: source.phase_system,
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["panel-definitions"] });
+      setCloningId(null);
+    },
+    onError: () => {
+      setCloningId(null);
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: client.deletePanelDefinition,
     onSuccess: async () => {
@@ -50,6 +87,20 @@ export function PanelDefinitionsPage() {
   function update<K extends keyof typeof draft>(key: K, value: (typeof draft)[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
   }
+
+  function handleSearchChange(value: string) {
+    setSearch(value);
+    localStorage.setItem(SEARCH_STORAGE_KEY, value);
+  }
+
+  const filteredDefinitions = (definitionsQuery.data ?? []).filter((def) => {
+    if (!search.trim()) return true;
+    const term = search.toLowerCase();
+    return (
+      def.name.toLowerCase().includes(term) ||
+      (def.description ?? "").toLowerCase().includes(term)
+    );
+  });
 
   return (
     <div className="stack">
@@ -65,6 +116,15 @@ export function PanelDefinitionsPage() {
       </section>
 
       <section className="card">
+        <div style={{ marginBottom: "0.75rem" }}>
+          <input
+            type="search"
+            placeholder="Kabin ara..."
+            value={search}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            style={{ width: "100%", maxWidth: 320 }}
+          />
+        </div>
         <div className="table-wrap">
           <table>
             <thead>
@@ -74,11 +134,12 @@ export function PanelDefinitionsPage() {
                 <th>Montaj Plakasi</th>
                 <th>Yon</th>
                 <th>Faz</th>
+                <th>Olusturma / Revizyon</th>
                 <th>Islem</th>
               </tr>
             </thead>
             <tbody>
-              {definitionsQuery.data?.map((definition) => (
+              {filteredDefinitions.map((definition) => (
                 <tr key={definition.id}>
                   <td>
                     <strong>{definition.name}</strong>
@@ -93,16 +154,37 @@ export function PanelDefinitionsPage() {
                   <td>{definition.busbar_orientation || "-"}</td>
                   <td>{definition.phase_system || "-"}</td>
                   <td>
-                    <button type="button" className="ghost" onClick={() => deleteMutation.mutate(definition.id)}>
+                    <div>{fmtDate(definition.created_at)}</div>
+                    <div className="table-subtext">{fmtDate(definition.updated_at)}</div>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="ghost"
+                      disabled={cloningId === definition.id}
+                      onClick={() => {
+                        setCloningId(definition.id);
+                        cloneMutation.mutate(definition);
+                      }}
+                    >
+                      {cloningId === definition.id ? "..." : "Kopyala"}
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost"
+                      onClick={() => deleteMutation.mutate(definition.id)}
+                    >
                       Sil
                     </button>
                   </td>
                 </tr>
               ))}
-              {!definitionsQuery.data?.length && (
+              {!filteredDefinitions.length && (
                 <tr>
-                  <td colSpan={6}>
-                    <div className="empty-state">Tanimli kabin yok.</div>
+                  <td colSpan={7}>
+                    <div className="empty-state">
+                      {search.trim() ? "Aramayla eslesen kabin bulunamadi." : "Tanimli kabin yok."}
+                    </div>
                   </td>
                 </tr>
               )}

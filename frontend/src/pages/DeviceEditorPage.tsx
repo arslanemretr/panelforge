@@ -6,7 +6,7 @@
  * Alt: Canlı 3-görünüm teknik çizim
  */
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { client } from "../api/client";
@@ -77,15 +77,18 @@ const FACES = [
 // ── Ana bileşen ───────────────────────────────────────────────────────────────
 export function DeviceEditorPage() {
   const { id } = useParams<{ id: string }>();
-  const isEdit = Boolean(id);
+  const [searchParams] = useSearchParams();
+  const cloneId = searchParams.get("clone");
+  const isEdit = Boolean(id) && !cloneId;
+  const loadId = id || cloneId || undefined;
   const navigate = useNavigate();
   const qc = useQueryClient();
 
-  // Mevcut cihazı yükle (düzenleme modunda)
+  // Mevcut cihazı yükle (düzenleme veya kopyalama modunda)
   const deviceQ = useQuery({
-    queryKey: ["device", id],
-    queryFn: () => client.listDevices().then((list) => list.find((d) => d.id === Number(id)) ?? null),
-    enabled: isEdit,
+    queryKey: ["device", loadId],
+    queryFn: () => client.listDevices().then((list) => list.find((d) => d.id === Number(loadId)) ?? null),
+    enabled: Boolean(loadId),
   });
 
   const [form, setForm] = useState<DeviceForm>(EMPTY_FORM);
@@ -96,12 +99,12 @@ export function DeviceEditorPage() {
   ]);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Düzenleme modunda mevcut veriyi yükle
+  // Düzenleme/kopyalama modunda mevcut veriyi yükle
   useEffect(() => {
     const device = deviceQ.data;
     if (!device) return;
     setForm({
-      brand: device.brand,
+      brand: device.brand + (cloneId ? " (Kopya)" : ""),
       model: device.model,
       device_type: device.device_type,
       enclosure_type: device.enclosure_type ?? "",
@@ -125,7 +128,7 @@ export function DeviceEditorPage() {
         bolt_count: t.bolt_count != null ? Number(t.bolt_count) : null,
       }))
     );
-  }, [deviceQ.data]);
+  }, [deviceQ.data, cloneId]);
 
   // Mutations
   const createMut = useMutation({
@@ -190,11 +193,13 @@ export function DeviceEditorPage() {
     setTerminals((ts) => ts.filter((_, i) => i !== idx));
   }
 
-  if (isEdit && deviceQ.isLoading) {
+  if (Boolean(loadId) && deviceQ.isLoading) {
     return <div className="loading-state">Cihaz yükleniyor…</div>;
   }
 
-  const pageTitle = isEdit
+  const pageTitle = cloneId
+    ? `Kopyala — ${form.brand}`
+    : isEdit
     ? `Düzenle — ${form.brand} ${form.model}`
     : "Yeni Cihaz Tanımla";
 

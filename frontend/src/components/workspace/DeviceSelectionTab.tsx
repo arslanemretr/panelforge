@@ -29,6 +29,7 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
   const [configY, setConfigY] = useState(0);   // mm, alttan
   const [configZ, setConfigZ] = useState(0);   // mm, derinlik (ön yüzeyden)
   const [configRotation, setConfigRotation] = useState(0);
+  const [configQuantity, setConfigQuantity] = useState(1);
 
   // ── Queries ──────────────────────────────────────────────────────────────────
   const panelQuery = useQuery({
@@ -101,6 +102,7 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
     setConfigY(0);
     setConfigZ(0);
     setConfigRotation(0);
+    setConfigQuantity(1);
     setSelectedPanel(projectPanels.length === 1 ? projectPanels[0] : null);
     setConfigStep(projectPanels.length === 1 ? "enter-coords" : "pick-cabinet");
   }
@@ -114,6 +116,7 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
     setConfigY(pd.y_mm);
     setConfigZ(pd.z_mm ?? 0);
     setConfigRotation(pd.rotation_deg);
+    setConfigQuantity(pd.quantity);
     setConfigStep("enter-coords");
   }
 
@@ -132,7 +135,7 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
       y_mm: configY,
       z_mm: configZ,
       rotation_deg: configRotation,
-      quantity: 1,
+      quantity: configQuantity,
     });
   }
 
@@ -148,7 +151,7 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
         y_mm: configY,
         z_mm: configZ,
         rotation_deg: configRotation,
-        quantity: editingDevice.quantity,
+        quantity: configQuantity,
       },
     });
   }
@@ -192,6 +195,7 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
                 <th>X (mm)</th>
                 <th>Y (mm)</th>
                 <th>Dönüş</th>
+                <th>Adet</th>
                 <th>İşlemler</th>
               </tr>
             </thead>
@@ -204,6 +208,7 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
                   <td>{pd.x_mm}</td>
                   <td>{pd.y_mm}</td>
                   <td>{pd.rotation_deg}°</td>
+                  <td>{pd.quantity}</td>
                   <td className="actions-cell">
                     <button type="button" className="ghost" onClick={() => openEditFlow(pd)}>
                       Düzenle
@@ -429,6 +434,18 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
                     <option value={180}>180°</option>
                     <option value={270}>270°</option>
                   </select>
+                </label>
+
+                <label className="field">
+                  <span>Adet</span>
+                  <input
+                    className="input"
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={configQuantity}
+                    onChange={(e) => setConfigQuantity(Math.max(1, Number(e.target.value)))}
+                  />
                 </label>
               </div>
 

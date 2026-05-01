@@ -41,6 +41,7 @@ export interface ProjectPanel {
   panel_definition_id: number;
   label?: string | null;
   seq: number;
+  quantity: number;
   panel_definition: PanelDefinition;
 }
 
@@ -92,6 +93,8 @@ export interface Device {
   height_mm: number;
   depth_mm?: number | null;
   terminals: DeviceTerminal[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface ProjectDevice {
@@ -131,6 +134,7 @@ export interface CopperDefinition {
   slot_width_mm?: number | null;
   slot_length_mm?: number | null;
   density_g_cm3?: number | null;
+  coating_type?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -181,6 +185,9 @@ export interface CopperSettings {
   busbar_clearance_mm?: number | null;       // ana bara-bara arası min. hava boşluğu
   branch_clearance_mm?: number | null;       // tali bara-bara arası min. hava boşluğu
   min_hole_hole_distance_mm?: number | null; // delik merkezi-merkezi arası min. mesafe
+  coating_type?: string | null;             // "Kaplamasız" | "Kalay Kaplı" | vb.
+  main_phase_center_mm?: number | null;     // ana faz L1↔L2 merkez-merkez mesafesi
+  branch_phase_center_mm?: number | null;   // tali faz merkez-merkez mesafesi
 }
 
 export interface ValidationResult {
