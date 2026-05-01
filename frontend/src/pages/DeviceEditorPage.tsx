@@ -494,6 +494,7 @@ export function DeviceEditorPage() {
           heightMm={form.height_mm}
           depthMm={form.depth_mm}
           terminals={terminals}
+          height={960}
         />
       </section>
 
