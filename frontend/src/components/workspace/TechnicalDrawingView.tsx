@@ -221,9 +221,11 @@ export function TechnicalDrawingView({
             <select
               className="input"
               value={selectedId}
-              onChange={(e) =>
-                setSelectedId(e.target.value === "all" ? "all" : Number(e.target.value))
-              }
+              onChange={(e) => {
+                setSelectedId(e.target.value === "all" ? "all" : Number(e.target.value));
+                setZoom(1);
+                setPan({ x: 0, y: 0 });
+              }}
               style={{ fontSize: "0.85rem", padding: "0.3rem 0.6rem", minWidth: 160 }}
             >
               <option value="all">Tüm Kabinler</option>
@@ -328,7 +330,7 @@ export function TechnicalDrawingView({
         ════════════════════════════════════════════════════════════════ */}
 
         {/* Kabin gövdeleri */}
-        {layouts.map((cl) => {
+        {layouts.map((cl, clIdx) => {
           const cx  = fvX(cl.assemblyX);
           const cy  = fvY(cl.cH);
           const cWp = cl.cW * scale;
@@ -339,7 +341,7 @@ export function TechnicalDrawingView({
           const intW = (cl.cW - cl.lm - cl.rm) * scale;
           const intH = (cl.cH - cl.tm - cl.bm) * scale;
           return (
-            <g key={`fv-cab-${cl.id}`}>
+            <g key={`fv-cab-${cl.id}-${clIdx}`}>
               <rect x={cx} y={cy} width={cWp} height={cHp} fill="#d6d6d6" stroke="#1a1a1a" strokeWidth={2} />
               <rect x={cx}           y={cy} width={cWp} height={wall} fill="#e4e4e4" />
               <rect x={cx}           y={cy} width={wall}   height={cHp} fill="#e4e4e4" />
@@ -546,12 +548,12 @@ export function TechnicalDrawingView({
         ════════════════════════════════════════════════════════════════ */}
 
         {/* Kabin gövdeleri — üst görünüm */}
-        {layouts.map((cl) => {
+        {layouts.map((cl, clIdx) => {
           const cx = fvX(cl.assemblyX);
           const cw = cl.cW * scale;
           const cd = cl.cD * scale;
           return (
-            <g key={`tv-cab-${cl.id}`}>
+            <g key={`tv-cab-${cl.id}-${clIdx}`}>
               <rect x={cx} y={tvY(0)} width={cw} height={cd}
                 fill="#d8d8d8" stroke="#1a1a1a" strokeWidth={1.5} />
               {/* Ön yüzey vurgusu (SVG'de üst kenar) */}
