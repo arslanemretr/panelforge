@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 
 import { client } from "../api/client";
+import { ConfirmModal } from "../components/ConfirmModal";
 import { Modal } from "../components/Modal";
 import type { CopperDefinition } from "../types";
 
@@ -53,6 +54,7 @@ export function CopperDefinitionsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [draft, setDraft] = useState<DraftCopper>(emptyDraft);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [confirmPending, setConfirmPending] = useState<{ message: string; onConfirm: () => void } | null>(null);
   const [search, setSearch] = useState<string>(
     localStorage.getItem("copper-def-search") ?? ""
   );
@@ -216,10 +218,12 @@ export function CopperDefinitionsPage() {
                       type="button"
                       className="ghost danger"
                       disabled={deleteMutation.isPending}
-                      onClick={() => {
-                        if (window.confirm(`"${definition.name}" bakır tanımını silmek istediğinizden emin misiniz?\nBu işlem geri alınamaz.`))
-                          deleteMutation.mutate(definition.id);
-                      }}
+                      onClick={() =>
+                        setConfirmPending({
+                          message: `"${definition.name}" bakır tanımını silmek istediğinizden emin misiniz?`,
+                          onConfirm: () => { deleteMutation.mutate(definition.id); setConfirmPending(null); },
+                        })
+                      }
                     >
                       Sil
                     </button>
@@ -287,6 +291,13 @@ export function CopperDefinitionsPage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmModal
+        open={confirmPending !== null}
+        message={confirmPending?.message ?? ""}
+        onConfirm={() => confirmPending?.onConfirm()}
+        onCancel={() => setConfirmPending(null)}
+      />
     </div>
   );
 }

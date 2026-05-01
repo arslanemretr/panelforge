@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
 import { client } from "../api/client";
+import { ConfirmModal } from "../components/ConfirmModal";
 import { Modal } from "../components/Modal";
 import { DeviceTechDrawing } from "../components/DeviceTechDrawing";
 import type { Device } from "../types";
@@ -19,6 +20,7 @@ export function DeviceDefinitionsPage() {
   const navigate = useNavigate();
   const [viewingDevice, setViewingDevice] = useState<Device | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [confirmPending, setConfirmPending] = useState<{ message: string; onConfirm: () => void } | null>(null);
   const [search, setSearch] = useState<string>(
     localStorage.getItem("device-search") ?? ""
   );
@@ -45,8 +47,10 @@ export function DeviceDefinitionsPage() {
 
   function handleDelete(deviceId: number, deviceName: string) {
     setDeleteError(null);
-    if (window.confirm(`"${deviceName}" cihazını silmek istediğinizden emin misiniz?\nBu işlem geri alınamaz.`))
-      deleteMutation.mutate(deviceId);
+    setConfirmPending({
+      message: `"${deviceName}" cihazını silmek istediğinizden emin misiniz?`,
+      onConfirm: () => { deleteMutation.mutate(deviceId); setConfirmPending(null); },
+    });
   }
 
   function handleSearchChange(value: string) {
@@ -268,6 +272,13 @@ export function DeviceDefinitionsPage() {
           </div>
         )}
       </Modal>
+
+      <ConfirmModal
+        open={confirmPending !== null}
+        message={confirmPending?.message ?? ""}
+        onConfirm={() => confirmPending?.onConfirm()}
+        onCancel={() => setConfirmPending(null)}
+      />
     </div>
   );
 }

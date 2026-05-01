@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { client } from "../api/client";
+import { ConfirmModal } from "../components/ConfirmModal";
 import { Modal } from "../components/Modal";
 import type { PanelDefinition } from "../types";
 
@@ -33,6 +34,7 @@ export function PanelDefinitionsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [draft, setDraft] = useState(emptyPanelDefinition);
   const [cloningId, setCloningId] = useState<number | null>(null);
+  const [confirmPending, setConfirmPending] = useState<{ message: string; onConfirm: () => void } | null>(null);
   const [search, setSearch] = useState<string>(
     () => localStorage.getItem(SEARCH_STORAGE_KEY) ?? ""
   );
@@ -190,10 +192,12 @@ export function PanelDefinitionsPage() {
                       type="button"
                       className="ghost danger"
                       disabled={deleteMutation.isPending}
-                      onClick={() => {
-                        if (window.confirm(`"${definition.name}" kabin tanımını silmek istediğinizden emin misiniz?\nBu işlem geri alınamaz.`))
-                          deleteMutation.mutate(definition.id);
-                      }}
+                      onClick={() =>
+                        setConfirmPending({
+                          message: `"${definition.name}" kabin tanımını silmek istediğinizden emin misiniz?`,
+                          onConfirm: () => { deleteMutation.mutate(definition.id); setConfirmPending(null); },
+                        })
+                      }
                     >
                       Sil
                     </button>
@@ -294,6 +298,13 @@ export function PanelDefinitionsPage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmModal
+        open={confirmPending !== null}
+        message={confirmPending?.message ?? ""}
+        onConfirm={() => confirmPending?.onConfirm()}
+        onCancel={() => setConfirmPending(null)}
+      />
     </div>
   );
 }

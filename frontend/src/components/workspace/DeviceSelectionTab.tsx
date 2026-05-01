@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { client } from "../../api/client";
 import type { Device, ProjectDevice, ProjectPanel } from "../../types";
+import { ConfirmModal } from "../ConfirmModal";
 import { Modal } from "../Modal";
 import { LibraryPickerModal } from "./LibraryPickerModal";
 import { TechnicalDrawingView } from "./TechnicalDrawingView";
@@ -30,6 +31,7 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
   const [configZ, setConfigZ] = useState(0);   // mm, derinlik (ön yüzeyden)
   const [configRotation, setConfigRotation] = useState(0);
   const [configQuantity, setConfigQuantity] = useState(1);
+  const [confirmPending, setConfirmPending] = useState<{ message: string; onConfirm: () => void } | null>(null);
 
   // ── Queries ──────────────────────────────────────────────────────────────────
   const panelQuery = useQuery({
@@ -217,10 +219,12 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
                       type="button"
                       className="ghost danger"
                       disabled={deleteMutation.isPending}
-                      onClick={() => {
-                        if (window.confirm(`"${pd.label}" cihazını yerleşimden kaldırmak istediğinizden emin misiniz?`))
-                          deleteMutation.mutate(pd.id);
-                      }}
+                      onClick={() =>
+                        setConfirmPending({
+                          message: `"${pd.label}" cihazını yerleşimden kaldırmak istediğinizden emin misiniz?`,
+                          onConfirm: () => { deleteMutation.mutate(pd.id); setConfirmPending(null); },
+                        })
+                      }
                     >
                       Sil
                     </button>
@@ -480,6 +484,13 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
           )}
         </div>
       </Modal>
+
+      <ConfirmModal
+        open={confirmPending !== null}
+        message={confirmPending?.message ?? ""}
+        onConfirm={() => confirmPending?.onConfirm()}
+        onCancel={() => setConfirmPending(null)}
+      />
     </div>
   );
 }

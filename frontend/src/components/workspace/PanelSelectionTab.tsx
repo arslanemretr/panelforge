@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { client } from "../../api/client";
 import type { PanelDefinition, ProjectPanel } from "../../types";
+import { ConfirmModal } from "../ConfirmModal";
 import { Modal } from "../Modal";
 import { LibraryPickerModal } from "./LibraryPickerModal";
 import { TechnicalDrawingView } from "./TechnicalDrawingView";
@@ -18,6 +19,7 @@ export function PanelSelectionTab({ projectId }: PanelSelectionTabProps) {
   const [pendingQuantity, setPendingQuantity] = useState(1);
   const [editingPanel, setEditingPanel] = useState<ProjectPanel | null>(null);
   const [editLabel, setEditLabel] = useState("");
+  const [confirmPending, setConfirmPending] = useState<{ message: string; onConfirm: () => void } | null>(null);
 
   const projectPanelsQuery = useQuery({
     queryKey: ["project-panels", projectId],
@@ -168,10 +170,12 @@ export function PanelSelectionTab({ projectId }: PanelSelectionTabProps) {
                       type="button"
                       className="ghost danger"
                       disabled={deleteMutation.isPending}
-                      onClick={() => {
-                        if (window.confirm(`"${item.label}" kabinini yerleşimden kaldırmak istediğinizden emin misiniz?`))
-                          deleteMutation.mutate(item.id);
-                      }}
+                      onClick={() =>
+                        setConfirmPending({
+                          message: `"${item.label}" kabinini yerleşimden kaldırmak istediğinizden emin misiniz?`,
+                          onConfirm: () => { deleteMutation.mutate(item.id); setConfirmPending(null); },
+                        })
+                      }
                     >
                       Sil
                     </button>
@@ -309,6 +313,13 @@ export function PanelSelectionTab({ projectId }: PanelSelectionTabProps) {
           </div>
         )}
       </Modal>
+
+      <ConfirmModal
+        open={confirmPending !== null}
+        message={confirmPending?.message ?? ""}
+        onConfirm={() => confirmPending?.onConfirm()}
+        onCancel={() => setConfirmPending(null)}
+      />
     </div>
   );
 }

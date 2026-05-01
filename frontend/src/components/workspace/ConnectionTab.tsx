@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { client } from "../../api/client";
 import type { DeviceConnection, ProjectDevice } from "../../types";
+import { ConfirmModal } from "../ConfirmModal";
 import { Modal } from "../Modal";
 
 interface Props {
@@ -58,6 +59,7 @@ export function ConnectionTab({ projectId }: Props) {
   const [open, setOpen] = useState(false);
   const [confirmAuto, setConfirmAuto] = useState(false);
   const [form, setForm] = useState<ConnForm>(EMPTY_FORM);
+  const [confirmPending, setConfirmPending] = useState<{ message: string; onConfirm: () => void } | null>(null);
 
   const connectionsQ = useQuery({
     queryKey: ["connections", projectId],
@@ -180,10 +182,12 @@ export function ConnectionTab({ projectId }: Props) {
                       <button
                         type="button"
                         className="btn-danger-sm"
-                        onClick={() => {
-                          if (window.confirm("Bu bağlantıyı silmek istediğinizden emin misiniz?"))
-                            deleteMut.mutate(c.id);
-                        }}
+                        onClick={() =>
+                          setConfirmPending({
+                            message: "Bu bağlantıyı silmek istediğinizden emin misiniz?",
+                            onConfirm: () => { deleteMut.mutate(c.id); setConfirmPending(null); },
+                          })
+                        }
                         title="Sil"
                       >
                         ✕
@@ -385,6 +389,13 @@ export function ConnectionTab({ projectId }: Props) {
           </div>
         </div>
       </Modal>
+
+      <ConfirmModal
+        open={confirmPending !== null}
+        message={confirmPending?.message ?? ""}
+        onConfirm={() => confirmPending?.onConfirm()}
+        onCancel={() => setConfirmPending(null)}
+      />
     </div>
   );
 }

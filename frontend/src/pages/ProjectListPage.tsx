@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 
 import { client } from "../api/client";
+import { ConfirmModal } from "../components/ConfirmModal";
 import { Modal } from "../components/Modal";
 import { useProjectStore } from "../store/useProjectStore";
 
@@ -20,6 +21,7 @@ export function ProjectListPage() {
   const setActiveProjectId = useProjectStore((state) => state.setActiveProjectId);
   const [modalOpen, setModalOpen] = useState(false);
   const [draft, setDraft] = useState(emptyProjectDraft);
+  const [confirmPending, setConfirmPending] = useState<{ message: string; onConfirm: () => void } | null>(null);
 
   const projectsQuery = useQuery({
     queryKey: ["projects"],
@@ -34,9 +36,10 @@ export function ProjectListPage() {
   });
 
   function handleDelete(projectId: number, projectName: string) {
-    if (window.confirm(`"${projectName}" projesini kalıcı olarak silmek istediğinizden emin misiniz?\nBu işlem geri alınamaz.`)) {
-      deleteProjectMutation.mutate(projectId);
-    }
+    setConfirmPending({
+      message: `"${projectName}" projesini kalıcı olarak silmek istediğinizden emin misiniz?`,
+      onConfirm: () => { deleteProjectMutation.mutate(projectId); setConfirmPending(null); },
+    });
   }
 
   const createProjectMutation = useMutation({
@@ -217,6 +220,13 @@ export function ProjectListPage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmModal
+        open={confirmPending !== null}
+        message={confirmPending?.message ?? ""}
+        onConfirm={() => confirmPending?.onConfirm()}
+        onCancel={() => setConfirmPending(null)}
+      />
     </div>
   );
 }
