@@ -183,28 +183,38 @@ def _rail_center_3d(
 
     Koordinat sistemi (panel-iç, sol-alt-ön köşe = orijin):
       busbar_x_mm : sol iç köşeden ray grubunun sol kenarına mesafe
-      busbar_y_mm : alt iç köşeden tüm barların ortak alt kenarına mesafe
+      busbar_y_mm : alt iç köşeden barların referans kenarına mesafe
       busbar_z_mm : ön yüzeyden ilk barın ön yüzüne mesafe
 
-    Tüm barlar (phaseCount × bars_per_phase) Z ekseninde ard arda dizilir;
-    Y merkezi hepsi için aynıdır. main_phase_spacing_mm yalnızca tali bara
-    bağlantı hesabında kullanılır, başlangıç yerleşimini etkilemez.
+    phase_stack_axis (CopperSettings):
+      "Z" (varsayılan) : fazlar Z ekseninde ard arda (derinlikte katmanlı)
+                         aynı faz içi paralel barlar da Z'de istifli
+      "Y"              : fazlar Y ekseninde istifli (dikey katmanlı)
+                         aynı faz içi paralel barlar Z'de istifli
     """
-    bx         = _to_float(copper.busbar_x_mm, 50.0)
-    by         = _to_float(copper.busbar_y_mm, 100.0)
-    bz         = _to_float(copper.busbar_z_mm)
-    bar_w      = _to_float(copper.main_width_mm, 40.0)
-    bar_t      = _to_float(copper.main_thickness_mm, 5.0)
-    bar_gap    = _to_float(copper.bar_gap_mm, 0.0)
-    bars_per_phase = int(copper.bars_per_phase or 1)
-    bar_step   = bar_t + bar_gap   # bir barın kapladığı Z derinliği
+    bx    = _to_float(copper.busbar_x_mm, 50.0)
+    by    = _to_float(copper.busbar_y_mm, 100.0)
+    bz    = _to_float(copper.busbar_z_mm)
+    bar_w = _to_float(copper.main_width_mm, 40.0)
+    bar_t = _to_float(copper.main_thickness_mm, 5.0)
+    bar_gap = _to_float(copper.bar_gap_mm, 0.0)
+    bars_per_phase  = int(copper.bars_per_phase or 1)
+    phase_spacing   = _to_float(copper.main_phase_spacing_mm, bar_w + bar_gap)
+    bar_step        = bar_t + bar_gap          # Z'de bir barın kapladığı derinlik
 
-    # Global sıra: faz grubundaki toplam bar sayısı × faz + bar içi sıra
-    global_index = phase_index * bars_per_phase + bar_index
+    stack_axis = (copper.phase_stack_axis or "Z").upper()
 
     center_x = base_offset.x + bx
-    center_y = base_offset.y + by + bar_w / 2.0   # tüm barlar aynı Y
-    center_z = base_offset.z + bz + global_index * bar_step + bar_t / 2.0
+
+    if stack_axis == "Y":
+        # Fazlar Y'de istifli; aynı faz içi paralel barlar Z'de
+        center_y = base_offset.y + by + phase_index * phase_spacing + bar_w / 2.0
+        center_z = base_offset.z + bz + bar_index * bar_step + bar_t / 2.0
+    else:
+        # "Z" — varsayılan: tüm barlar (faz × paralel) Z'de global sırayla
+        global_index = phase_index * bars_per_phase + bar_index
+        center_y = base_offset.y + by + bar_w / 2.0
+        center_z = base_offset.z + bz + global_index * bar_step + bar_t / 2.0
 
     return Point3D(x=center_x, y=center_y, z=center_z)
 
