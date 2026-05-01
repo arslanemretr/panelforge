@@ -431,7 +431,7 @@ def _collect_device_terminals(
             if conn.phase.upper() != phase.upper():
                 continue
             if conn.source_type != "busbar":
-                continue  # device-to-device: ileriki commit'te
+                continue  # device-to-device: calculate_project() sonunda ayrı döngüde işlenir
             pd = placement_map.get(conn.target_device_id)
             if pd is None:
                 continue
@@ -636,6 +636,52 @@ def calculate_project(db: Session, project_id: int) -> CalculationResponse:
                 holes=b_holes,
                 bends=bends,
             ))
+
+    # ── Device-to-device explicit bağlantılar ────────────────────────────────
+    # source_type="device" olan bağlantılar: kaynak terminal → hedef terminal
+    # Ana bara üzerinden geçmez; doğrudan cihaz-cihaz tali bakır üretilir.
+    placement_map = {pd.id: pd for pd in placements}
+    d2d_connections = [c for c in explicit_connections if c.source_type == "device"]
+    for conn_idx, conn in enumerate(d2d_connections, start=1):
+        source_pd = placement_map.get(conn.source_device_id or -1)
+        target_pd = placement_map.get(conn.target_device_id)
+        if source_pd is None or target_pd is None:
+            continue
+
+        source_term = next(
+            (t for t in source_pd.device.terminals if t.id == conn.source_terminal_id),
+            None,
+        )
+        target_term = next(
+            (t for t in target_pd.device.terminals if t.id == conn.target_terminal_id),
+            None,
+        )
+        if source_term is None or target_term is None:
+            continue
+
+        start_w = _terminal_world_3d(source_pd, source_term, panel_offsets_3d, default_offset_3d)
+        end_w   = _terminal_world_3d(target_pd, target_term, panel_offsets_3d, default_offset_3d)
+
+        segments, bends = _route_3d(
+            start_w, end_w, bend_radius, branch_t, k_flatwise, k_edgewise,
+            terminal_face=target_term.terminal_face,
+        )
+        b_holes = _holes_for_branch_3d(segments, branch_w, target_term, default_hole)
+
+        busbars.append(BusbarPart(
+            part_no=f"DD-{source_pd.label}-{target_pd.label}-{conn.phase}-{conn_idx:03d}",
+            name=f"Cihaz Bag. · {source_pd.label} → {target_pd.label} · {conn.phase}",
+            busbar_type="branch",
+            phase=conn.phase,
+            width=branch_w,
+            thickness=branch_t,
+            material=copper.branch_material or "Cu",
+            quantity=1,
+            connected_device_label=target_pd.label,
+            segments=segments,
+            holes=b_holes,
+            bends=bends,
+        ))
 
     # ── Veritabanına yaz ──────────────────────────────────────────────────────
     for part in busbars:
