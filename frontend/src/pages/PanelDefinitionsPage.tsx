@@ -130,6 +130,7 @@ export function PanelDefinitionsPage() {
             <thead>
               <tr>
                 <th style={{ padding: "0.5rem 0.65rem" }}>Kabin Adı</th>
+                <th style={{ padding: "0.5rem 0.65rem" }}>Açıklama</th>
                 <th style={{ padding: "0.5rem 0.65rem" }}>Ölçü</th>
                 <th style={{ padding: "0.5rem 0.65rem" }}>Montaj Plakası</th>
                 <th style={{ padding: "0.5rem 0.65rem" }}>Yön</th>
@@ -148,7 +149,9 @@ export function PanelDefinitionsPage() {
                 <tr key={definition.id}>
                   <td style={{ padding: "0.45rem 0.65rem" }}>
                     <strong>{definition.name}</strong>
-                    <div className="table-subtext">{definition.description || "—"}</div>
+                  </td>
+                  <td style={{ padding: "0.45rem 0.65rem", color: "var(--muted)", fontSize: "0.85rem" }}>
+                    {definition.description || "—"}
                   </td>
                   <td style={{ padding: "0.45rem 0.65rem", fontVariantNumeric: "tabular-nums", fontSize: "0.85rem" }}>
                     {definition.width_mm}×{definition.height_mm}×{definition.depth_mm ?? 0}
@@ -196,7 +199,7 @@ export function PanelDefinitionsPage() {
               ))}
               {!filteredDefinitions.length && (
                 <tr>
-                  <td colSpan={8}>
+                  <td colSpan={9}>
                     <div className="empty-state">
                       {search.trim() ? "Aramayla eşleşen kabin bulunamadı." : "Tanımlı kabin yok."}
                     </div>
