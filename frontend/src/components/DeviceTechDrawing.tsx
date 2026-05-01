@@ -9,6 +9,8 @@
  * Delik sembolü, boyut okları, merkez çizgileri, lejant.
  */
 
+import { useEffect, useRef, useState } from "react";
+
 const COLORS = {
   paper:      "#f4f6f8",   // kağıt zemin
   border:     "#c8d4e0",   // kağıt kenarlığı
@@ -217,15 +219,108 @@ export function DeviceTechDrawing({
 
   const dimId = (suffix: string) => `d-${suffix}-${W}-${H}-${D}`;
 
+  // ── Zoom / Pan ──────────────────────────────────────────────────────────────
+  const [zoom, setZoom]     = useState(1);
+  const [pan,  setPan]      = useState({ x: 0, y: 0 });
+  const [dragging, setDrag] = useState(false);
+  const svgRef   = useRef<SVGSVGElement>(null);
+  const dragRef  = useRef<{ sx: number; sy: number; px: number; py: number } | null>(null);
+  const stateRef = useRef({ zoom, pan, svgW, svgH });
+  stateRef.current = { zoom, pan, svgW, svgH };
+
+  // Wheel zoom — passive:false gerektiğinden useEffect içinde
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      const { zoom: cz, pan: cp, svgW: cW, svgH: cH } = stateRef.current;
+      const factor   = e.deltaY < 0 ? 1.2 : 1 / 1.2;
+      const newZoom  = Math.min(12, Math.max(0.2, cz * factor));
+      const rect     = el.getBoundingClientRect();
+      const vbW = cW / cz;
+      const vbH = cH / cz;
+      const ancX = cp.x + (e.clientX - rect.left)  / rect.width  * vbW;
+      const ancY = cp.y + (e.clientY - rect.top)   / rect.height * vbH;
+      const newVbW = cW / newZoom;
+      const newVbH = cH / newZoom;
+      const fX = (ancX - cp.x) / vbW;
+      const fY = (ancY - cp.y) / vbH;
+      setZoom(newZoom);
+      setPan({ x: ancX - fX * newVbW, y: ancY - fY * newVbH });
+    };
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function zoomBy(factor: number) {
+    const { zoom: cz, pan: cp, svgW: cW, svgH: cH } = stateRef.current;
+    const newZoom = Math.min(12, Math.max(0.2, cz * factor));
+    const vbW = cW / cz; const vbH = cH / cz;
+    const cx = cp.x + vbW / 2; const cy = cp.y + vbH / 2;
+    const nW = cW / newZoom;   const nH = cH / newZoom;
+    setZoom(newZoom);
+    setPan({ x: cx - nW / 2, y: cy - nH / 2 });
+  }
+
+  function resetView() { setZoom(1); setPan({ x: 0, y: 0 }); }
+
+  function onMouseDown(e: React.MouseEvent<SVGSVGElement>) {
+    if (e.button !== 0) return;
+    dragRef.current = { sx: e.clientX, sy: e.clientY, px: pan.x, py: pan.y };
+    setDrag(true);
+  }
+  function onMouseMove(e: React.MouseEvent<SVGSVGElement>) {
+    if (!dragRef.current || !svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const dx = (e.clientX - dragRef.current.sx) / rect.width  * (svgW / zoom);
+    const dy = (e.clientY - dragRef.current.sy) / rect.height * (svgH / zoom);
+    setPan({ x: dragRef.current.px - dx, y: dragRef.current.py - dy });
+  }
+  function onMouseUp() { dragRef.current = null; setDrag(false); }
+
+  const viewBoxStr = `${pan.x} ${pan.y} ${svgW / zoom} ${svgH / zoom}`;
+
   return (
+    <div style={{ width: "100%" }}>
+      {/* Zoom toolbar */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: "0.35rem",
+        marginBottom: "0.4rem",
+      }}>
+        <button type="button" className="ghost"
+          style={{ padding: "0.18rem 0.5rem", fontSize: "1rem", lineHeight: 1 }}
+          onClick={() => zoomBy(1.4)} title="Yakınlaştır">+</button>
+        <span style={{ fontSize: "0.78rem", minWidth: "2.8rem", textAlign: "center", color: "var(--muted)" }}>
+          {Math.round(zoom * 100)}%
+        </span>
+        <button type="button" className="ghost"
+          style={{ padding: "0.18rem 0.5rem", fontSize: "1rem", lineHeight: 1 }}
+          onClick={() => zoomBy(1 / 1.4)} title="Uzaklaştır">−</button>
+        <button type="button" className="ghost"
+          style={{ padding: "0.18rem 0.5rem", fontSize: "0.8rem" }}
+          onClick={resetView} title="Görünümü sıfırla">↺</button>
+        <span style={{ fontSize: "0.75rem", color: "var(--muted)", marginLeft: "0.25rem" }}>
+          · Kaydırmak için sürükle, yakınlaştırmak için scroll
+        </span>
+      </div>
+
     <div style={{ width: "100%", height, background: COLORS.border, borderRadius: 10, padding: 1 }}>
       <svg
-        viewBox={`0 0 ${svgW} ${svgH}`}
+        ref={svgRef}
+        viewBox={viewBoxStr}
         width="100%"
         height="100%"
-        preserveAspectRatio="xMidYMid meet"
-        style={{ display: "block", borderRadius: 9 }}
+        style={{
+          display: "block", borderRadius: 9,
+          cursor: dragging ? "grabbing" : "grab",
+          userSelect: "none",
+        }}
         fontFamily="'Courier New', Consolas, monospace"
+        onMouseDown={onMouseDown}
+        onMouseMove={onMouseMove}
+        onMouseUp={onMouseUp}
+        onMouseLeave={onMouseUp}
       >
         {/* ── Kağıt zemini ─────────────────────────────────────────── */}
         <rect x={0} y={0} width={svgW} height={svgH} fill={COLORS.paper} />
@@ -432,6 +527,7 @@ export function DeviceTechDrawing({
           width={svgW - 2 * (OUTER - 2)} height={svgH - 2 * (OUTER - 2)}
           fill="none" stroke={COLORS.object} strokeWidth={0.8} />
       </svg>
+    </div>
     </div>
   );
 }
