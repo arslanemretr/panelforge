@@ -56,6 +56,20 @@ export interface DeviceTerminal {
   hole_diameter_mm?: number | null;
   slot_width_mm?: number | null;
   slot_length_mm?: number | null;
+  terminal_role?: string | null;   // "input" | "output"
+  terminal_group?: string | null;  // "line" | "load" | "bus" | "branch"
+}
+
+export interface DeviceConnection {
+  id: number;
+  project_id: number;
+  source_type: string;             // "busbar" | "device"
+  source_device_id: number | null;
+  source_terminal_id: number | null;
+  target_device_id: number;
+  target_terminal_id: number;
+  phase: string;
+  connection_type: string;         // "main_to_device" | "device_to_device"
 }
 
 export interface Device {

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 
 import { client } from "../api/client";
+import { ConnectionTab } from "../components/workspace/ConnectionTab";
 import { CopperSelectionTab } from "../components/workspace/CopperSelectionTab";
 import { DeviceSelectionTab } from "../components/workspace/DeviceSelectionTab";
 import { PanelSelectionTab } from "../components/workspace/PanelSelectionTab";
@@ -15,6 +16,7 @@ type WorkspaceTab =
   | "panel-selection"
   | "device-selection"
   | "copper-selection"
+  | "connections"
   | "parameters"
   | "results";
 
@@ -25,11 +27,12 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
-  { key: "panel-selection", label: "1 · Kabin Seçimi", requiresPanel: false },
-  { key: "device-selection", label: "2 · Cihaz Yerleşimi", requiresPanel: true },
-  { key: "copper-selection", label: "3 · Bakır Seçimi", requiresPanel: true },
-  { key: "parameters", label: "4 · Parametreler", requiresPanel: true },
-  { key: "results", label: "5 · Sonuçlar", requiresPanel: true },
+  { key: "panel-selection",  label: "1 · Kabin Seçimi",    requiresPanel: false },
+  { key: "device-selection", label: "2 · Cihaz Yerleşimi", requiresPanel: true  },
+  { key: "copper-selection", label: "3 · Bakır Seçimi",    requiresPanel: true  },
+  { key: "connections",      label: "4 · Bağlantılar",     requiresPanel: true  },
+  { key: "parameters",       label: "5 · Parametreler",    requiresPanel: true  },
+  { key: "results",          label: "6 · Sonuçlar",        requiresPanel: true  },
 ];
 
 export function ProjectWorkspacePage() {
@@ -126,11 +129,12 @@ export function ProjectWorkspacePage() {
 
       {/* Tab content */}
       <div className="workspace-body">
-        {activeTab === "panel-selection" && <PanelSelectionTab projectId={projectId} />}
+        {activeTab === "panel-selection"  && <PanelSelectionTab  projectId={projectId} />}
         {activeTab === "device-selection" && <DeviceSelectionTab projectId={projectId} />}
         {activeTab === "copper-selection" && <CopperSelectionTab projectId={projectId} />}
-        {activeTab === "parameters" && <ParametersTab projectId={projectId} />}
-        {activeTab === "results" && <ResultsTab projectId={projectId} />}
+        {activeTab === "connections"      && <ConnectionTab      projectId={projectId} />}
+        {activeTab === "parameters"       && <ParametersTab      projectId={projectId} />}
+        {activeTab === "results"          && <ResultsTab         projectId={projectId} />}
       </div>
     </div>
   );

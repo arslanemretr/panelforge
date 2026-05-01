@@ -5,6 +5,7 @@ import type {
   CopperDefinition,
   CopperSettings,
   Device,
+  DeviceConnection,
   Panel,
   PanelDefinition,
   Project,
@@ -83,6 +84,23 @@ export const client = {
   createCopperDefinition: async (payload: Omit<CopperDefinition, "id" | "created_at" | "updated_at">) =>
     (await api.post<CopperDefinition>("/copper-definitions", payload)).data,
   deleteCopperDefinition: async (definitionId: number) => api.delete(`/copper-definitions/${definitionId}`),
+
+  listConnections: async (projectId: number) =>
+    (await api.get<DeviceConnection[]>(`/projects/${projectId}/connections`)).data,
+  createConnection: async (
+    projectId: number,
+    payload: {
+      source_type: string;
+      source_device_id?: number | null;
+      source_terminal_id?: number | null;
+      target_device_id: number;
+      target_terminal_id: number;
+      phase: string;
+      connection_type: string;
+    },
+  ) => (await api.post<DeviceConnection>(`/projects/${projectId}/connections`, payload)).data,
+  deleteConnection: async (projectId: number, connectionId: number) =>
+    api.delete(`/projects/${projectId}/connections/${connectionId}`),
 
   validateProject: async (projectId: number) =>
     (await api.post<ValidationResult>(`/projects/${projectId}/validate`)).data,
