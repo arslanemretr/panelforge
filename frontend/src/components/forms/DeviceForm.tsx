@@ -17,6 +17,8 @@ const defaultTerminal = (terminalName: string, phase: string, x: number): Device
   hole_diameter_mm: 11,
   slot_width_mm: null,
   slot_length_mm: null,
+  terminal_role: null,
+  terminal_group: null,
 });
 
 export function DeviceForm({ initialValue, onSubmit }: DeviceFormProps) {
@@ -40,6 +42,8 @@ export function DeviceForm({ initialValue, onSubmit }: DeviceFormProps) {
           hole_diameter_mm: terminal.hole_diameter_mm != null ? Number(terminal.hole_diameter_mm) : null,
           slot_width_mm: terminal.slot_width_mm != null ? Number(terminal.slot_width_mm) : null,
           slot_length_mm: terminal.slot_length_mm != null ? Number(terminal.slot_length_mm) : null,
+          terminal_role: terminal.terminal_role ?? null,
+          terminal_group: terminal.terminal_group ?? null,
         }))
       : [
           defaultTerminal("L1", "L1", 30),
@@ -135,6 +139,8 @@ export function DeviceForm({ initialValue, onSubmit }: DeviceFormProps) {
             <span>Z</span>
             <span>Yuzey</span>
             <span>Delik Capi</span>
+            <span>Rol</span>
+            <span>Grup</span>
           </div>
 
           {terminals.map((terminal, index) => (
@@ -202,6 +208,28 @@ export function DeviceForm({ initialValue, onSubmit }: DeviceFormProps) {
                 title="Delik capi"
                 aria-label={`Terminal ${index + 1} delik capi`}
               />
+              <select
+                value={terminal.terminal_role ?? ""}
+                onChange={(event) => updateTerminal(index, "terminal_role", event.target.value || null)}
+                title="Terminal rolu"
+                aria-label={`Terminal ${index + 1} rolu`}
+              >
+                <option value="">—</option>
+                <option value="input">input</option>
+                <option value="output">output</option>
+              </select>
+              <select
+                value={terminal.terminal_group ?? ""}
+                onChange={(event) => updateTerminal(index, "terminal_group", event.target.value || null)}
+                title="Terminal grubu"
+                aria-label={`Terminal ${index + 1} grubu`}
+              >
+                <option value="">—</option>
+                <option value="line">line</option>
+                <option value="load">load</option>
+                <option value="bus">bus</option>
+                <option value="branch">branch</option>
+              </select>
             </div>
           ))}
         </div>

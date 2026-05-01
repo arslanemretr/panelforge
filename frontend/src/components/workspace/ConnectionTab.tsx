@@ -257,9 +257,10 @@ export function ConnectionTab({ projectId }: Props) {
                     }
                   >
                     <option value="">— Seçin —</option>
-                    {sourceDevice.device.terminals.map((t) => (
-                      <option key={t.id} value={t.id}>{t.terminal_name} ({t.phase})</option>
-                    ))}
+                    {sourceDevice.device.terminals.map((t) => {
+                      const meta = [t.phase, t.terminal_role, t.terminal_group].filter(Boolean).join(" · ");
+                      return <option key={t.id} value={t.id}>{t.terminal_name} ({meta})</option>;
+                    })}
                   </select>
                 </label>
               )}
@@ -296,9 +297,10 @@ export function ConnectionTab({ projectId }: Props) {
                 }
               >
                 <option value="">— Seçin —</option>
-                {targetDevice.device.terminals.map((t) => (
-                  <option key={t.id} value={t.id}>{t.terminal_name} ({t.phase})</option>
-                ))}
+                {targetDevice.device.terminals.map((t) => {
+                  const meta = [t.phase, t.terminal_role, t.terminal_group].filter(Boolean).join(" · ");
+                  return <option key={t.id} value={t.id}>{t.terminal_name} ({meta})</option>;
+                })}
               </select>
             </label>
           )}
