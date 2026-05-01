@@ -39,6 +39,22 @@ export function CopperSettingsForm({ initialValue, onSubmit }: CopperSettingsFor
     setValue((current) => ({ ...current, [key]: nextValue }));
   }
 
+  const SectionTitle = ({ title }: { title: string }) => (
+    <div
+      style={{
+        gridColumn: "1 / -1",
+        borderBottom: "1px solid var(--border)",
+        paddingBottom: "0.3rem",
+        marginTop: "0.5rem",
+        fontWeight: 700,
+        fontSize: "0.9rem",
+        color: "var(--accent)",
+      }}
+    >
+      {title}
+    </div>
+  );
+
   return (
     <form
       className="form-grid"
@@ -47,6 +63,86 @@ export function CopperSettingsForm({ initialValue, onSubmit }: CopperSettingsFor
         await onSubmit(value);
       }}
     >
+      {/* ── Ana Bakır Konumlandırma ──────────────────────────────────────── */}
+      <SectionTitle title="Ana Bara Konumlandırma" />
+      <label>
+        <span>Bara X konumu (mm)</span>
+        <input
+          type="number"
+          value={value.busbar_x_mm ?? ""}
+          placeholder="50"
+          onChange={(event) => update("busbar_x_mm", event.target.value === "" ? null : Number(event.target.value))}
+        />
+      </label>
+      <label>
+        <span>Bara Y konumu (mm)</span>
+        <input
+          type="number"
+          value={value.busbar_y_mm ?? ""}
+          placeholder="100"
+          onChange={(event) => update("busbar_y_mm", event.target.value === "" ? null : Number(event.target.value))}
+        />
+      </label>
+      <label>
+        <span>Bara Z konumu (mm)</span>
+        <input
+          type="number"
+          value={value.busbar_z_mm ?? ""}
+          placeholder="0"
+          onChange={(event) => update("busbar_z_mm", event.target.value === "" ? null : Number(event.target.value))}
+        />
+      </label>
+      <label>
+        <span>Bara boyu (mm)</span>
+        <input
+          type="number"
+          value={value.busbar_length_mm ?? ""}
+          placeholder="1000"
+          onChange={(event) => update("busbar_length_mm", event.target.value === "" ? null : Number(event.target.value))}
+        />
+      </label>
+      <label>
+        <span>Faz sayisi</span>
+        <input
+          type="number"
+          min={1}
+          max={5}
+          value={value.busbar_phase_count ?? 3}
+          onChange={(event) => update("busbar_phase_count", Number(event.target.value))}
+        />
+      </label>
+      <label>
+        <span>Faz basi paralel bar</span>
+        <input
+          type="number"
+          min={1}
+          max={4}
+          value={value.bars_per_phase ?? 1}
+          onChange={(event) => update("bars_per_phase", Number(event.target.value))}
+        />
+      </label>
+      <label>
+        <span>Bar arasi bosluk (mm)</span>
+        <input
+          type="number"
+          value={value.bar_gap_mm ?? 0}
+          onChange={(event) => update("bar_gap_mm", Number(event.target.value))}
+        />
+      </label>
+      <label>
+        <span>Bara yonelimi</span>
+        <select
+          className="form-input"
+          value={value.busbar_orientation ?? "horizontal"}
+          onChange={(event) => update("busbar_orientation", event.target.value)}
+        >
+          <option value="horizontal">Yatay</option>
+          <option value="vertical">Dikey</option>
+        </select>
+      </label>
+
+      {/* ── Ana Bakır Kesiti ──────────────────────────────────────────────── */}
+      <SectionTitle title="Ana Bara Kesiti" />
       <label>
         <span>Ana bara genisligi</span>
         <input type="number" value={value.main_width_mm ?? 0} onChange={(event) => update("main_width_mm", Number(event.target.value))} />
@@ -67,6 +163,8 @@ export function CopperSettingsForm({ initialValue, onSubmit }: CopperSettingsFor
           onChange={(event) => update("main_phase_spacing_mm", Number(event.target.value))}
         />
       </label>
+      {/* ── Tali Bakır ───────────────────────────────────────────────────── */}
+      <SectionTitle title="Tali Bara Kesiti" />
       <label>
         <span>Tali bara genisligi</span>
         <input type="number" value={value.branch_width_mm ?? 0} onChange={(event) => update("branch_width_mm", Number(event.target.value))} />
@@ -87,6 +185,8 @@ export function CopperSettingsForm({ initialValue, onSubmit }: CopperSettingsFor
           onChange={(event) => update("branch_phase_spacing_mm", Number(event.target.value))}
         />
       </label>
+      {/* ── Büküm + Delik ────────────────────────────────────────────────── */}
+      <SectionTitle title="Büküm ve Delik" />
       <label>
         <span>Bukum ic yari capi</span>
         <input
@@ -117,6 +217,8 @@ export function CopperSettingsForm({ initialValue, onSubmit }: CopperSettingsFor
           onChange={(event) => update("k_factor_edgewise", Number(event.target.value))}
         />
       </label>
+      {/* ── Boşluk Kontrolleri ───────────────────────────────────────────── */}
+      <SectionTitle title="Boşluk ve Güvenlik Mesafeleri" />
       <label>
         <span>Ana bara bogazi (mm)</span>
         <input
@@ -168,10 +270,14 @@ export function CopperSettingsForm({ initialValue, onSubmit }: CopperSettingsFor
           onChange={(event) => update("default_hole_diameter_mm", Number(event.target.value))}
         />
       </label>
+      {/* ── Malzeme ve Özkütle ───────────────────────────────────────────── */}
+      <SectionTitle title="Malzeme ve Özkütle" />
       <label className="checkbox-field">
         <input type="checkbox" checked={value.use_slot_holes} onChange={(event) => update("use_slot_holes", event.target.checked)} />
         <span>Slot delik kullan</span>
       </label>
+      {/* ── Koordinat Sistemi ─────────────────────────────────────────────── */}
+      <SectionTitle title="Koordinat Sistemi" />
       <label>
         <span>Faz istifleme ekseni</span>
         <select
