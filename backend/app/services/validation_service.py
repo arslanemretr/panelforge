@@ -67,6 +67,13 @@ def validate_project(db: Session, project_id: int) -> ValidationResult:
             missing_fields.append("Bukum yaricapi eksik")
         if not copper.default_hole_diameter_mm:
             missing_fields.append("Delik capi eksik")
+        # Bilgi amaçlı uyarılar — hesaplamayı engellemez
+        if not copper.busbar_length_mm:
+            warnings.append("Ana bara boyu tanimlanmadi — varsayilan 1000 mm kullanilacak")
+        if not copper.busbar_clearance_mm:
+            warnings.append("Ana bara bogaz mesafesi tanimlanmadi — bogaz kontrolu atlanacak")
+        if not copper.min_hole_hole_distance_mm:
+            warnings.append("Min. delik-delik mesafesi tanimlanmadi — delik araligi kontrolu atlanacak")
 
     return ValidationResult(
         can_calculate=not missing_fields,
