@@ -172,6 +172,28 @@ export function CopperSettingsForm({ initialValue, onSubmit }: CopperSettingsFor
         <input type="checkbox" checked={value.use_slot_holes} onChange={(event) => update("use_slot_holes", event.target.checked)} />
         <span>Slot delik kullan</span>
       </label>
+      <label>
+        <span>Faz istifleme ekseni</span>
+        <select
+          className="form-input"
+          value={value.phase_stack_axis ?? "Z"}
+          onChange={(event) => update("phase_stack_axis", event.target.value)}
+        >
+          <option value="Z">Z — derinlikte katmanlı (varsayılan)</option>
+          <option value="Y">Y — dikey katmanlı</option>
+        </select>
+      </label>
+      <label>
+        <span>Bara düzlemi</span>
+        <select
+          className="form-input"
+          value={value.busbar_plane ?? "XY"}
+          onChange={(event) => update("busbar_plane", event.target.value)}
+        >
+          <option value="XY">XY — yatay düzlem (varsayılan)</option>
+          <option value="XZ">XZ — derinlik düzlemi</option>
+        </select>
+      </label>
       <div className="form-actions">
         <button type="submit">Bakir ayarlarini kaydet</button>
       </div>
