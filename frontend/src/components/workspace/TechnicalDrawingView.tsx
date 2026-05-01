@@ -14,7 +14,7 @@
  *   Ön ↔ Üst  : aynı X ekseni (genişlik)
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Busbar, CopperSettings, Panel, ProjectDevice, ProjectPanel } from "../../types";
 import {
   buildCabinetLayouts,
@@ -73,6 +73,14 @@ export function TechnicalDrawingView({
   // ── Kabin filtresi ────────────────────────────────────────────────────────
   const [selectedId, setSelectedId] = useState<number | "all">("all");
 
+  // ── Zoom / Pan ────────────────────────────────────────────────────────────
+  const [zoom, setZoom]   = useState(1);
+  const [pan,  setPan]    = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const dragRef  = useRef<{ startX: number; startY: number; panX: number; panY: number } | null>(null);
+  const svgRef   = useRef<SVGSVGElement>(null);
+  const stateRef = useRef({ zoom, pan, svgH: 0 });
+
   // Seçime göre filtrelenmiş layout ve kutular
   const filteredLayouts = selectedId === "all"
     ? allLayouts
@@ -113,6 +121,76 @@ export function TechnicalDrawingView({
   const drawD = MD * scale;
 
   const SVG_H = PAD_T + VIEW_LABEL_H + drawH + GAP + drawD + PAD_B;
+
+  // stateRef her render'da güncelle (wheel handler'da stale closure olmaz)
+  stateRef.current = { zoom, pan, svgH: SVG_H };
+
+  // ── Wheel zoom (passive:false gerektiğinden useEffect ile) ────────────────
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      const { zoom: cz, pan: cp, svgH: cH } = stateRef.current;
+      const factor = e.deltaY < 0 ? 1.18 : 0.85;
+      const newZoom = Math.min(10, Math.max(0.25, cz * factor));
+      const rect    = el.getBoundingClientRect();
+      const vbW = SVG_W / cz;
+      const vbH = cH   / cz;
+      // İmlecin SVG koordinat uzayındaki yeri
+      const ancX = cp.x + (e.clientX - rect.left)  / rect.width  * vbW;
+      const ancY = cp.y + (e.clientY - rect.top)   / rect.height * vbH;
+      const newVbW = SVG_W / newZoom;
+      const newVbH = cH    / newZoom;
+      const fX = (ancX - cp.x) / vbW;
+      const fY = (ancY - cp.y) / vbH;
+      setZoom(newZoom);
+      setPan({ x: ancX - fX * newVbW, y: ancY - fY * newVbH });
+    };
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Zoom yardımcıları ─────────────────────────────────────────────────────
+  function zoomBy(factor: number) {
+    const { zoom: cz, pan: cp, svgH: cH } = stateRef.current;
+    const newZoom = Math.min(10, Math.max(0.25, cz * factor));
+    const vbW = SVG_W / cz;
+    const vbH = cH   / cz;
+    const cx = cp.x + vbW / 2;
+    const cy = cp.y + vbH / 2;
+    const newVbW = SVG_W / newZoom;
+    const newVbH = cH    / newZoom;
+    setZoom(newZoom);
+    setPan({ x: cx - newVbW / 2, y: cy - newVbH / 2 });
+  }
+
+  function resetView() { setZoom(1); setPan({ x: 0, y: 0 }); }
+
+  // ── Drag-to-pan handlers ──────────────────────────────────────────────────
+  function onMouseDown(e: React.MouseEvent<SVGSVGElement>) {
+    if (e.button !== 0) return;
+    dragRef.current = { startX: e.clientX, startY: e.clientY, panX: pan.x, panY: pan.y };
+    setDragging(true);
+  }
+
+  function onMouseMove(e: React.MouseEvent<SVGSVGElement>) {
+    if (!dragRef.current || !svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const vbW  = SVG_W / zoom;
+    const vbH  = SVG_H / zoom;
+    const dx   = (e.clientX - dragRef.current.startX) / rect.width  * vbW;
+    const dy   = (e.clientY - dragRef.current.startY) / rect.height * vbH;
+    setPan({ x: dragRef.current.panX - dx, y: dragRef.current.panY - dy });
+  }
+
+  function onMouseUp() { dragRef.current = null; setDragging(false); }
+
+  // viewBox: zoom ve pan'a göre
+  const vbW = SVG_W / zoom;
+  const vbH = SVG_H / zoom;
+  const viewBoxStr = `${pan.x} ${pan.y} ${vbW} ${vbH}`;
 
   // ── Koordinat fonksiyonları ────────────────────────────────────────────────
   const fvX = (x: number) => PAD_L + x * scale;
@@ -156,6 +234,27 @@ export function TechnicalDrawingView({
               ))}
             </select>
           )}
+          {/* Zoom kontrolleri */}
+          <div style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+            <button
+              type="button" className="ghost"
+              style={{ padding: "0.2rem 0.55rem", fontSize: "1rem", lineHeight: 1 }}
+              onClick={() => zoomBy(1.4)} title="Yakınlaştır"
+            >+</button>
+            <span style={{ fontSize: "0.8rem", minWidth: "3rem", textAlign: "center", color: "var(--muted)" }}>
+              {Math.round(zoom * 100)}%
+            </span>
+            <button
+              type="button" className="ghost"
+              style={{ padding: "0.2rem 0.55rem", fontSize: "1rem", lineHeight: 1 }}
+              onClick={() => zoomBy(1 / 1.4)} title="Uzaklaştır"
+            >−</button>
+            <button
+              type="button" className="ghost"
+              style={{ padding: "0.2rem 0.55rem", fontSize: "0.8rem" }}
+              onClick={resetView} title="Görünümü sıfırla"
+            >↺</button>
+          </div>
           <span className="helper-text" style={{ fontSize: "0.82rem" }}>
             Aynı ölçek · Ön–Yan–Üst
           </span>
@@ -163,15 +262,22 @@ export function TechnicalDrawingView({
       </div>
 
       <svg
-        viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+        ref={svgRef}
+        viewBox={viewBoxStr}
         width="100%"
         style={{
           display: "block",
           background: "#fff",
           border: "1px solid #ccc",
           borderRadius: "8px",
-          maxHeight: "72vh",
+          maxHeight: "108vh",
+          cursor: dragging ? "grabbing" : "grab",
+          userSelect: "none",
         }}
+        onMouseDown={onMouseDown}
+        onMouseMove={onMouseMove}
+        onMouseUp={onMouseUp}
+        onMouseLeave={onMouseUp}
       >
         {/* ────────────────────────────────────────────────────────────────
             Projeksiyon yardım çizgileri (ince kesik)
