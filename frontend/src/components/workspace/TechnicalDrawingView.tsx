@@ -416,9 +416,9 @@ export function TechnicalDrawingView({
           const color = PHASE_COLORS[phaseColorIndex(b.phase)];
           const sw = b.busbar_type === "main" ? 2.5 : 1.5;
           return b.segments.flatMap((seg, si) => {
-            const x1 = fvX(Number(seg.start_x_mm ?? 0));
+            const x1 = fvX(Number(seg.start_x_mm ?? 0) - xOffset);
             const y1 = fvY(Number(seg.start_y_mm ?? 0));
-            const x2 = fvX(Number(seg.end_x_mm   ?? 0));
+            const x2 = fvX(Number(seg.end_x_mm   ?? 0) - xOffset);
             const y2 = fvY(Number(seg.end_y_mm   ?? 0));
             if (Math.abs(x1 - x2) < 0.4 && Math.abs(y1 - y2) < 0.4) return [];
             return [<line key={`fv-seg-${b.id}-${si}`} x1={x1} y1={y1} x2={x2} y2={y2}
@@ -614,9 +614,9 @@ export function TechnicalDrawingView({
           const color = PHASE_COLORS[phaseColorIndex(b.phase)];
           const sw = b.busbar_type === "main" ? 2.5 : 1.5;
           return b.segments.flatMap((seg, si) => {
-            const x1 = fvX(Number(seg.start_x_mm ?? 0));
+            const x1 = fvX(Number(seg.start_x_mm ?? 0) - xOffset);
             const y1 = tvY(Number(seg.start_z_mm ?? 0));
-            const x2 = fvX(Number(seg.end_x_mm   ?? 0));
+            const x2 = fvX(Number(seg.end_x_mm   ?? 0) - xOffset);
             const y2 = tvY(Number(seg.end_z_mm   ?? 0));
             if (Math.abs(x1 - x2) < 0.4 && Math.abs(y1 - y2) < 0.4) return [];
             return [<line key={`tv-seg-${b.id}-${si}`} x1={x1} y1={y1} x2={x2} y2={y2}
