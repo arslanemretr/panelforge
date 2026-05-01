@@ -17,6 +17,14 @@ class DeviceTerminalBase(BaseModel):
     slot_length_mm: Decimal | None = None
     terminal_role: str | None = None   # input | output
     terminal_group: str | None = None  # line | load | bus | branch
+    # Genişletilmiş terminal bilgileri
+    terminal_type: str | None = None           # "Ön Terminal" | "Arka Terminal" vb.
+    terminal_width_mm: Decimal | None = None   # terminal bloğu fiziksel genişliği
+    terminal_height_mm: Decimal | None = None  # terminal bloğu fiziksel yüksekliği
+    terminal_depth_mm: Decimal | None = None   # terminal bloğu fiziksel derinliği
+    bolt_type: str | None = None               # "M12", "M10" vb.
+    bolt_count: int | None = None              # vida miktarı
+    bolt_center_distance_mm: Decimal | None = None  # merkez ölçüsü (mm)
 
 
 class DeviceTerminalCreate(DeviceTerminalBase):
@@ -32,6 +40,7 @@ class DeviceBase(BaseModel):
     brand: str
     model: str
     device_type: str
+    enclosure_type: str | None = None  # "Sabit" | "Çekme" | "Eklenti"
     poles: int
     current_a: Decimal | None = None
     width_mm: Decimal

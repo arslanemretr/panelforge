@@ -124,6 +124,7 @@ class Device(Base):
     brand: Mapped[str] = mapped_column(Text, nullable=False)
     model: Mapped[str] = mapped_column(Text, nullable=False)
     device_type: Mapped[str] = mapped_column(Text, nullable=False)
+    enclosure_type: Mapped[str | None] = mapped_column(Text)           # "Sabit" | "Çekme" | "Eklenti"
     poles: Mapped[int] = mapped_column(Integer, nullable=False)
     current_a: Mapped[Decimal | None] = mapped_column(Numeric)
     width_mm: Mapped[Decimal] = mapped_column(Numeric, nullable=False)
@@ -150,6 +151,14 @@ class DeviceTerminal(Base):
     slot_length_mm: Mapped[Decimal | None] = mapped_column(Numeric)
     terminal_role: Mapped[str | None] = mapped_column(Text)          # input | output
     terminal_group: Mapped[str | None] = mapped_column(Text)         # line | load | bus | branch
+    # Genişletilmiş terminal bilgileri
+    terminal_type: Mapped[str | None] = mapped_column(Text)          # "Ön Terminal" | "Arka Terminal" vb.
+    terminal_width_mm: Mapped[Decimal | None] = mapped_column(Numeric)   # terminal bloğu fiziksel gen.
+    terminal_height_mm: Mapped[Decimal | None] = mapped_column(Numeric)  # terminal bloğu fiziksel yük.
+    terminal_depth_mm: Mapped[Decimal | None] = mapped_column(Numeric)   # terminal bloğu fiziksel der.
+    bolt_type: Mapped[str | None] = mapped_column(Text)              # "M12", "M10" vb.
+    bolt_count: Mapped[int | None] = mapped_column(Integer)          # vida miktarı
+    bolt_center_distance_mm: Mapped[Decimal | None] = mapped_column(Numeric)  # merkez ölçüsü (mm)
 
     device: Mapped["Device"] = relationship(back_populates="terminals")
 
