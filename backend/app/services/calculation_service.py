@@ -16,6 +16,7 @@ from app.domain.geometry import (
     rotate_xyz,
 )
 from app.schemas.calculation import BusbarRead, CalculationResponse, CalculationResults, SummaryRead
+from app.services.geometry_validation import run_all_checks
 from app.services.validation_service import validate_project
 
 
@@ -800,6 +801,9 @@ def get_results(db: Session, project_id: int) -> CalculationResults:
             ],
         ))
 
+    # Geometri doğrulama kontrolleri (clearance + delik aralığı)
+    geo_warnings: list[str] = run_all_checks(busbars, cs) if cs else []
+
     summary = SummaryRead(
         main_busbar_count=sum(1 for x in serialized if x.busbar_type == "main"),
         branch_busbar_count=sum(1 for x in serialized if x.busbar_type == "branch"),
@@ -808,4 +812,4 @@ def get_results(db: Session, project_id: int) -> CalculationResults:
         total_bend_count=total_bends,
         total_weight_kg=total_weight,
     )
-    return CalculationResults(summary=summary, busbars=serialized, warnings=[])
+    return CalculationResults(summary=summary, busbars=serialized, warnings=geo_warnings)
