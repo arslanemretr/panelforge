@@ -454,35 +454,35 @@ def _holes_for_branch_3d(
     default_diameter: float,
 ) -> list[Hole]:
     """
-    Tali bakır düz açınımında segment uçlarına delik ekler.
-    İlk delik = ana bakır bağlantısı, son delik = cihaz terminali.
+    Tali bakır açınımında yalnızca iki delik açar:
+      1. x = 0        → ana bakır bağlantısı
+      2. x = toplam   → cihaz terminal bağlantısı
+
+    Büküm noktaları (ara segment eklemleri) delik gerektirmez;
+    bükümler mekanik olarak oluşturulur, delme yapılmaz.
     """
-    d         = float(terminal.hole_diameter_mm) if terminal.hole_diameter_mm else default_diameter
-    half_w    = bar_width / 2.0
-    term_face = terminal.terminal_face  # str | None
+    if not segments:
+        return []
 
-    holes:      list[Hole] = []
-    cumulative = 0.0
+    d        = float(terminal.hole_diameter_mm) if terminal.hole_diameter_mm else default_diameter
+    half_w   = round(bar_width / 2.0, 2)
+    total_len = round(sum(s.length for s in segments), 2)
 
-    for i, seg in enumerate(segments):
-        if i == 0:
-            holes.append(Hole(
-                x=0.0,
-                y=round(half_w, 2),
-                diameter=d,
-                description="Ana bakir baglanti deligi",
-            ))
-        cumulative += seg.length
-        is_last = (i == len(segments) - 1)
-        holes.append(Hole(
-            x=round(cumulative, 2),
-            y=round(half_w, 2),
+    return [
+        Hole(
+            x=0.0,
+            y=half_w,
             diameter=d,
-            face=term_face if is_last else None,
-            description="Cihaz terminal deligi" if is_last else "Kose baglanti deligi",
-        ))
-
-    return holes
+            description="Ana bakir baglanti deligi",
+        ),
+        Hole(
+            x=total_len,
+            y=half_w,
+            diameter=d,
+            face=terminal.terminal_face,
+            description="Cihaz terminal deligi",
+        ),
+    ]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
