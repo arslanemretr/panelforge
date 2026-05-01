@@ -355,6 +355,56 @@ def _holes_for_main_busbar_3d(
     return sorted(holes, key=lambda h: h.x)
 
 
+def _collect_device_terminals(
+    phase: str,
+    placements: list[models.ProjectDevice],
+    explicit_connections: list[models.DeviceConnection],
+    panel_offsets_3d: dict[int, Point3D],
+    default_offset_3d: Point3D,
+) -> list[tuple[models.ProjectDevice, models.DeviceTerminal, Point3D]]:
+    """
+    Verilen faz için (placement, terminal, dünya noktası) üçlülerini döndürür.
+
+    • Projede en az bir DeviceConnection kaydı varsa → explicit yönlendirme:
+        source_type="busbar" olan bağlantılar işlenir; device-to-device bağlantılar
+        ileriki fazlarda eklenir.
+    • Kayıt yoksa → geriye dönük uyumluluk: terminal.phase == faz eşleştirmesi.
+    """
+    result: list[tuple[models.ProjectDevice, models.DeviceTerminal, Point3D]] = []
+
+    if explicit_connections:
+        placement_map = {pd.id: pd for pd in placements}
+        for conn in explicit_connections:
+            if conn.phase.upper() != phase.upper():
+                continue
+            if conn.source_type != "busbar":
+                continue  # device-to-device: ileriki commit'te
+            pd = placement_map.get(conn.target_device_id)
+            if pd is None:
+                continue
+            term = next(
+                (t for t in pd.device.terminals if t.id == conn.target_terminal_id),
+                None,
+            )
+            if term is None:
+                continue
+            tw = _terminal_world_3d(pd, term, panel_offsets_3d, default_offset_3d)
+            result.append((pd, term, tw))
+    else:
+        # Geriye uyumlu: terminal faz adına göre eşleştir
+        for pd in placements:
+            term = next(
+                (t for t in pd.device.terminals if t.phase.upper() == phase.upper()),
+                None,
+            )
+            if term is None:
+                continue
+            tw = _terminal_world_3d(pd, term, panel_offsets_3d, default_offset_3d)
+            result.append((pd, term, tw))
+
+    return result
+
+
 def _holes_for_branch_3d(
     segments: list[Segment3D],
     bar_width: float,
@@ -433,6 +483,11 @@ def calculate_project(db: Session, project_id: int) -> CalculationResponse:
         .order_by(models.ProjectPanel.seq.asc(), models.ProjectPanel.id.asc())
         .all()
     )
+    explicit_connections = (
+        db.query(models.DeviceConnection)
+        .filter(models.DeviceConnection.project_id == project_id)
+        .all()
+    )
 
     panel_offsets_3d, default_offset_3d = _project_panel_offsets_3d(panel, project_panels)
 
@@ -470,13 +525,10 @@ def calculate_project(db: Session, project_id: int) -> CalculationResponse:
 
     for phase_index, phase in enumerate(phases):
         # Bu faz için cihaz terminallerini topla ──────────────────────────────
-        device_terminals: list[tuple[models.ProjectDevice, models.DeviceTerminal, Point3D]] = []
-        for pd in placements:
-            term = next((t for t in pd.device.terminals if t.phase.upper() == phase), None)
-            if term is None:
-                continue
-            tw = _terminal_world_3d(pd, term, panel_offsets_3d, default_offset_3d)
-            device_terminals.append((pd, term, tw))
+        # Explicit DeviceConnection kayıtları varsa onları kullan, yoksa faz eşleştirmesi.
+        device_terminals = _collect_device_terminals(
+            phase, placements, explicit_connections, panel_offsets_3d, default_offset_3d
+        )
 
         if not device_terminals:
             continue   # bu faz için cihaz yok → ana bakır da oluşturma
