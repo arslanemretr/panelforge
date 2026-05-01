@@ -56,6 +56,7 @@ const EMPTY_FORM: ConnForm = {
 export function ConnectionTab({ projectId }: Props) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [confirmAuto, setConfirmAuto] = useState(false);
   const [form, setForm] = useState<ConnForm>(EMPTY_FORM);
 
   const connectionsQ = useQuery({
@@ -91,6 +92,14 @@ export function ConnectionTab({ projectId }: Props) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["connections", projectId] }),
   });
 
+  const autoMut = useMutation({
+    mutationFn: () => client.autoAssignConnections(projectId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["connections", projectId] });
+      setConfirmAuto(false);
+    },
+  });
+
   const devices = devicesQ.data ?? [];
   const connections = connectionsQ.data ?? [];
 
@@ -108,12 +117,20 @@ export function ConnectionTab({ projectId }: Props) {
       <section className="table-card">
         <div className="section-header">
           <h3 style={{ margin: 0 }}>Bağlantı Tanımları</h3>
-          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
             {connections.length > 0 && (
               <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>
                 Explicit yönlendirme aktif — {connections.length} bağlantı
               </span>
             )}
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => setConfirmAuto(true)}
+              title="Cihazların terminallerini faz eşleştirmesiyle otomatik ata"
+            >
+              ⚡ Otomatik Ata
+            </button>
             <button type="button" className="btn-primary" onClick={() => setOpen(true)}>
               + Bağlantı Ekle
             </button>
@@ -322,6 +339,45 @@ export function ConnectionTab({ projectId }: Props) {
               onClick={() => createMut.mutate()}
             >
               {createMut.isPending ? "Ekleniyor…" : "Ekle"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+      {/* Auto-assign confirmation modal */}
+      <Modal
+        open={confirmAuto}
+        onClose={() => setConfirmAuto(false)}
+        title="Otomatik Ata — Onayla"
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <p style={{ margin: 0, lineHeight: 1.5 }}>
+            Mevcut tüm bağlantılar silinecek ve cihaz terminallerinden faz eşleştirmesiyle
+            otomatik olarak yeniden oluşturulacak.
+          </p>
+          <p style={{ margin: 0, color: "var(--muted)", fontSize: "0.85rem" }}>
+            Devam etmek istiyor musunuz?
+          </p>
+          {autoMut.isError && (
+            <p style={{ color: "var(--danger)", margin: 0, fontSize: "0.85rem" }}>
+              İşlem başarısız. Lütfen tekrar deneyin.
+            </p>
+          )}
+          <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => setConfirmAuto(false)}
+              disabled={autoMut.isPending}
+            >
+              İptal
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={autoMut.isPending}
+              onClick={() => autoMut.mutate()}
+            >
+              {autoMut.isPending ? "Atanıyor…" : "Onayla"}
             </button>
           </div>
         </div>

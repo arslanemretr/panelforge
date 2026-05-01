@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.dependencies import db_session
 from app.db import models
@@ -63,6 +63,64 @@ def create_connection(
     db.commit()
     db.refresh(conn)
     return conn
+
+
+@router.post(
+    "/projects/{project_id}/connections/auto-assign",
+    response_model=list[DeviceConnectionRead],
+    status_code=status.HTTP_201_CREATED,
+)
+def auto_assign_connections(
+    project_id: int,
+    db: Session = Depends(db_session),
+) -> list[models.DeviceConnection]:
+    """
+    Projedeki tüm cihaz terminallerini faz eşleştirmesiyle Ana Bara → Cihaz
+    bağlantısı olarak otomatik atar.
+
+    Mevcut tüm bağlantılar önce silinir, ardından her cihazın her terminali
+    için bir DeviceConnection kaydı oluşturulur.
+    """
+    project = db.get(models.Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Mevcut bağlantıları temizle
+    db.query(models.DeviceConnection).filter(
+        models.DeviceConnection.project_id == project_id
+    ).delete()
+    db.flush()
+
+    # Tüm cihaz + terminal çift
+    placements = (
+        db.query(models.ProjectDevice)
+        .options(selectinload(models.ProjectDevice.device).selectinload(models.Device.terminals))
+        .filter(models.ProjectDevice.project_id == project_id)
+        .order_by(models.ProjectDevice.id.asc())
+        .all()
+    )
+
+    new_conns: list[models.DeviceConnection] = []
+    for pd in placements:
+        for term in pd.device.terminals:
+            conn = models.DeviceConnection(
+                project_id=project_id,
+                source_type="busbar",
+                source_device_id=None,
+                source_terminal_id=None,
+                target_device_id=pd.id,
+                target_terminal_id=term.id,
+                phase=term.phase,
+                connection_type="main_to_device",
+            )
+            db.add(conn)
+            new_conns.append(conn)
+
+    db.commit()
+    for conn in new_conns:
+        db.refresh(conn)
+
+    return new_conns
 
 
 @router.delete(

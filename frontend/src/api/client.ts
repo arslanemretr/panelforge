@@ -101,6 +101,8 @@ export const client = {
   ) => (await api.post<DeviceConnection>(`/projects/${projectId}/connections`, payload)).data,
   deleteConnection: async (projectId: number, connectionId: number) =>
     api.delete(`/projects/${projectId}/connections/${connectionId}`),
+  autoAssignConnections: async (projectId: number) =>
+    (await api.post<DeviceConnection[]>(`/projects/${projectId}/connections/auto-assign`)).data,
 
   validateProject: async (projectId: number) =>
     (await api.post<ValidationResult>(`/projects/${projectId}/validate`)).data,
