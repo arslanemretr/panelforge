@@ -5,12 +5,14 @@ import axios from "axios";
 import { client } from "../api/client";
 import { Modal } from "../components/Modal";
 import { DeviceForm } from "../components/forms/DeviceForm";
+import { DeviceTechDrawing } from "../components/DeviceTechDrawing";
 import type { Device } from "../types";
 
 export function DeviceDefinitionsPage() {
   const queryClient = useQueryClient();
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [editingDevice, setEditingDevice] = useState<Device | null>(null);
+  const [viewingDevice, setViewingDevice] = useState<Device | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const devicesQuery = useQuery({
@@ -126,6 +128,14 @@ export function DeviceDefinitionsPage() {
                     <button
                       type="button"
                       className="ghost"
+                      onClick={() => setViewingDevice(device)}
+                      title="Teknik çizimi görüntüle"
+                    >
+                      Görüntüle
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost"
                       onClick={() => setEditingDevice(device)}
                     >
                       Düzenle
@@ -156,6 +166,48 @@ export function DeviceDefinitionsPage() {
       {/* Add modal */}
       <Modal title="Yeni Cihaz Tanimla" open={addModalOpen} onClose={() => setAddModalOpen(false)}>
         <DeviceForm onSubmit={createMutation.mutateAsync} />
+      </Modal>
+
+      {/* View modal — teknik çizim */}
+      <Modal
+        title={viewingDevice ? `Teknik Çizim — ${viewingDevice.brand} ${viewingDevice.model}` : ""}
+        open={!!viewingDevice}
+        onClose={() => setViewingDevice(null)}
+      >
+        {viewingDevice && (
+          <div>
+            {/* cihaz bilgi özeti */}
+            <div
+              style={{
+                display: "flex",
+                gap: "1.5rem",
+                flexWrap: "wrap",
+                padding: "0.75rem 0",
+                marginBottom: "1rem",
+                borderBottom: "1px solid var(--line)",
+                fontSize: "0.875rem",
+                color: "var(--muted)",
+              }}
+            >
+              <span><strong style={{ color: "var(--text)" }}>{viewingDevice.device_type}</strong></span>
+              <span>Kutup: <strong style={{ color: "var(--text)" }}>{viewingDevice.poles}</strong></span>
+              <span>Akım: <strong style={{ color: "var(--text)" }}>{viewingDevice.current_a ?? "—"} A</strong></span>
+              <span>
+                Boyut:{" "}
+                <strong style={{ color: "var(--text)" }}>
+                  {viewingDevice.width_mm} × {viewingDevice.height_mm} × {viewingDevice.depth_mm ?? 0} mm
+                </strong>
+              </span>
+              <span>Terminal: <strong style={{ color: "var(--text)" }}>{viewingDevice.terminals.length}</strong></span>
+            </div>
+            <DeviceTechDrawing
+              widthMm={Number(viewingDevice.width_mm)}
+              heightMm={Number(viewingDevice.height_mm)}
+              depthMm={Number(viewingDevice.depth_mm ?? 0)}
+              terminals={viewingDevice.terminals}
+            />
+          </div>
+        )}
       </Modal>
 
       {/* Edit modal */}
