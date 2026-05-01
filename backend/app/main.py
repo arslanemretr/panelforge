@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.calculations import router as calculations_router
 from app.api.copper_definitions import router as copper_definitions_router
 from app.api.copper_settings import router as copper_router
+from app.api.device_connections import router as device_connections_router
 from app.api.devices import router as devices_router
 from app.api.exports import router as exports_router
 from app.api.panel_definitions import router as panel_definitions_router
@@ -27,6 +28,7 @@ app.include_router(projects_router, prefix="/api")
 app.include_router(panels_router, prefix="/api")
 app.include_router(devices_router, prefix="/api")
 app.include_router(project_devices_router, prefix="/api")
+app.include_router(device_connections_router, prefix="/api")
 app.include_router(project_panels_router, prefix="/api")
 app.include_router(project_coppers_router, prefix="/api")
 app.include_router(copper_router, prefix="/api")

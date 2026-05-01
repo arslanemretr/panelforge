@@ -15,6 +15,8 @@ class DeviceTerminalBase(BaseModel):
     hole_diameter_mm: Decimal | None = None
     slot_width_mm: Decimal | None = None
     slot_length_mm: Decimal | None = None
+    terminal_role: str | None = None   # input | output
+    terminal_group: str | None = None  # line | load | bus | branch
 
 
 class DeviceTerminalCreate(DeviceTerminalBase):
