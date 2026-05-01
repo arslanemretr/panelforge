@@ -78,8 +78,10 @@ export function TechnicalDrawingView({
     ? allLayouts
     : allLayouts.filter((l) => l.id === selectedId);
 
-  // Tekil kabin seçilince assemblyX sıfırlanır (kabin soldan başlar)
-  const xOffset = filteredLayouts.length === 1 ? filteredLayouts[0].assemblyX : 0;
+  // Seçim yapılmışsa filtrelenmiş grubun başlangıç X'i sıfırlanır
+  const xOffset = selectedId !== "all" && filteredLayouts.length > 0
+    ? filteredLayouts[0].assemblyX
+    : 0;
   const layouts = filteredLayouts.map((l) => ({
     ...l,
     assemblyX: l.assemblyX - xOffset,
@@ -147,8 +149,8 @@ export function TechnicalDrawingView({
               style={{ fontSize: "0.85rem", padding: "0.3rem 0.6rem", minWidth: 160 }}
             >
               <option value="all">Tüm Kabinler</option>
-              {allLayouts.map((l) => (
-                <option key={l.id} value={l.id}>
+              {allLayouts.map((l, idx) => (
+                <option key={`${l.id}-${idx}`} value={l.id}>
                   {l.label}
                 </option>
               ))}
@@ -168,6 +170,7 @@ export function TechnicalDrawingView({
           background: "#fff",
           border: "1px solid #ccc",
           borderRadius: "8px",
+          maxHeight: "72vh",
         }}
       >
         {/* ────────────────────────────────────────────────────────────────
@@ -239,8 +242,9 @@ export function TechnicalDrawingView({
               <rect x={intX} y={intY} width={intW} height={intH}
                 fill="#f0f6ff" stroke="#3366cc" strokeWidth={0.8} strokeDasharray="4 3" />
               <rect x={cx} y={cy} width={cWp} height={cHp} fill="none" stroke="#1a1a1a" strokeWidth={2} />
-              <text x={cx + cWp / 2} y={cy - 4}
-                textAnchor="middle" fontSize={8} fill="#666" fontFamily="'Segoe UI', sans-serif">
+              <text x={cx + cWp / 2} y={cy + 13}
+                textAnchor="middle" fontSize={8} fill="#444" fontFamily="'Segoe UI', sans-serif"
+                fontWeight="600">
                 {cl.label}
               </text>
             </g>

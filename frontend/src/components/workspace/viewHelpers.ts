@@ -147,25 +147,33 @@ export function buildCabinetLayouts(
 
   for (const pp of sorted) {
     const def = pp.panel_definition;
+    const qty = Math.max(1, pp.quantity ?? 1);
     const cW = Number(def.width_mm);
     const cH = Number(def.height_mm);
     // depth_mm yoksa mounting_plate_height_mm veya 300mm fallback
-    const cD = Number(def.depth_mm ?? (def as { depth_mm?: number }).depth_mm ?? 300);
+    const cD = Number(def.depth_mm ?? 300);
     const lm = Number(def.left_margin_mm ?? 0);
     const rm = Number(def.right_margin_mm ?? 0);
     const tm = Number(def.top_margin_mm ?? 0);
     const bm = Number(def.bottom_margin_mm ?? 0);
 
-    layouts.push({
-      id: pp.id,
-      seq: pp.seq,
-      label: pp.label ?? def.name,
-      assemblyX: accX,
-      cW, cH, cD, lm, rm, tm, bm,
-      intLeft: accX + lm,
-    });
+    for (let q = 0; q < qty; q++) {
+      const label = qty > 1
+        ? `${pp.label ?? def.name} (${q + 1}/${qty})`
+        : (pp.label ?? def.name);
 
-    accX += cW;
+      layouts.push({
+        id: pp.id,
+        seq: pp.seq,
+        label,
+        assemblyX: accX,
+        cW, cH, cD, lm, rm, tm, bm,
+        intLeft: accX + lm,
+      });
+
+      accX += cW;
+    }
+
     maxH = Math.max(maxH, cH);
     maxD = Math.max(maxD, cD);
   }
