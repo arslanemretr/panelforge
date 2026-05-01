@@ -269,7 +269,7 @@ export function DeviceForm({ initialValue, onSubmit }: DeviceFormProps) {
             heightMm={heightMm}
             depthMm={depthMm}
             terminals={terminals}
-            compact
+            height={320}
           />
         </div>
       </div>
