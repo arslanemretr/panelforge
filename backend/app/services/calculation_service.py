@@ -245,6 +245,41 @@ def _junction_3d(main_seg: Segment3D, terminal: Point3D) -> Point3D:
 
 # ── Ortogonal 3D yönlendirme ──────────────────────────────────────────────────
 
+# terminal_face → son segmentin hareket edeceği eksen
+# Koordinat sistemi: Z = derinlik (ön→arka artar), Y = yükseklik (aşağı→yukarı artar)
+_FACE_LAST_AXIS: dict[str, str] = {
+    "front":  "z",   # bağlantı cihazın ön yüzüne geliyor → son segment Z ekseni
+    "back":   "z",   # arka yüz → yine Z
+    "left":   "x",   # sol yüz  → X
+    "right":  "x",   # sağ yüz  → X
+    "top":    "y",   # üst yüz  → Y
+    "bottom": "y",   # alt yüz  → Y
+}
+
+
+def _reorder_legs_for_face(
+    legs: list[tuple[str, float]],
+    terminal_face: str | None,
+) -> list[tuple[str, float]]:
+    """
+    Son segmentin terminal yüzüne dik gelmesi için bacak sırasını düzenler.
+    İlgili eksen zaten son bacaksa veya sadece 1 bacak varsa değişiklik yapmaz.
+    """
+    if not terminal_face or len(legs) <= 1:
+        return legs
+    last_axis = _FACE_LAST_AXIS.get(terminal_face.lower())
+    if last_axis is None:
+        return legs
+    # Hedef eksen mevcut bacaklar arasında var mı?
+    face_idx = next((i for i, (ax, _) in enumerate(legs) if ax == last_axis), None)
+    if face_idx is None or face_idx == len(legs) - 1:
+        return legs  # Zaten son ya da yok
+    # O bacağı sona taşı
+    reordered = [leg for i, leg in enumerate(legs) if i != face_idx]
+    reordered.append(legs[face_idx])
+    return reordered
+
+
 def _route_3d(
     start: Point3D,
     end: Point3D,
@@ -252,19 +287,23 @@ def _route_3d(
     thickness: float,
     k_flatwise: float,
     k_edgewise: float,
+    terminal_face: str | None = None,
 ) -> tuple[list[Segment3D], list[Bend]]:
     """
     Başlangıç → bitiş arası ortogonal 3D yol:
       • Tek eksen farkı  → 1 segment, 0 büküm
       • İki eksen farkı  → 2 segment, 1 büküm (90°)
       • Üç eksen farkı   → 3 segment, 2 büküm (90°, 90°)
-    Öncelik sırası: X bacağı → Y bacağı → Z bacağı.
+
+    terminal_face verilmişse (_FACE_LAST_AXIS tablosu), son segment o yüze
+    dik gelecek şekilde bacak sırası yeniden düzenlenir.
+    Varsayılan öncelik sırası: X → Y → Z.
     """
     dx = abs(end.x - start.x)
     dy = abs(end.y - start.y)
     dz = abs(end.z - start.z)
 
-    # Hareket gereken eksenleri sıraya koy
+    # Hareket gereken eksenleri sıraya koy (varsayılan X→Y→Z)
     legs: list[tuple[str, float]] = []
     if dx >= 0.01:
         legs.append(("x", end.x))
@@ -276,6 +315,9 @@ def _route_3d(
     if len(legs) <= 1:
         # Düz (aynı çizgi) veya dejenere
         return [Segment3D(start=start, end=end)], []
+
+    # terminal_face'e göre son bacağı hizala
+    legs = _reorder_legs_for_face(legs, terminal_face)
 
     # Ara noktaları (waypoints) oluştur
     cur: dict[str, float] = {"x": start.x, "y": start.y, "z": start.z}
@@ -564,7 +606,8 @@ def calculate_project(db: Session, project_id: int) -> CalculationResponse:
         for branch_index, (pd, term, tw) in enumerate(device_terminals, start=1):
             junc = ref_junctions[branch_index - 1]
             segments, bends = _route_3d(
-                junc, tw, bend_radius, branch_t, k_flatwise, k_edgewise
+                junc, tw, bend_radius, branch_t, k_flatwise, k_edgewise,
+                terminal_face=term.terminal_face,
             )
             b_holes = _holes_for_branch_3d(segments, branch_w, term, default_hole)
 
