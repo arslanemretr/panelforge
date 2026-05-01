@@ -2,6 +2,7 @@ import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom"
 
 import { CopperDefinitionsPage } from "./pages/CopperDefinitionsPage";
 import { DeviceDefinitionsPage } from "./pages/DeviceDefinitionsPage";
+import { DeviceEditorPage } from "./pages/DeviceEditorPage";
 import { PanelDefinitionsPage } from "./pages/PanelDefinitionsPage";
 import { ProjectListPage } from "./pages/ProjectListPage";
 import { ProjectWorkspacePage } from "./pages/ProjectWorkspacePage";
@@ -81,6 +82,8 @@ export default function App() {
           <Route path="/" element={<Navigate to="/projects" replace />} />
           <Route path="/projects" element={<ProjectListPage />} />
           <Route path="/definitions/devices" element={<DeviceDefinitionsPage />} />
+          <Route path="/definitions/devices/new" element={<DeviceEditorPage />} />
+          <Route path="/definitions/devices/:id" element={<DeviceEditorPage />} />
           <Route path="/definitions/panels" element={<PanelDefinitionsPage />} />
           <Route path="/definitions/copper" element={<CopperDefinitionsPage />} />
         </Routes>

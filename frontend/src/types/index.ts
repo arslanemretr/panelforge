@@ -52,12 +52,20 @@ export interface DeviceTerminal {
   x_mm: number;
   y_mm: number;
   z_mm?: number;
-  terminal_face?: string | null;   // "front" | "back" | "left" | "right" | "top" | "bottom"
+  terminal_face?: string | null;         // "front" | "back" | "left" | "right" | "top" | "bottom"
   hole_diameter_mm?: number | null;
   slot_width_mm?: number | null;
   slot_length_mm?: number | null;
-  terminal_role?: string | null;   // "input" | "output"
-  terminal_group?: string | null;  // "line" | "load" | "bus" | "branch"
+  terminal_role?: string | null;         // "input" | "output"
+  terminal_group?: string | null;        // "line" | "load" | "bus" | "branch"
+  // Genişletilmiş alanlar
+  terminal_type?: string | null;         // "Ön Terminal" | "Arka Terminal" vb.
+  terminal_width_mm?: number | null;     // terminal bloğu fiziksel genişliği
+  terminal_height_mm?: number | null;    // terminal bloğu fiziksel yüksekliği
+  terminal_depth_mm?: number | null;     // terminal bloğu fiziksel derinliği
+  bolt_type?: string | null;             // "M12", "M10" vb.
+  bolt_count?: number | null;            // vida miktarı
+  bolt_center_distance_mm?: number | null; // merkez ölçüsü (mm)
 }
 
 export interface DeviceConnection {
@@ -77,6 +85,7 @@ export interface Device {
   brand: string;
   model: string;
   device_type: string;
+  enclosure_type?: string | null;  // "Sabit" | "Çekme" | "Eklenti"
   poles: number;
   current_a?: number | null;
   width_mm: number;

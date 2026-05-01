@@ -1,40 +1,22 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
 import { client } from "../api/client";
 import { Modal } from "../components/Modal";
-import { DeviceForm } from "../components/forms/DeviceForm";
 import { DeviceTechDrawing } from "../components/DeviceTechDrawing";
 import type { Device } from "../types";
 
 export function DeviceDefinitionsPage() {
   const queryClient = useQueryClient();
-  const [addModalOpen, setAddModalOpen] = useState(false);
-  const [editingDevice, setEditingDevice] = useState<Device | null>(null);
+  const navigate = useNavigate();
   const [viewingDevice, setViewingDevice] = useState<Device | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const devicesQuery = useQuery({
     queryKey: ["devices"],
     queryFn: client.listDevices,
-  });
-
-  const createMutation = useMutation({
-    mutationFn: client.createDevice,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["devices"] });
-      setAddModalOpen(false);
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, payload }: { id: number; payload: Omit<Device, "id"> }) =>
-      client.updateDevice(id, payload),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["devices"] });
-      setEditingDevice(null);
-    },
   });
 
   const deleteMutation = useMutation({
@@ -63,10 +45,10 @@ export function DeviceDefinitionsPage() {
         <div>
           <span className="eyebrow">Tanimlamalar</span>
           <h1>Cihaz Tanimlama</h1>
-          <p>Cihaz kutuphanesini tablo halinde yonetin. Yeni cihazlari modal uzerinden ekleyin.</p>
+          <p>Cihaz kutuphanesini yonetin. Detaylı tanımlama için editör sayfasını kullanın.</p>
         </div>
-        <button type="button" onClick={() => setAddModalOpen(true)}>
-          Yeni Cihaz
+        <button type="button" onClick={() => navigate("/definitions/devices/new")}>
+          + Yeni Cihaz
         </button>
       </section>
 
@@ -105,11 +87,12 @@ export function DeviceDefinitionsPage() {
                 <th>Marka</th>
                 <th>Model</th>
                 <th>Tip</th>
+                <th>Kasa</th>
                 <th>Kutup</th>
-                <th>Akim</th>
-                <th>Olcu</th>
+                <th>Akim (A)</th>
+                <th>Boyut W×H×D (mm)</th>
                 <th>Terminal</th>
-                <th>Islem</th>
+                <th>İşlem</th>
               </tr>
             </thead>
             <tbody>
@@ -118,10 +101,13 @@ export function DeviceDefinitionsPage() {
                   <td>{device.brand}</td>
                   <td>{device.model}</td>
                   <td>{device.device_type}</td>
+                  <td style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
+                    {device.enclosure_type ?? "—"}
+                  </td>
                   <td>{device.poles}</td>
-                  <td>{device.current_a ?? "-"}</td>
-                  <td>
-                    {device.width_mm}x{device.height_mm}x{device.depth_mm ?? 0}
+                  <td>{device.current_a ?? "—"}</td>
+                  <td style={{ fontVariantNumeric: "tabular-nums", fontSize: "0.85rem" }}>
+                    {device.width_mm} × {device.height_mm} × {device.depth_mm ?? 0}
                   </td>
                   <td>{device.terminals.length}</td>
                   <td className="actions-cell">
@@ -136,7 +122,7 @@ export function DeviceDefinitionsPage() {
                     <button
                       type="button"
                       className="ghost"
-                      onClick={() => setEditingDevice(device)}
+                      onClick={() => navigate(`/definitions/devices/${device.id}`)}
                     >
                       Düzenle
                     </button>
@@ -153,7 +139,7 @@ export function DeviceDefinitionsPage() {
               ))}
               {!devicesQuery.data?.length && (
                 <tr>
-                  <td colSpan={8}>
+                  <td colSpan={9}>
                     <div className="empty-state">Tanimli cihaz yok.</div>
                   </td>
                 </tr>
@@ -163,12 +149,7 @@ export function DeviceDefinitionsPage() {
         </div>
       </section>
 
-      {/* Add modal */}
-      <Modal title="Yeni Cihaz Tanimla" open={addModalOpen} onClose={() => setAddModalOpen(false)}>
-        <DeviceForm onSubmit={createMutation.mutateAsync} />
-      </Modal>
-
-      {/* View modal — teknik çizim */}
+      {/* Görüntüleme modalı — teknik çizim */}
       <Modal
         title={viewingDevice ? `Teknik Çizim — ${viewingDevice.brand} ${viewingDevice.model}` : ""}
         open={!!viewingDevice}
@@ -176,7 +157,6 @@ export function DeviceDefinitionsPage() {
       >
         {viewingDevice && (
           <div>
-            {/* cihaz bilgi özeti */}
             <div
               style={{
                 display: "flex",
@@ -190,6 +170,9 @@ export function DeviceDefinitionsPage() {
               }}
             >
               <span><strong style={{ color: "var(--text)" }}>{viewingDevice.device_type}</strong></span>
+              {viewingDevice.enclosure_type && (
+                <span>Kasa: <strong style={{ color: "var(--text)" }}>{viewingDevice.enclosure_type}</strong></span>
+              )}
               <span>Kutup: <strong style={{ color: "var(--text)" }}>{viewingDevice.poles}</strong></span>
               <span>Akım: <strong style={{ color: "var(--text)" }}>{viewingDevice.current_a ?? "—"} A</strong></span>
               <span>
@@ -207,23 +190,6 @@ export function DeviceDefinitionsPage() {
               terminals={viewingDevice.terminals}
             />
           </div>
-        )}
-      </Modal>
-
-      {/* Edit modal */}
-      <Modal
-        title={editingDevice ? `Düzenle — ${editingDevice.brand} ${editingDevice.model}` : ""}
-        open={!!editingDevice}
-        onClose={() => setEditingDevice(null)}
-      >
-        {editingDevice && (
-          <DeviceForm
-            key={editingDevice.id}
-            initialValue={editingDevice}
-            onSubmit={async (payload) => {
-              await updateMutation.mutateAsync({ id: editingDevice.id, payload });
-            }}
-          />
         )}
       </Modal>
     </div>
