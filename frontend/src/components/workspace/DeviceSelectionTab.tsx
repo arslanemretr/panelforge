@@ -217,7 +217,10 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
                       type="button"
                       className="ghost danger"
                       disabled={deleteMutation.isPending}
-                      onClick={() => deleteMutation.mutate(pd.id)}
+                      onClick={() => {
+                        if (window.confirm(`"${pd.label}" cihazını yerleşimden kaldırmak istediğinizden emin misiniz?`))
+                          deleteMutation.mutate(pd.id);
+                      }}
                     >
                       Sil
                     </button>

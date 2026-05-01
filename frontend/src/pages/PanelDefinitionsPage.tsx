@@ -190,7 +190,10 @@ export function PanelDefinitionsPage() {
                       type="button"
                       className="ghost danger"
                       disabled={deleteMutation.isPending}
-                      onClick={() => deleteMutation.mutate(definition.id)}
+                      onClick={() => {
+                        if (window.confirm(`"${definition.name}" kabin tanımını silmek istediğinizden emin misiniz?\nBu işlem geri alınamaz.`))
+                          deleteMutation.mutate(definition.id);
+                      }}
                     >
                       Sil
                     </button>

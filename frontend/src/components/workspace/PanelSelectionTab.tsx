@@ -168,7 +168,10 @@ export function PanelSelectionTab({ projectId }: PanelSelectionTabProps) {
                       type="button"
                       className="ghost danger"
                       disabled={deleteMutation.isPending}
-                      onClick={() => deleteMutation.mutate(item.id)}
+                      onClick={() => {
+                        if (window.confirm(`"${item.label}" kabinini yerleşimden kaldırmak istediğinizden emin misiniz?`))
+                          deleteMutation.mutate(item.id);
+                      }}
                     >
                       Sil
                     </button>

@@ -180,7 +180,10 @@ export function ConnectionTab({ projectId }: Props) {
                       <button
                         type="button"
                         className="btn-danger-sm"
-                        onClick={() => deleteMut.mutate(c.id)}
+                        onClick={() => {
+                          if (window.confirm("Bu bağlantıyı silmek istediğinizden emin misiniz?"))
+                            deleteMut.mutate(c.id);
+                        }}
                         title="Sil"
                       >
                         ✕

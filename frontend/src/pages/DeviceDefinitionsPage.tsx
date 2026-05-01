@@ -43,9 +43,10 @@ export function DeviceDefinitionsPage() {
     },
   });
 
-  function handleDelete(deviceId: number) {
+  function handleDelete(deviceId: number, deviceName: string) {
     setDeleteError(null);
-    deleteMutation.mutate(deviceId);
+    if (window.confirm(`"${deviceName}" cihazını silmek istediğinizden emin misiniz?\nBu işlem geri alınamaz.`))
+      deleteMutation.mutate(deviceId);
   }
 
   function handleSearchChange(value: string) {
@@ -203,7 +204,7 @@ export function DeviceDefinitionsPage() {
                       type="button"
                       className="ghost danger"
                       disabled={deleteMutation.isPending}
-                      onClick={() => handleDelete(device.id)}
+                      onClick={() => handleDelete(device.id, `${device.brand} ${device.model}`)}
                     >
                       Sil
                     </button>
