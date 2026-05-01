@@ -130,38 +130,52 @@ export function DeviceDefinitionsPage() {
           <table>
             <thead>
               <tr>
-                <th>Marka</th>
-                <th>Model</th>
-                <th>Tip</th>
-                <th>Kasa</th>
-                <th>Kutup</th>
-                <th>Akim (A)</th>
-                <th>Boyut W×H×D (mm)</th>
-                <th>Terminal</th>
-                <th>Oluşturma / Revizyon</th>
-                <th>İşlem</th>
+                <th style={{ padding: "0.5rem 0.65rem" }}>Marka</th>
+                <th style={{ padding: "0.5rem 0.65rem" }}>Model</th>
+                <th style={{ padding: "0.5rem 0.65rem" }}>Tip</th>
+                <th style={{ padding: "0.5rem 0.65rem" }}>Kasa</th>
+                <th style={{ padding: "0.5rem 0.65rem" }}>Kutup</th>
+                <th style={{ padding: "0.5rem 0.65rem" }}>Akım (A)</th>
+                <th style={{ padding: "0.5rem 0.65rem" }}>W×H×D (mm)</th>
+                <th style={{ padding: "0.5rem 0.65rem" }}>Terminal</th>
+                <th style={{ padding: "0.5rem 0.65rem" }}>Oluşturma</th>
+                <th style={{ padding: "0.5rem 0.65rem" }}>Revizyon</th>
+                <th style={{
+                  padding: "0.5rem 0.9rem",
+                  borderLeft: "2px solid var(--line)",
+                  background: "rgba(255,255,255,0.03)",
+                }}>İşlem</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((device) => (
                 <tr key={device.id}>
-                  <td>{device.brand}</td>
-                  <td>{device.model}</td>
-                  <td>{device.device_type}</td>
-                  <td style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
+                  <td style={{ padding: "0.45rem 0.65rem" }}>{device.brand}</td>
+                  <td style={{ padding: "0.45rem 0.65rem" }}>{device.model}</td>
+                  <td style={{ padding: "0.45rem 0.65rem" }}>{device.device_type}</td>
+                  <td style={{ padding: "0.45rem 0.65rem", color: "var(--muted)", fontSize: "0.85rem" }}>
                     {device.enclosure_type ?? "—"}
                   </td>
-                  <td>{device.poles}</td>
-                  <td>{device.current_a ?? "—"}</td>
-                  <td style={{ fontVariantNumeric: "tabular-nums", fontSize: "0.85rem" }}>
+                  <td style={{ padding: "0.45rem 0.65rem" }}>{device.poles}</td>
+                  <td style={{ padding: "0.45rem 0.65rem" }}>{device.current_a ?? "—"}</td>
+                  <td style={{ padding: "0.45rem 0.65rem", fontVariantNumeric: "tabular-nums", fontSize: "0.85rem" }}>
                     {device.width_mm} × {device.height_mm} × {device.depth_mm ?? 0}
                   </td>
-                  <td>{device.terminals.length}</td>
-                  <td style={{ fontSize: "0.82rem", color: "var(--muted)", lineHeight: 1.6 }}>
-                    <div>{fmtDate(device.created_at)}</div>
-                    <div>{fmtDate(device.updated_at)}</div>
+                  <td style={{ padding: "0.45rem 0.65rem" }}>{device.terminals.length}</td>
+                  <td style={{ padding: "0.45rem 0.65rem", fontSize: "0.82rem", color: "var(--muted)" }}>
+                    {fmtDate(device.created_at)}
                   </td>
-                  <td className="actions-cell">
+                  <td style={{ padding: "0.45rem 0.65rem", fontSize: "0.82rem", color: "var(--muted)" }}>
+                    {fmtDate(device.updated_at)}
+                  </td>
+                  <td
+                    className="actions-cell"
+                    style={{
+                      padding: "0.45rem 0.9rem",
+                      borderLeft: "2px solid var(--line)",
+                      background: "rgba(255,255,255,0.02)",
+                    }}
+                  >
                     <button
                       type="button"
                       className="ghost"
@@ -198,7 +212,7 @@ export function DeviceDefinitionsPage() {
               ))}
               {!filtered.length && (
                 <tr>
-                  <td colSpan={10}>
+                  <td colSpan={11}>
                     <div className="empty-state">
                       {search ? "Arama kriterine uyan cihaz bulunamadı." : "Tanimli cihaz yok."}
                     </div>
