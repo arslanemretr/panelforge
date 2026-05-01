@@ -68,6 +68,10 @@ def validate_project(db: Session, project_id: int) -> ValidationResult:
         if not copper.default_hole_diameter_mm:
             missing_fields.append("Delik capi eksik")
         # Bilgi amaçlı uyarılar — hesaplamayı engellemez
+        if not copper.busbar_x_mm:
+            warnings.append("Ana bara X konumu tanimlanmadi — varsayilan 50 mm kullanilacak")
+        if not copper.busbar_y_mm:
+            warnings.append("Ana bara Y konumu tanimlanmadi — varsayilan 100 mm kullanilacak")
         if not copper.busbar_length_mm:
             warnings.append("Ana bara boyu tanimlanmadi — varsayilan 1000 mm kullanilacak")
         if not copper.busbar_clearance_mm:
