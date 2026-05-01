@@ -129,35 +129,49 @@ export function PanelDefinitionsPage() {
           <table>
             <thead>
               <tr>
-                <th>Kabin Adi</th>
-                <th>Olcu</th>
-                <th>Montaj Plakasi</th>
-                <th>Yon</th>
-                <th>Faz</th>
-                <th>Olusturma / Revizyon</th>
-                <th>Islem</th>
+                <th style={{ padding: "0.5rem 0.65rem" }}>Kabin Adı</th>
+                <th style={{ padding: "0.5rem 0.65rem" }}>Ölçü</th>
+                <th style={{ padding: "0.5rem 0.65rem" }}>Montaj Plakası</th>
+                <th style={{ padding: "0.5rem 0.65rem" }}>Yön</th>
+                <th style={{ padding: "0.5rem 0.65rem" }}>Faz</th>
+                <th style={{ padding: "0.5rem 0.65rem" }}>Oluşturma</th>
+                <th style={{ padding: "0.5rem 0.65rem" }}>Revizyon</th>
+                <th style={{
+                  padding: "0.5rem 0.9rem",
+                  borderLeft: "2px solid var(--line)",
+                  background: "rgba(255,255,255,0.03)",
+                }}>İşlem</th>
               </tr>
             </thead>
             <tbody>
               {filteredDefinitions.map((definition) => (
                 <tr key={definition.id}>
-                  <td>
+                  <td style={{ padding: "0.45rem 0.65rem" }}>
                     <strong>{definition.name}</strong>
-                    <div className="table-subtext">{definition.description || "-"}</div>
+                    <div className="table-subtext">{definition.description || "—"}</div>
                   </td>
-                  <td>
-                    {definition.width_mm}x{definition.height_mm}x{definition.depth_mm ?? 0}
+                  <td style={{ padding: "0.45rem 0.65rem", fontVariantNumeric: "tabular-nums", fontSize: "0.85rem" }}>
+                    {definition.width_mm}×{definition.height_mm}×{definition.depth_mm ?? 0}
                   </td>
-                  <td>
-                    {definition.mounting_plate_width_mm ?? 0}x{definition.mounting_plate_height_mm ?? 0}
+                  <td style={{ padding: "0.45rem 0.65rem", fontSize: "0.85rem" }}>
+                    {definition.mounting_plate_width_mm ?? 0}×{definition.mounting_plate_height_mm ?? 0}
                   </td>
-                  <td>{definition.busbar_orientation || "-"}</td>
-                  <td>{definition.phase_system || "-"}</td>
-                  <td>
-                    <div>{fmtDate(definition.created_at)}</div>
-                    <div className="table-subtext">{fmtDate(definition.updated_at)}</div>
+                  <td style={{ padding: "0.45rem 0.65rem" }}>{definition.busbar_orientation || "—"}</td>
+                  <td style={{ padding: "0.45rem 0.65rem" }}>{definition.phase_system || "—"}</td>
+                  <td style={{ padding: "0.45rem 0.65rem", fontSize: "0.82rem", color: "var(--muted)" }}>
+                    {fmtDate(definition.created_at)}
                   </td>
-                  <td>
+                  <td style={{ padding: "0.45rem 0.65rem", fontSize: "0.82rem", color: "var(--muted)" }}>
+                    {fmtDate(definition.updated_at)}
+                  </td>
+                  <td
+                    className="actions-cell"
+                    style={{
+                      padding: "0.45rem 0.9rem",
+                      borderLeft: "2px solid var(--line)",
+                      background: "rgba(255,255,255,0.02)",
+                    }}
+                  >
                     <button
                       type="button"
                       className="ghost"
@@ -171,7 +185,8 @@ export function PanelDefinitionsPage() {
                     </button>
                     <button
                       type="button"
-                      className="ghost"
+                      className="ghost danger"
+                      disabled={deleteMutation.isPending}
                       onClick={() => deleteMutation.mutate(definition.id)}
                     >
                       Sil
@@ -181,9 +196,9 @@ export function PanelDefinitionsPage() {
               ))}
               {!filteredDefinitions.length && (
                 <tr>
-                  <td colSpan={7}>
+                  <td colSpan={8}>
                     <div className="empty-state">
-                      {search.trim() ? "Aramayla eslesen kabin bulunamadi." : "Tanimli kabin yok."}
+                      {search.trim() ? "Aramayla eşleşen kabin bulunamadı." : "Tanımlı kabin yok."}
                     </div>
                   </td>
                 </tr>

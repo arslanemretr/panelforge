@@ -170,30 +170,40 @@ export function CopperDefinitionsPage() {
           <table>
             <thead>
               <tr>
-                <th>Bakır Kodu</th>
-                <th>Kalınlık (mm)</th>
-                <th>En (mm)</th>
-                <th>Oluşturma / Revizyon</th>
-                <th>İşlem</th>
+                <th style={{ padding: "0.5rem 0.65rem" }}>Bakır Kodu</th>
+                <th style={{ padding: "0.5rem 0.65rem" }}>Kalınlık (mm)</th>
+                <th style={{ padding: "0.5rem 0.65rem" }}>En (mm)</th>
+                <th style={{ padding: "0.5rem 0.65rem" }}>Oluşturma</th>
+                <th style={{ padding: "0.5rem 0.65rem" }}>Revizyon</th>
+                <th style={{
+                  padding: "0.5rem 0.9rem",
+                  borderLeft: "2px solid var(--line)",
+                  background: "rgba(255,255,255,0.03)",
+                }}>İşlem</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((definition) => (
                 <tr key={definition.id}>
-                  <td>
+                  <td style={{ padding: "0.45rem 0.65rem" }}>
                     <strong>{definition.name}</strong>
                   </td>
-                  <td>{definition.main_thickness_mm ?? "-"}</td>
-                  <td>{definition.main_width_mm ?? "-"}</td>
-                  <td>
-                    <div style={{ fontSize: "0.8rem", color: "var(--color-muted, #888)" }}>
-                      {fmtDate(definition.created_at)}
-                    </div>
-                    <div style={{ fontSize: "0.8rem", color: "var(--color-muted, #888)" }}>
-                      {fmtDate(definition.updated_at)}
-                    </div>
+                  <td style={{ padding: "0.45rem 0.65rem" }}>{definition.main_thickness_mm ?? "—"}</td>
+                  <td style={{ padding: "0.45rem 0.65rem" }}>{definition.main_width_mm ?? "—"}</td>
+                  <td style={{ padding: "0.45rem 0.65rem", fontSize: "0.82rem", color: "var(--muted)" }}>
+                    {fmtDate(definition.created_at)}
                   </td>
-                  <td>
+                  <td style={{ padding: "0.45rem 0.65rem", fontSize: "0.82rem", color: "var(--muted)" }}>
+                    {fmtDate(definition.updated_at)}
+                  </td>
+                  <td
+                    className="actions-cell"
+                    style={{
+                      padding: "0.45rem 0.9rem",
+                      borderLeft: "2px solid var(--line)",
+                      background: "rgba(255,255,255,0.02)",
+                    }}
+                  >
                     <button
                       type="button"
                       className="ghost"
@@ -215,8 +225,10 @@ export function CopperDefinitionsPage() {
               ))}
               {!filtered.length && (
                 <tr>
-                  <td colSpan={5}>
-                    <div className="empty-state">Tanimli bakir yok.</div>
+                  <td colSpan={6}>
+                    <div className="empty-state">
+                      {search ? "Arama kriterine uyan bakır bulunamadı." : "Tanımlı bakır yok."}
+                    </div>
                   </td>
                 </tr>
               )}
