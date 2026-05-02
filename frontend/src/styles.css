@@ -349,6 +349,25 @@ button.ghost {
   cursor: pointer;
 }
 
+.toolbar-action,
+.toolbar-action span,
+.toolbar-action-button,
+.toolbar-action-button span {
+  color: inherit;
+}
+
+.toolbar-action-button {
+  color: var(--text);
+}
+
+[data-theme="light"] .toolbar-action,
+[data-theme="light"] .toolbar-action span,
+[data-theme="light"] .toolbar-action-button,
+[data-theme="light"] .toolbar-action-button span {
+  color: #111827;
+}
+
+
 .toolbar-action-export {
   color: #111827;
   background: linear-gradient(135deg, #ffbf7a, #ffd89d);
@@ -1314,3 +1333,4 @@ th {
   line-height: 1;
   flex-shrink: 0;
 }
+

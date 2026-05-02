@@ -351,7 +351,7 @@ export function DeviceDefinitionsPage() {
           )}
           {!!activeFilterCount && (
             <span className="table-toolbar-count">
-              {activeFilterCount} aktif filtre · {filtered.length} / {allDevices.length} kayit
+              {activeFilterCount} aktif filtre - {filtered.length} / {allDevices.length} kayit
             </span>
           )}
           <div className="table-toolbar-actions">
@@ -398,8 +398,7 @@ export function DeviceDefinitionsPage() {
                 <th
                   style={{
                     padding: "0.5rem 0.9rem",
-                    borderLeft: "2px solid var(--line)",
-                    background: "rgba(255,255,255,0.03)",
+                    
                   }}
                 >
                   Islem
@@ -431,8 +430,7 @@ export function DeviceDefinitionsPage() {
                     className="actions-cell"
                     style={{
                       padding: "0.45rem 0.9rem",
-                      borderLeft: "2px solid var(--line)",
-                      background: "rgba(255,255,255,0.02)",
+                      
                     }}
                   >
                     <button type="button" className="ghost" onClick={() => setViewingDevice(device)}>
@@ -752,3 +750,4 @@ export function DeviceDefinitionsPage() {
     </div>
   );
 }
+
