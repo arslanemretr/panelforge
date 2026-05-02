@@ -8,3 +8,4 @@ pydantic-settings==2.10.1
 reportlab==4.4.3
 openpyxl==3.1.5
 ezdxf==1.4.2
+python-multipart==0.0.20

@@ -2,7 +2,19 @@
   "permissions": {
     "allow": [
       "Bash(xargs wc *)",
-      "Bash(docker compose *)"
+      "Bash(docker compose *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(ssh panel.perlyon.com \"cd /opt/panelforge && git pull && docker compose -f docker-compose.prod.yml up -d --build --remove-orphans\")",
+      "Bash(ssh root@panel.perlyon.com \"cd /opt/panelforge && git pull && docker compose -f docker-compose.prod.yml up -d --build --remove-orphans\")",
+      "Bash(git -C /d/PanelForge add backend/app/db/models.py backend/app/schemas/device.py backend/alembic/versions/0014_device_terminal_extended.py)",
+      "Bash(git -C /d/PanelForge commit -m ' *)",
+      "Bash(npx tsc *)",
+      "Bash(git -C /d/PanelForge add frontend/src/components/DeviceTechDrawing.tsx)",
+      "Bash(git -C /d/PanelForge push)",
+      "Bash(git -C /d/PanelForge add frontend/src/pages/DeviceEditorPage.tsx)",
+      "Bash(git -C /d/PanelForge commit -m \"fix\\(ui\\): teknik çizim yüksekliği 960px \\(2×\\)\")",
+      "Bash(git -C /d/PanelForge add backend/)"
     ]
   }
 }

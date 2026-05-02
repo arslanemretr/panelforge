@@ -97,6 +97,38 @@ export interface Device {
   updated_at?: string;
 }
 
+export interface DeviceImportError {
+  sheet: string;
+  row: number;
+  message: string;
+}
+
+export interface DeviceImportPreviewRow {
+  device_code: string;
+  brand: string;
+  model: string;
+  device_type: string;
+  poles: number;
+  current_a?: number | null;
+  width_mm: number;
+  height_mm: number;
+  depth_mm?: number | null;
+  terminal_count: number;
+}
+
+export interface DeviceImportPreview {
+  can_import: boolean;
+  device_count: number;
+  terminal_count: number;
+  errors: DeviceImportError[];
+  devices: DeviceImportPreviewRow[];
+}
+
+export interface DeviceImportResult {
+  created_device_count: number;
+  created_terminal_count: number;
+}
+
 export interface ProjectDevice {
   id: number;
   project_id: number;
@@ -116,6 +148,7 @@ export interface ProjectDevice {
 export interface CopperDefinition {
   id: number;
   name: string;
+  copper_kind: string;
   description?: string | null;
   main_width_mm?: number | null;
   main_thickness_mm?: number | null;
@@ -135,6 +168,11 @@ export interface CopperDefinition {
   slot_length_mm?: number | null;
   density_g_cm3?: number | null;
   coating_type?: string | null;
+  busbar_x_mm?: number | null;
+  busbar_y_mm?: number | null;
+  busbar_z_mm?: number | null;
+  busbar_orientation?: string | null;
+  busbar_length_mm?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -188,6 +226,8 @@ export interface CopperSettings {
   coating_type?: string | null;             // "Kaplamasız" | "Kalay Kaplı" | vb.
   main_phase_center_mm?: number | null;     // ana faz L1↔L2 merkez-merkez mesafesi
   branch_phase_center_mm?: number | null;   // tali faz merkez-merkez mesafesi
+  main_copper_definition_id?: number | null;
+  branch_copper_definition_id?: number | null;
 }
 
 export interface ValidationResult {

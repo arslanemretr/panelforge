@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import db_session
@@ -13,8 +13,14 @@ router = APIRouter(tags=["copper-definitions"])
 
 
 @router.get("/copper-definitions", response_model=list[CopperDefinitionRead])
-def list_copper_definitions(db: Session = Depends(db_session)) -> list[models.CopperDefinition]:
-    return db.query(models.CopperDefinition).order_by(models.CopperDefinition.updated_at.desc()).all()
+def list_copper_definitions(
+    kind: str | None = Query(default=None),
+    db: Session = Depends(db_session),
+) -> list[models.CopperDefinition]:
+    query = db.query(models.CopperDefinition)
+    if kind:
+        query = query.filter(models.CopperDefinition.copper_kind == kind)
+    return query.order_by(models.CopperDefinition.updated_at.desc()).all()
 
 
 @router.post("/copper-definitions", response_model=CopperDefinitionRead, status_code=status.HTTP_201_CREATED)
@@ -58,6 +64,14 @@ def delete_copper_definition(definition_id: int, db: Session = Depends(db_sessio
     usage_count = (
         db.query(models.ProjectCopper)
         .filter(models.ProjectCopper.copper_definition_id == definition_id)
+        .count()
+    )
+    usage_count += (
+        db.query(models.CopperSettings)
+        .filter(
+            (models.CopperSettings.main_copper_definition_id == definition_id)
+            | (models.CopperSettings.branch_copper_definition_id == definition_id)
+        )
         .count()
     )
     if usage_count > 0:

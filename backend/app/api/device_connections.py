@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.api.dependencies import db_session
 from app.db import models
-from app.schemas.device_connection import DeviceConnectionCreate, DeviceConnectionRead
+from app.schemas.device_connection import DeviceConnectionCreate, DeviceConnectionRead, DeviceConnectionUpdate
 
 router = APIRouter(tags=["device-connections"])
 
@@ -60,6 +60,44 @@ def create_connection(
         connection_type=payload.connection_type,
     )
     db.add(conn)
+    db.commit()
+    db.refresh(conn)
+    return conn
+
+
+@router.put(
+    "/projects/{project_id}/connections/{connection_id}",
+    response_model=DeviceConnectionRead,
+)
+def update_connection(
+    project_id: int,
+    connection_id: int,
+    payload: DeviceConnectionUpdate,
+    db: Session = Depends(db_session),
+) -> models.DeviceConnection:
+    conn = (
+        db.query(models.DeviceConnection)
+        .filter(
+            models.DeviceConnection.project_id == project_id,
+            models.DeviceConnection.id == connection_id,
+        )
+        .one_or_none()
+    )
+    if conn is None:
+        raise HTTPException(status_code=404, detail="Connection not found")
+
+    target = db.get(models.ProjectDevice, payload.target_device_id)
+    if target is None or target.project_id != project_id:
+        raise HTTPException(status_code=404, detail="Target device not found in project")
+
+    if payload.source_device_id is not None:
+        source = db.get(models.ProjectDevice, payload.source_device_id)
+        if source is None or source.project_id != project_id:
+            raise HTTPException(status_code=404, detail="Source device not found in project")
+
+    for field, value in payload.model_dump().items():
+        setattr(conn, field, value)
+
     db.commit()
     db.refresh(conn)
     return conn

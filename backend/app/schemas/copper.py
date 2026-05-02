@@ -22,26 +22,27 @@ class CopperSettingsBase(BaseModel):
     use_slot_holes: bool = False
     slot_width_mm: Decimal | None = None
     slot_length_mm: Decimal | None = None
-    # Ana bakır yerleşim
     busbar_x_mm: Decimal | None = None
     busbar_y_mm: Decimal | None = None
     busbar_z_mm: Decimal | None = None
     busbar_orientation: str | None = "horizontal"
     busbar_length_mm: Decimal | None = None
     busbar_phase_count: int | None = 3
-    bars_per_phase: int | None = 1         # Faz başına paralel bar sayısı
-    bar_gap_mm: Decimal | None = Decimal("0")  # Aynı fazdaki barlar arası hava boşluğu
-    busbar_plane: str | None = "XY"       # XY = yatay düzlem | XZ = derinlik düzlemi
-    phase_stack_axis: str | None = "Y"    # Y = fazlar dikey istifli | Z = fazlar derinlik ekseninde
-    main_density_g_cm3: Decimal | None = None    # g/cm³, None → malzeme varsayılanı (Cu:8.96, Al:2.70)
-    branch_density_g_cm3: Decimal | None = None  # g/cm³, None → malzeme varsayılanı
-    k_factor_edgewise: Decimal | None = Decimal("0.40")  # edgewise büküm K faktörü
-    busbar_clearance_mm: Decimal | None = None            # ana bara-bara arası min. hava boşluğu
-    branch_clearance_mm: Decimal | None = None            # tali bara-bara arası min. hava boşluğu
-    min_hole_hole_distance_mm: Decimal | None = None      # delik merkezi-merkezi arası min. mesafe
-    coating_type: str | None = None                       # "Kaplamasız" | "Kalay Kaplı" | vb.
-    main_phase_center_mm: Decimal | None = None           # ana faz merkez-merkez mesafesi (L1↔L2)
-    branch_phase_center_mm: Decimal | None = None         # tali faz merkez-merkez mesafesi
+    bars_per_phase: int | None = 1
+    bar_gap_mm: Decimal | None = Decimal("0")
+    busbar_plane: str | None = "XY"
+    phase_stack_axis: str | None = "Y"
+    main_density_g_cm3: Decimal | None = None
+    branch_density_g_cm3: Decimal | None = None
+    k_factor_edgewise: Decimal | None = Decimal("0.40")
+    busbar_clearance_mm: Decimal | None = None
+    branch_clearance_mm: Decimal | None = None
+    min_hole_hole_distance_mm: Decimal | None = None
+    coating_type: str | None = None
+    main_phase_center_mm: Decimal | None = None
+    branch_phase_center_mm: Decimal | None = None
+    main_copper_definition_id: int | None = None
+    branch_copper_definition_id: int | None = None
 
 
 class CopperSettingsUpsert(CopperSettingsBase):

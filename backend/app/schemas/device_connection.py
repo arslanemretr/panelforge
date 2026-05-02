@@ -14,6 +14,10 @@ class DeviceConnectionCreate(BaseModel):
     connection_type: str                      # "main_to_device" | "device_to_device"
 
 
+class DeviceConnectionUpdate(DeviceConnectionCreate):
+    pass
+
+
 class DeviceConnectionRead(ORMModel):
     id: int
     project_id: int

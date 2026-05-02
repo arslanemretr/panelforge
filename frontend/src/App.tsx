@@ -20,7 +20,8 @@ const navSections = [
     items: [
       ["/definitions/devices", "Cihaz Tanimlama"],
       ["/definitions/panels", "Kabin Tanimlama"],
-      ["/definitions/copper", "Bakir Tanimlama"],
+      ["/definitions/copper/main", "Ana Bakir Tanimlama"],
+      ["/definitions/copper/branch", "Tali Bakir Tanimlama"],
     ],
   },
 ];
@@ -85,7 +86,9 @@ export default function App() {
           <Route path="/definitions/devices/new" element={<DeviceEditorPage />} />
           <Route path="/definitions/devices/:id" element={<DeviceEditorPage />} />
           <Route path="/definitions/panels" element={<PanelDefinitionsPage />} />
-          <Route path="/definitions/copper" element={<CopperDefinitionsPage />} />
+          <Route path="/definitions/copper" element={<Navigate to="/definitions/copper/main" replace />} />
+          <Route path="/definitions/copper/main" element={<CopperDefinitionsPage kind="main" />} />
+          <Route path="/definitions/copper/branch" element={<CopperDefinitionsPage kind="branch" />} />
         </Routes>
       </main>
     </div>

@@ -258,6 +258,8 @@ class CopperSettings(Base):
     coating_type: Mapped[str | None] = mapped_column(Text)              # "Kaplamasız" | "Kalay Kaplı" | vb.
     main_phase_center_mm: Mapped[Decimal | None] = mapped_column(Numeric)   # ana faz merkez-merkez mesafesi
     branch_phase_center_mm: Mapped[Decimal | None] = mapped_column(Numeric) # tali faz merkez-merkez mesafesi
+    main_copper_definition_id: Mapped[int | None] = mapped_column(Integer)
+    branch_copper_definition_id: Mapped[int | None] = mapped_column(Integer)
 
     project: Mapped["Project"] = relationship(back_populates="copper_settings")
 
@@ -285,6 +287,12 @@ class CopperDefinition(Base):
     slot_width_mm: Mapped[Decimal | None] = mapped_column(Numeric)
     slot_length_mm: Mapped[Decimal | None] = mapped_column(Numeric)
     density_g_cm3: Mapped[Decimal | None] = mapped_column(Numeric)  # g/cm³ — Cu≈8.96, Al≈2.70
+    copper_kind: Mapped[str] = mapped_column(Text, default="main")
+    busbar_x_mm: Mapped[Decimal | None] = mapped_column(Numeric)
+    busbar_y_mm: Mapped[Decimal | None] = mapped_column(Numeric)
+    busbar_z_mm: Mapped[Decimal | None] = mapped_column(Numeric)
+    busbar_orientation: Mapped[str | None] = mapped_column(Text)
+    busbar_length_mm: Mapped[Decimal | None] = mapped_column(Numeric)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,

@@ -5,6 +5,8 @@ import type {
   CopperDefinition,
   CopperSettings,
   Device,
+  DeviceImportPreview,
+  DeviceImportResult,
   DeviceConnection,
   Panel,
   PanelDefinition,
@@ -61,6 +63,18 @@ export const client = {
   updateDevice: async (deviceId: number, payload: Omit<Device, "id">) =>
     (await api.put<Device>(`/devices/${deviceId}`, payload)).data,
   deleteDevice: async (deviceId: number) => api.delete(`/devices/${deviceId}`),
+  exportDevicesExcelUrl: () => `${api.defaults.baseURL}/devices/export/excel`,
+  importDevicesTemplateUrl: () => `${api.defaults.baseURL}/devices/import/template`,
+  previewDevicesImport: async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return (await api.post<DeviceImportPreview>("/devices/import/preview", formData)).data;
+  },
+  importDevicesExcel: async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return (await api.post<DeviceImportResult>("/devices/import/excel", formData)).data;
+  },
 
   listProjectDevices: async (projectId: number) =>
     (await api.get<ProjectDevice[]>(`/projects/${projectId}/devices`)).data,
@@ -80,7 +94,8 @@ export const client = {
     (await api.get<CopperSettings | null>(`/projects/${projectId}/copper-settings`)).data,
   upsertCopperSettings: async (projectId: number, payload: CopperSettings) =>
     (await api.put<CopperSettings>(`/projects/${projectId}/copper-settings`, payload)).data,
-  listCopperDefinitions: async () => (await api.get<CopperDefinition[]>("/copper-definitions")).data,
+  listCopperDefinitions: async (kind?: "main" | "branch") =>
+    (await api.get<CopperDefinition[]>("/copper-definitions", { params: kind ? { kind } : undefined })).data,
   createCopperDefinition: async (payload: Omit<CopperDefinition, "id" | "created_at" | "updated_at">) =>
     (await api.post<CopperDefinition>("/copper-definitions", payload)).data,
   deleteCopperDefinition: async (definitionId: number) => api.delete(`/copper-definitions/${definitionId}`),
@@ -99,6 +114,19 @@ export const client = {
       connection_type: string;
     },
   ) => (await api.post<DeviceConnection>(`/projects/${projectId}/connections`, payload)).data,
+  updateConnection: async (
+    projectId: number,
+    connectionId: number,
+    payload: {
+      source_type: string;
+      source_device_id?: number | null;
+      source_terminal_id?: number | null;
+      target_device_id: number;
+      target_terminal_id: number;
+      phase: string;
+      connection_type: string;
+    },
+  ) => (await api.put<DeviceConnection>(`/projects/${projectId}/connections/${connectionId}`, payload)).data,
   deleteConnection: async (projectId: number, connectionId: number) =>
     api.delete(`/projects/${projectId}/connections/${connectionId}`),
   autoAssignConnections: async (projectId: number) =>

@@ -8,6 +8,7 @@ from app.schemas.common import ORMModel
 
 class CopperDefinitionBase(BaseModel):
     name: str
+    copper_kind: str = "main"
     description: str | None = None
     main_width_mm: Decimal | None = None
     main_thickness_mm: Decimal | None = None
@@ -25,8 +26,13 @@ class CopperDefinitionBase(BaseModel):
     use_slot_holes: bool = False
     slot_width_mm: Decimal | None = None
     slot_length_mm: Decimal | None = None
-    density_g_cm3: Decimal | None = None  # g/cm³ — Cu≈8.96, Al≈2.70
-    coating_type: str | None = None       # "Kaplamasız" | "Kalay Kaplı" | "Gümüş Kaplı" | "Makaron Kaplı" | "Boyalı" | "Üre Kaplamalı"
+    density_g_cm3: Decimal | None = None
+    coating_type: str | None = None
+    busbar_x_mm: Decimal | None = None
+    busbar_y_mm: Decimal | None = None
+    busbar_z_mm: Decimal | None = None
+    busbar_orientation: str | None = None
+    busbar_length_mm: Decimal | None = None
 
 
 class CopperDefinitionCreate(CopperDefinitionBase):
