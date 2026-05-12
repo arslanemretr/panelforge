@@ -169,6 +169,8 @@ export function PanelDefinitionsPage() {
     localStorage.setItem(SEARCH_KEY, value);
   }
 
+  const [activeTab, setActiveTab] = useState<"definitions" | "types">("definitions");
+
   const panelTypes = panelTypesQuery.data ?? [];
   const filteredDefs = (definitionsQuery.data ?? []).filter((def) => {
     if (!search.trim()) return true;
@@ -191,196 +193,232 @@ export function PanelDefinitionsPage() {
           <h1>Kabin Tanımlama</h1>
           <p>Kabin ölçülerini ve pano tiplerini yönetin.</p>
         </div>
-        <button type="button" onClick={openCreate}>
-          Yeni Kabin
-        </button>
-      </section>
-
-      {/* ── Pano Tipleri ── */}
-      <section className="card">
-        <div className="section-header" style={{ marginBottom: "0.75rem" }}>
-          <h3 style={{ margin: 0 }}>Pano Tipleri</h3>
-        </div>
-        <div className="table-wrap" style={{ marginBottom: "0.75rem" }}>
-          <table>
-            <thead>
-              <tr>
-                <th style={{ padding: "0.45rem 0.65rem" }}>Tip Adı</th>
-                <th style={{
-                  padding: "0.45rem 0.9rem",
-                  borderLeft: "2px solid var(--line)",
-                  background: "rgba(255,255,255,0.03)",
-                  width: 80,
-                }}>İşlem</th>
-              </tr>
-            </thead>
-            <tbody>
-              {panelTypes.map((pt) => (
-                <tr key={pt.id}>
-                  <td style={{ padding: "0.4rem 0.65rem" }}>{pt.name}</td>
-                  <td className="actions-cell" style={{
-                    padding: "0.4rem 0.9rem",
-                    borderLeft: "2px solid var(--line)",
-                    background: "rgba(255,255,255,0.02)",
-                  }}>
-                    <button
-                      type="button"
-                      className="ghost danger"
-                      disabled={deleteTypeMutation.isPending}
-                      onClick={() =>
-                        setConfirmPending({
-                          message: `"${pt.name}" tipini silmek istediğinizden emin misiniz?`,
-                          onConfirm: () => { deleteTypeMutation.mutate(pt.id); setConfirmPending(null); },
-                        })
-                      }
-                    >
-                      Sil
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {panelTypes.length === 0 && (
-                <tr>
-                  <td colSpan={2}>
-                    <div className="empty-state">Henüz pano tipi tanımlanmamış.</div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Yeni tip ekle — inline */}
-        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-          <input
-            type="text"
-            placeholder="Yeni tip adı..."
-            value={newTypeName}
-            onChange={(e) => setNewTypeName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && newTypeName.trim()) createTypeMutation.mutate();
-            }}
-            style={{ maxWidth: 260 }}
-          />
-          <button
-            type="button"
-            disabled={!newTypeName.trim() || createTypeMutation.isPending}
-            onClick={() => createTypeMutation.mutate()}
-          >
-            {createTypeMutation.isPending ? "Ekleniyor..." : "Ekle"}
+        {activeTab === "definitions" && (
+          <button type="button" onClick={openCreate}>
+            Yeni Kabin
           </button>
-        </div>
+        )}
       </section>
 
-      {/* ── Kabin Tanımları ── */}
-      <section className="card">
-        <div style={{ marginBottom: "0.75rem" }}>
-          <input
-            type="search"
-            placeholder="Kabin ara..."
-            value={search}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            style={{ width: "100%", maxWidth: 320 }}
-          />
-        </div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th style={{ padding: "0.5rem 0.65rem" }}>Kabin Adı</th>
-                <th style={{ padding: "0.5rem 0.65rem" }}>Açıklama</th>
-                <th style={{ padding: "0.5rem 0.65rem" }}>Pano Tipi</th>
-                <th style={{ padding: "0.5rem 0.65rem" }}>Ölçü (G×Y×D mm)</th>
-                <th style={{ padding: "0.5rem 0.65rem" }}>Montaj Plakası</th>
-                <th style={{ padding: "0.5rem 0.65rem" }}>Orijin (X, Y, Z)</th>
-                <th style={{ padding: "0.5rem 0.65rem" }}>Oluşturma</th>
-                <th style={{ padding: "0.5rem 0.65rem" }}>Revizyon</th>
-                <th style={{
-                  padding: "0.5rem 0.9rem",
-                  borderLeft: "2px solid var(--line)",
-                  background: "rgba(255,255,255,0.03)",
-                }}>İşlem</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredDefs.map((def) => (
-                <tr key={def.id}>
-                  <td style={{ padding: "0.45rem 0.65rem" }}>
-                    <strong>{def.name}</strong>
-                  </td>
-                  <td style={{ padding: "0.45rem 0.65rem", color: "var(--muted)", fontSize: "0.85rem" }}>
-                    {def.description || "—"}
-                  </td>
-                  <td style={{ padding: "0.45rem 0.65rem", fontSize: "0.85rem" }}>
-                    {def.panel_type?.name ?? "—"}
-                  </td>
-                  <td style={{ padding: "0.45rem 0.65rem", fontVariantNumeric: "tabular-nums", fontSize: "0.85rem" }}>
-                    {def.width_mm}×{def.height_mm}×{def.depth_mm ?? 0}
-                  </td>
-                  <td style={{ padding: "0.45rem 0.65rem", fontSize: "0.85rem" }}>
-                    {def.mounting_plate_width_mm ?? 0}×{def.mounting_plate_height_mm ?? 0}
-                  </td>
-                  <td style={{ padding: "0.45rem 0.65rem", fontSize: "0.82rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>
-                    {def.origin_x_mm ?? 0}, {def.origin_y_mm ?? 0}, {def.origin_z_mm ?? 0}
-                  </td>
-                  <td style={{ padding: "0.45rem 0.65rem", fontSize: "0.82rem", color: "var(--muted)" }}>
-                    {fmtDate(def.created_at)}
-                  </td>
-                  <td style={{ padding: "0.45rem 0.65rem", fontSize: "0.82rem", color: "var(--muted)" }}>
-                    {fmtDate(def.updated_at)}
-                  </td>
-                  <td
-                    className="actions-cell"
-                    style={{
+      {/* ── Tab çubuğu ── */}
+      <div className="subtabs">
+        <button
+          type="button"
+          className={activeTab === "definitions" ? "tab-active" : "tab-idle"}
+          onClick={() => setActiveTab("definitions")}
+        >
+          Kabin Tanımları
+        </button>
+        <button
+          type="button"
+          className={activeTab === "types" ? "tab-active" : "tab-idle"}
+          onClick={() => setActiveTab("types")}
+        >
+          Pano Tipleri
+          {panelTypes.length > 0 && (
+            <span style={{
+              marginLeft: "0.4rem",
+              fontSize: "0.75rem",
+              background: "var(--accent-soft)",
+              color: "var(--accent)",
+              borderRadius: "999px",
+              padding: "0.1rem 0.45rem",
+            }}>
+              {panelTypes.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ── Kabin Tanımları tab ── */}
+      {activeTab === "definitions" && (
+        <section className="card">
+          <div style={{ marginBottom: "0.75rem" }}>
+            <input
+              type="search"
+              placeholder="Kabin ara..."
+              value={search}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              style={{ width: "100%", maxWidth: 320 }}
+            />
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th style={{ padding: "0.5rem 0.65rem" }}>Kabin Adı</th>
+                  <th style={{ padding: "0.5rem 0.65rem" }}>Açıklama</th>
+                  <th style={{ padding: "0.5rem 0.65rem" }}>Pano Tipi</th>
+                  <th style={{ padding: "0.5rem 0.65rem" }}>Ölçü (G×Y×D mm)</th>
+                  <th style={{ padding: "0.5rem 0.65rem" }}>Montaj Plakası</th>
+                  <th style={{ padding: "0.5rem 0.65rem" }}>Orijin (X, Y, Z)</th>
+                  <th style={{ padding: "0.5rem 0.65rem" }}>Oluşturma</th>
+                  <th style={{ padding: "0.5rem 0.65rem" }}>Revizyon</th>
+                  <th style={{
+                    padding: "0.5rem 0.9rem",
+                    borderLeft: "2px solid var(--line)",
+                    background: "rgba(255,255,255,0.03)",
+                  }}>İşlem</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredDefs.map((def) => (
+                  <tr key={def.id}>
+                    <td style={{ padding: "0.45rem 0.65rem" }}>
+                      <strong>{def.name}</strong>
+                    </td>
+                    <td style={{ padding: "0.45rem 0.65rem", color: "var(--muted)", fontSize: "0.85rem" }}>
+                      {def.description || "—"}
+                    </td>
+                    <td style={{ padding: "0.45rem 0.65rem", fontSize: "0.85rem" }}>
+                      {def.panel_type?.name ?? "—"}
+                    </td>
+                    <td style={{ padding: "0.45rem 0.65rem", fontVariantNumeric: "tabular-nums", fontSize: "0.85rem" }}>
+                      {def.width_mm}×{def.height_mm}×{def.depth_mm ?? 0}
+                    </td>
+                    <td style={{ padding: "0.45rem 0.65rem", fontSize: "0.85rem" }}>
+                      {def.mounting_plate_width_mm ?? 0}×{def.mounting_plate_height_mm ?? 0}
+                    </td>
+                    <td style={{ padding: "0.45rem 0.65rem", fontSize: "0.82rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>
+                      {def.origin_x_mm ?? 0}, {def.origin_y_mm ?? 0}, {def.origin_z_mm ?? 0}
+                    </td>
+                    <td style={{ padding: "0.45rem 0.65rem", fontSize: "0.82rem", color: "var(--muted)" }}>
+                      {fmtDate(def.created_at)}
+                    </td>
+                    <td style={{ padding: "0.45rem 0.65rem", fontSize: "0.82rem", color: "var(--muted)" }}>
+                      {fmtDate(def.updated_at)}
+                    </td>
+                    <td
+                      className="actions-cell"
+                      style={{
+                        padding: "0.45rem 0.9rem",
+                        borderLeft: "2px solid var(--line)",
+                        background: "rgba(255,255,255,0.02)",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className="ghost"
+                        onClick={() => openEdit(def)}
+                      >
+                        Düzenle
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost"
+                        disabled={cloneMutation.isPending}
+                        onClick={() => cloneMutation.mutate(def)}
+                      >
+                        Kopyala
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost danger"
+                        disabled={deleteMutation.isPending}
+                        onClick={() =>
+                          setConfirmPending({
+                            message: `"${def.name}" kabin tanımını silmek istediğinizden emin misiniz?`,
+                            onConfirm: () => { deleteMutation.mutate(def.id); setConfirmPending(null); },
+                          })
+                        }
+                      >
+                        Sil
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {!filteredDefs.length && (
+                  <tr>
+                    <td colSpan={9}>
+                      <div className="empty-state">
+                        {search.trim() ? "Aramayla eşleşen kabin bulunamadı." : "Tanımlı kabin yok."}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* ── Pano Tipleri tab ── */}
+      {activeTab === "types" && (
+        <section className="card">
+          <div className="section-header" style={{ marginBottom: "0.75rem" }}>
+            <h3 style={{ margin: 0 }}>Pano Tipleri</h3>
+          </div>
+          <div className="table-wrap" style={{ marginBottom: "0.75rem" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th style={{ padding: "0.5rem 0.65rem" }}>Tip Adı</th>
+                  <th style={{
+                    padding: "0.5rem 0.9rem",
+                    borderLeft: "2px solid var(--line)",
+                    background: "rgba(255,255,255,0.03)",
+                    width: 90,
+                  }}>İşlem</th>
+                </tr>
+              </thead>
+              <tbody>
+                {panelTypes.map((pt) => (
+                  <tr key={pt.id}>
+                    <td style={{ padding: "0.45rem 0.65rem" }}>{pt.name}</td>
+                    <td className="actions-cell" style={{
                       padding: "0.45rem 0.9rem",
                       borderLeft: "2px solid var(--line)",
                       background: "rgba(255,255,255,0.02)",
-                    }}
-                  >
-                    <button
-                      type="button"
-                      className="ghost"
-                      onClick={() => openEdit(def)}
-                    >
-                      Düzenle
-                    </button>
-                    <button
-                      type="button"
-                      className="ghost"
-                      disabled={cloneMutation.isPending}
-                      onClick={() => cloneMutation.mutate(def)}
-                    >
-                      Kopyala
-                    </button>
-                    <button
-                      type="button"
-                      className="ghost danger"
-                      disabled={deleteMutation.isPending}
-                      onClick={() =>
-                        setConfirmPending({
-                          message: `"${def.name}" kabin tanımını silmek istediğinizden emin misiniz?`,
-                          onConfirm: () => { deleteMutation.mutate(def.id); setConfirmPending(null); },
-                        })
-                      }
-                    >
-                      Sil
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {!filteredDefs.length && (
-                <tr>
-                  <td colSpan={9}>
-                    <div className="empty-state">
-                      {search.trim() ? "Aramayla eşleşen kabin bulunamadı." : "Tanımlı kabin yok."}
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+                    }}>
+                      <button
+                        type="button"
+                        className="ghost danger"
+                        disabled={deleteTypeMutation.isPending}
+                        onClick={() =>
+                          setConfirmPending({
+                            message: `"${pt.name}" tipini silmek istediğinizden emin misiniz?`,
+                            onConfirm: () => { deleteTypeMutation.mutate(pt.id); setConfirmPending(null); },
+                          })
+                        }
+                      >
+                        Sil
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {panelTypes.length === 0 && (
+                  <tr>
+                    <td colSpan={2}>
+                      <div className="empty-state">Henüz pano tipi tanımlanmamış.</div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Yeni tip ekle — inline */}
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+            <input
+              type="text"
+              placeholder="Yeni tip adı..."
+              value={newTypeName}
+              onChange={(e) => setNewTypeName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newTypeName.trim()) createTypeMutation.mutate();
+              }}
+              style={{ maxWidth: 280 }}
+            />
+            <button
+              type="button"
+              disabled={!newTypeName.trim() || createTypeMutation.isPending}
+              onClick={() => createTypeMutation.mutate()}
+            >
+              {createTypeMutation.isPending ? "Ekleniyor..." : "Ekle"}
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* ── Kabin Ekle / Düzenle Modal ── */}
       <Modal
