@@ -104,6 +104,8 @@ export const client = {
     (await api.get<CopperDefinition[]>("/copper-definitions", { params: kind ? { kind } : undefined })).data,
   createCopperDefinition: async (payload: Omit<CopperDefinition, "id" | "created_at" | "updated_at">) =>
     (await api.post<CopperDefinition>("/copper-definitions", payload)).data,
+  updateCopperDefinition: async (id: number, payload: Omit<CopperDefinition, "id" | "created_at" | "updated_at">) =>
+    (await api.put<CopperDefinition>(`/copper-definitions/${id}`, payload)).data,
   deleteCopperDefinition: async (definitionId: number) => api.delete(`/copper-definitions/${definitionId}`),
 
   listConnections: async (projectId: number) =>

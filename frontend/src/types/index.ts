@@ -183,6 +183,13 @@ export interface CopperDefinition {
   busbar_z_mm?: number | null;
   busbar_orientation?: string | null;
   busbar_length_mm?: number | null;
+  // Elektriksel yerleşim
+  phase_type?: string | null;
+  bars_per_phase?: number | null;
+  bar_gap_mm?: number | null;
+  phase_center_mm?: number | null;
+  layer_type?: string | null;
+  neutral_bar_count?: number | null;
   created_at: string;
   updated_at: string;
 }

@@ -33,6 +33,13 @@ class CopperDefinitionBase(BaseModel):
     busbar_z_mm: Decimal | None = None
     busbar_orientation: str | None = None
     busbar_length_mm: Decimal | None = None
+    # Elektriksel yerleşim
+    phase_type: str | None = None
+    bars_per_phase: int | None = 1
+    bar_gap_mm: Decimal | None = None
+    phase_center_mm: Decimal | None = None
+    layer_type: str | None = "Tek Kat"
+    neutral_bar_count: int | None = 1
 
 
 class CopperDefinitionCreate(CopperDefinitionBase):
