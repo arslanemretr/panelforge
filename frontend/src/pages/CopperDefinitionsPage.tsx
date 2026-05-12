@@ -436,6 +436,7 @@ function MainBusbarPreview({ draft }: { draft: MainDraft }) {
 // ─── Ana bileşen ───────────────────────────────────────────────────────────
 export function CopperDefinitionsPage({ kind }: CopperDefinitionsPageProps) {
   const queryClient = useQueryClient();
+  // Branch kind için modal; main kind için inline form (modalOpen sadece branch kullanır)
   const [modalOpen, setModalOpen] = useState(false);
   const [editingDef, setEditingDef] = useState<CopperDefinition | null>(null);
   const [search, setSearch] = useState<string>(localStorage.getItem(`copper-def-search-${kind}`) ?? "");
@@ -446,9 +447,7 @@ export function CopperDefinitionsPage({ kind }: CopperDefinitionsPageProps) {
 
   const title = kind === "main" ? "Ana Bakır Tanımlama" : "Tali Bakır Tanımlama";
   const createLabel = kind === "main" ? "Yeni Ana Bakır" : "Yeni Tali Bakır";
-  const modalTitle = editingDef
-    ? (kind === "main" ? "Ana Bakırı Düzenle" : "Tali Bakırı Düzenle")
-    : createLabel;
+  const modalTitle = editingDef ? "Tali Bakırı Düzenle" : createLabel;
 
   const definitionsQuery = useQuery({
     queryKey: ["copper-definitions", kind],
@@ -460,11 +459,11 @@ export function CopperDefinitionsPage({ kind }: CopperDefinitionsPageProps) {
     ? definitions.filter((item) => item.name.toLowerCase().includes(search.trim().toLowerCase()))
     : definitions;
 
-  function openCreate() {
+  function startCreate() {
     setEditingDef(null);
     setMainDraft(EMPTY_MAIN);
     setBranchDraft(EMPTY_BRANCH);
-    setModalOpen(true);
+    if (kind === "branch") setModalOpen(true);
   }
 
   function openEdit(def: CopperDefinition) {
@@ -485,15 +484,20 @@ export function CopperDefinitionsPage({ kind }: CopperDefinitionsPageProps) {
         slot_width_mm: Number(def.slot_width_mm ?? 12),
         slot_length_mm: Number(def.slot_length_mm ?? 18),
       });
+      setModalOpen(true);
     }
-    setModalOpen(true);
   }
 
   function closeModal() {
     setModalOpen(false);
     setEditingDef(null);
-    setMainDraft(EMPTY_MAIN);
     setBranchDraft(EMPTY_BRANCH);
+  }
+
+  // Ana bakır inline form: düzenleme modundan çıkıp yeni oluşturma moduna geç
+  function cancelMainEdit() {
+    setEditingDef(null);
+    setMainDraft(EMPTY_MAIN);
   }
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["copper-definitions", kind] });
@@ -501,7 +505,11 @@ export function CopperDefinitionsPage({ kind }: CopperDefinitionsPageProps) {
   const createMutation = useMutation({
     mutationFn: () =>
       client.createCopperDefinition(kind === "main" ? buildMainPayload(mainDraft) : buildBranchPayload(branchDraft)),
-    onSuccess: async () => { await invalidate(); closeModal(); },
+    onSuccess: async () => {
+      await invalidate();
+      if (kind === "main") { setMainDraft(EMPTY_MAIN); setEditingDef(null); }
+      else closeModal();
+    },
   });
 
   const updateMutation = useMutation({
@@ -510,7 +518,11 @@ export function CopperDefinitionsPage({ kind }: CopperDefinitionsPageProps) {
         editingDef!.id,
         kind === "main" ? buildMainPayload(mainDraft) : buildBranchPayload(branchDraft),
       ),
-    onSuccess: async () => { await invalidate(); closeModal(); },
+    onSuccess: async () => {
+      await invalidate();
+      if (kind === "main") { setEditingDef(null); setMainDraft(EMPTY_MAIN); }
+      else closeModal();
+    },
   });
 
   const cloneMutation = useMutation({
@@ -571,6 +583,254 @@ export function CopperDefinitionsPage({ kind }: CopperDefinitionsPageProps) {
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
+  // ─── Tablo (her iki kind için ortak) ──────────────────────────────────────
+  const tableSection = (
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Ad</th>
+            {kind === "main" ? (
+              <>
+                <th>Kesit</th>
+                <th>Faz Tipi</th>
+                <th>Kat Tipi</th>
+                <th>Faz Miktarı</th>
+                <th>Fazlar Arası</th>
+              </>
+            ) : (
+              <>
+                <th>Kesit</th>
+                <th>Malzeme</th>
+                <th>Delik / Büküm</th>
+                <th>Slot</th>
+              </>
+            )}
+            <th>Oluşturma</th>
+            <th>Revizyon</th>
+            <th style={{ borderLeft: "2px solid var(--line)" }}>İşlem</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filtered.map((def) => (
+            <tr
+              key={def.id}
+              style={
+                kind === "main" && editingDef?.id === def.id
+                  ? { background: "rgba(99,102,241,0.10)", outline: "1px solid rgba(99,102,241,0.3)" }
+                  : undefined
+              }
+            >
+              <td><strong>{def.name}</strong></td>
+              {kind === "main" ? (
+                <>
+                  <td>{def.main_width_mm ?? "-"} × {def.main_thickness_mm ?? "-"} mm</td>
+                  <td>{def.phase_type ?? "-"}</td>
+                  <td>{def.layer_type ?? "-"}</td>
+                  <td>{def.bars_per_phase ?? 1} adet</td>
+                  <td>{def.phase_center_mm ? `${def.phase_center_mm} mm` : (def.main_phase_spacing_mm ? `${def.main_phase_spacing_mm} mm` : "-")}</td>
+                </>
+              ) : (
+                <>
+                  <td>{def.branch_width_mm ?? "-"} × {def.branch_thickness_mm ?? "-"} mm</td>
+                  <td>{def.branch_material}</td>
+                  <td>Ø{def.default_hole_diameter_mm ?? "-"} / R{def.bend_inner_radius_mm ?? "-"}</td>
+                  <td>{def.use_slot_holes ? `${def.slot_width_mm ?? "-"} × ${def.slot_length_mm ?? "-"}` : "—"}</td>
+                </>
+              )}
+              <td>{fmtDate(def.created_at)}</td>
+              <td>{fmtDate(def.updated_at)}</td>
+              <td className="actions-cell" style={{ borderLeft: "2px solid var(--line)" }}>
+                <button type="button" className="ghost" onClick={() => openEdit(def)}>
+                  Düzenle
+                </button>
+                <button
+                  type="button"
+                  className="ghost"
+                  disabled={cloneMutation.isPending}
+                  onClick={() => cloneMutation.mutate(def)}
+                >
+                  Kopyala
+                </button>
+                <button
+                  type="button"
+                  className="ghost danger"
+                  disabled={deleteMutation.isPending}
+                  onClick={() =>
+                    setConfirmPending({
+                      message: `"${def.name}" bakır tanımını silmek istediğinizden emin misiniz?`,
+                      onConfirm: () => { deleteMutation.mutate(def.id); setConfirmPending(null); },
+                    })
+                  }
+                >
+                  Sil
+                </button>
+              </td>
+            </tr>
+          ))}
+          {!filtered.length && (
+            <tr>
+              <td colSpan={kind === "main" ? 9 : 8}>
+                <div className="empty-state">
+                  {search ? "Arama kriterine uygun bakır tanımı bulunamadı." : "Tanımlı bakır yok."}
+                </div>
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  // ─── Ana bakır inline formu ────────────────────────────────────────────────
+  const mainInlineForm = (
+    <form
+      className="form-grid"
+      onSubmit={(e) => { e.preventDefault(); editingDef ? updateMutation.mutate() : createMutation.mutate(); }}
+    >
+      {/* Genel Bilgiler */}
+      <div style={{ gridColumn: "1 / -1", marginBottom: "0.25rem" }}>
+        <span style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted)" }}>
+          Genel Bilgiler
+        </span>
+      </div>
+
+      <label className="field" style={{ gridColumn: "1 / -1" }}>
+        <span>Ana Bakır Adı</span>
+        <input className="input" value={mainDraft.name} onChange={(e) => setMainDraft((v) => ({ ...v, name: e.target.value }))} required />
+      </label>
+      <label className="field">
+        <span>Genişlik (mm)</span>
+        <input className="input" type="number" min={1} value={mainDraft.width_mm} onChange={(e) => setMainDraft((v) => ({ ...v, width_mm: Number(e.target.value) }))} />
+      </label>
+      <label className="field">
+        <span>Kalınlık (mm)</span>
+        <input className="input" type="number" min={1} value={mainDraft.thickness_mm} onChange={(e) => setMainDraft((v) => ({ ...v, thickness_mm: Number(e.target.value) }))} />
+      </label>
+      <label className="field">
+        <span>Kat Tipi</span>
+        <select className="input" value={mainDraft.layer_type} onChange={(e) => setMainDraft((v) => ({ ...v, layer_type: e.target.value }))}>
+          <option value="Tek Kat">Tek Kat</option>
+          <option value="Çift Kat">Çift Kat</option>
+        </select>
+      </label>
+
+      {/* Elektriksel Yerleşim */}
+      <div style={{ gridColumn: "1 / -1", marginTop: "0.6rem", marginBottom: "0.25rem" }}>
+        <span style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted)" }}>
+          Elektriksel Yerleşim
+        </span>
+      </div>
+
+      <label className="field">
+        <span>Faz Tipi</span>
+        <select className="input" value={mainDraft.phase_type} onChange={(e) => setMainDraft((v) => ({ ...v, phase_type: e.target.value }))}>
+          <option value="L1-L2-L3">L1 — L2 — L3</option>
+          <option value="N-L1-L2-L3">N — L1 — L2 — L3</option>
+          <option value="L1-L2-L3-N">L1 — L2 — L3 — N</option>
+        </select>
+      </label>
+      <label className="field">
+        <span>Faz Miktarı (adet/faz)</span>
+        <input className="input" type="number" min={1} max={8} value={mainDraft.bars_per_phase} onChange={(e) => setMainDraft((v) => ({ ...v, bars_per_phase: Number(e.target.value) }))} />
+      </label>
+      <label className="field">
+        <span>Faz İçi Aralığı (mm)</span>
+        <input className="input" type="number" min={0} value={mainDraft.bar_gap_mm} onChange={(e) => setMainDraft((v) => ({ ...v, bar_gap_mm: Number(e.target.value) }))} />
+      </label>
+      <label className="field">
+        <span>Fazlar Arası Aralık (mm)</span>
+        <input className="input" type="number" min={1} value={mainDraft.phase_center_mm} onChange={(e) => setMainDraft((v) => ({ ...v, phase_center_mm: Number(e.target.value) }))} />
+      </label>
+      {hasNeutral(mainDraft.phase_type) && (
+        <label className="field">
+          <span>Nötr Bakır Miktarı (adet)</span>
+          <input className="input" type="number" min={1} max={8} value={mainDraft.neutral_bar_count} onChange={(e) => setMainDraft((v) => ({ ...v, neutral_bar_count: Number(e.target.value) }))} />
+        </label>
+      )}
+      <label className="field">
+        <span>X (mm)</span>
+        <input className="input" type="number" value={mainDraft.busbar_x_mm} onChange={(e) => setMainDraft((v) => ({ ...v, busbar_x_mm: Number(e.target.value) }))} />
+      </label>
+      <label className="field">
+        <span>Y (mm)</span>
+        <input className="input" type="number" value={mainDraft.busbar_y_mm} onChange={(e) => setMainDraft((v) => ({ ...v, busbar_y_mm: Number(e.target.value) }))} />
+      </label>
+      <label className="field">
+        <span>Z (mm)</span>
+        <input className="input" type="number" value={mainDraft.busbar_z_mm} onChange={(e) => setMainDraft((v) => ({ ...v, busbar_z_mm: Number(e.target.value) }))} />
+      </label>
+      <label className="field">
+        <span>Uzunluk (mm)</span>
+        <input className="input" type="number" value={mainDraft.busbar_length_mm} onChange={(e) => setMainDraft((v) => ({ ...v, busbar_length_mm: Number(e.target.value) }))} />
+      </label>
+
+      {/* Canlı Önizleme */}
+      <div style={{ gridColumn: "1 / -1", marginTop: "0.9rem" }}>
+        <div style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted)", marginBottom: "0.5rem" }}>
+          Canlı Önizleme
+        </div>
+        <MainBusbarPreview draft={mainDraft} />
+      </div>
+
+      <div className="form-actions" style={{ gridColumn: "1 / -1" }}>
+        <button type="submit" className="btn-primary" disabled={isSaving}>
+          {isSaving ? "Kaydediliyor..." : (editingDef ? "Güncelle" : "Kaydet")}
+        </button>
+        {editingDef && (
+          <button type="button" className="ghost" onClick={cancelMainEdit}>
+            İptal
+          </button>
+        )}
+      </div>
+    </form>
+  );
+
+  // ─── Branch modal form içeriği ────────────────────────────────────────────
+  const branchFormContent = (
+    <form
+      className="form-grid"
+      onSubmit={(e) => { e.preventDefault(); editingDef ? updateMutation.mutate() : createMutation.mutate(); }}
+    >
+      <label className="field" style={{ gridColumn: "1 / -1" }}>
+        <span>Tali Bakır Adı</span>
+        <input className="input" value={branchDraft.name} onChange={(e) => setBranchDraft((v) => ({ ...v, name: e.target.value }))} required />
+      </label>
+      <label className="field"><span>Genişlik (mm)</span><input className="input" type="number" value={branchDraft.width_mm} onChange={(e) => setBranchDraft((v) => ({ ...v, width_mm: Number(e.target.value) }))} /></label>
+      <label className="field"><span>Kalınlık (mm)</span><input className="input" type="number" value={branchDraft.thickness_mm} onChange={(e) => setBranchDraft((v) => ({ ...v, thickness_mm: Number(e.target.value) }))} /></label>
+      <label className="field">
+        <span>Malzeme</span>
+        <select className="input" value={branchDraft.material} onChange={(e) => setBranchDraft((v) => ({ ...v, material: e.target.value }))}>
+          <option value="Cu">Cu</option>
+          <option value="Al">Al</option>
+        </select>
+      </label>
+      <label className="field"><span>Büküm İç R (mm)</span><input className="input" type="number" value={branchDraft.bend_inner_radius_mm} onChange={(e) => setBranchDraft((v) => ({ ...v, bend_inner_radius_mm: Number(e.target.value) }))} /></label>
+      <label className="field"><span>Delik Çapı (mm)</span><input className="input" type="number" value={branchDraft.default_hole_diameter_mm} onChange={(e) => setBranchDraft((v) => ({ ...v, default_hole_diameter_mm: Number(e.target.value) }))} /></label>
+      <label className="field"><span>Min. Delik Kenar (mm)</span><input className="input" type="number" value={branchDraft.min_hole_edge_distance_mm} onChange={(e) => setBranchDraft((v) => ({ ...v, min_hole_edge_distance_mm: Number(e.target.value) }))} /></label>
+      <label className="field"><span>Min. Delik-Büküm (mm)</span><input className="input" type="number" value={branchDraft.min_bend_hole_distance_mm} onChange={(e) => setBranchDraft((v) => ({ ...v, min_bend_hole_distance_mm: Number(e.target.value) }))} /></label>
+      <label className="field" style={{ gridColumn: "1 / -1" }}>
+        <span>Slot Delik</span>
+        <label style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <input type="checkbox" checked={branchDraft.use_slot_holes} onChange={(e) => setBranchDraft((v) => ({ ...v, use_slot_holes: e.target.checked }))} />
+          <span>Oval delik kullanılsın</span>
+        </label>
+      </label>
+      {branchDraft.use_slot_holes && (
+        <>
+          <label className="field"><span>Slot Genişliği (mm)</span><input className="input" type="number" value={branchDraft.slot_width_mm} onChange={(e) => setBranchDraft((v) => ({ ...v, slot_width_mm: Number(e.target.value) }))} /></label>
+          <label className="field"><span>Slot Uzunluğu (mm)</span><input className="input" type="number" value={branchDraft.slot_length_mm} onChange={(e) => setBranchDraft((v) => ({ ...v, slot_length_mm: Number(e.target.value) }))} /></label>
+        </>
+      )}
+      <div className="form-actions" style={{ gridColumn: "1 / -1" }}>
+        <button type="submit" className="btn-primary" disabled={isSaving}>
+          {isSaving ? "Kaydediliyor..." : (editingDef ? "Güncelle" : "Kaydet")}
+        </button>
+      </div>
+    </form>
+  );
+
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="stack">
       <section className="card page-heading">
@@ -583,317 +843,79 @@ export function CopperDefinitionsPage({ kind }: CopperDefinitionsPageProps) {
               : "Tüm tali bağlantılarda kullanılacak bakır standardını yönetin. Delik ve büküm parametreleri burada tanımlanır."}
           </p>
         </div>
-        <button type="button" onClick={openCreate}>
+        <button type="button" onClick={startCreate}>
           {createLabel}
         </button>
       </section>
 
       {deleteError && <div className="alert alert-warning">{deleteError}</div>}
 
-      <section className="card">
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.9rem", flexWrap: "wrap" }}>
-          <input
-            type="search"
-            className="input"
-            placeholder={`${kind === "main" ? "Ana" : "Tali"} bakır ara...`}
-            value={search}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            style={{ flex: 1, maxWidth: "320px" }}
-          />
-          {search.trim() && (
-            <span style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
-              {filtered.length} / {definitions.length} kayıt
-            </span>
-          )}
-        </div>
+      {kind === "main" ? (
+        /* ── Ana bakır: 2 sütunlu inline layout ── */
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1.1fr)", gap: "1.5rem", alignItems: "start" }}>
 
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Ad</th>
-                {kind === "main" ? (
-                  <>
-                    <th>Kesit</th>
-                    <th>Faz Tipi</th>
-                    <th>Kat Tipi</th>
-                    <th>Faz Miktarı</th>
-                    <th>Fazlar Arası</th>
-                  </>
-                ) : (
-                  <>
-                    <th>Kesit</th>
-                    <th>Malzeme</th>
-                    <th>Delik / Büküm</th>
-                    <th>Slot</th>
-                  </>
-                )}
-                <th>Oluşturma</th>
-                <th>Revizyon</th>
-                <th style={{ borderLeft: "2px solid var(--line)" }}>İşlem</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((def) => (
-                <tr key={def.id}>
-                  <td><strong>{def.name}</strong></td>
-                  {kind === "main" ? (
-                    <>
-                      <td>{def.main_width_mm ?? "-"} × {def.main_thickness_mm ?? "-"} mm</td>
-                      <td>{def.phase_type ?? "-"}</td>
-                      <td>{def.layer_type ?? "-"}</td>
-                      <td>{def.bars_per_phase ?? 1} adet</td>
-                      <td>{def.phase_center_mm ? `${def.phase_center_mm} mm` : (def.main_phase_spacing_mm ? `${def.main_phase_spacing_mm} mm` : "-")}</td>
-                    </>
-                  ) : (
-                    <>
-                      <td>{def.branch_width_mm ?? "-"} × {def.branch_thickness_mm ?? "-"} mm</td>
-                      <td>{def.branch_material}</td>
-                      <td>Ø{def.default_hole_diameter_mm ?? "-"} / R{def.bend_inner_radius_mm ?? "-"}</td>
-                      <td>{def.use_slot_holes ? `${def.slot_width_mm ?? "-"} × ${def.slot_length_mm ?? "-"}` : "—"}</td>
-                    </>
-                  )}
-                  <td>{fmtDate(def.created_at)}</td>
-                  <td>{fmtDate(def.updated_at)}</td>
-                  <td className="actions-cell" style={{ borderLeft: "2px solid var(--line)" }}>
-                    <button type="button" className="ghost" onClick={() => openEdit(def)}>
-                      Düzenle
-                    </button>
-                    <button
-                      type="button"
-                      className="ghost"
-                      disabled={cloneMutation.isPending}
-                      onClick={() => cloneMutation.mutate(def)}
-                    >
-                      Kopyala
-                    </button>
-                    <button
-                      type="button"
-                      className="ghost danger"
-                      disabled={deleteMutation.isPending}
-                      onClick={() =>
-                        setConfirmPending({
-                          message: `"${def.name}" bakır tanımını silmek istediğinizden emin misiniz?`,
-                          onConfirm: () => {
-                            deleteMutation.mutate(def.id);
-                            setConfirmPending(null);
-                          },
-                        })
-                      }
-                    >
-                      Sil
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {!filtered.length && (
-                <tr>
-                  <td colSpan={kind === "main" ? 9 : 8}>
-                    <div className="empty-state">
-                      {search ? "Arama kriterine uygun bakır tanımı bulunamadı." : "Tanımlı bakır yok."}
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* ─── Modal ─────────────────────────────────────────────────────── */}
-      <Modal title={modalTitle} open={modalOpen} onClose={closeModal}>
-        <form
-          className="form-grid"
-          onSubmit={(e) => {
-            e.preventDefault();
-            editingDef ? updateMutation.mutate() : createMutation.mutate();
-          }}
-        >
-          {kind === "main" ? (
-            <>
-              {/* ── Genel Bilgiler ── */}
-              <div style={{ gridColumn: "1 / -1", marginBottom: "0.25rem" }}>
-                <span style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted)" }}>
-                  Genel Bilgiler
+          {/* SOL: Tablo */}
+          <section className="card">
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.9rem", flexWrap: "wrap" }}>
+              <input
+                type="search"
+                className="input"
+                placeholder="Ana bakır ara..."
+                value={search}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                style={{ flex: 1, minWidth: 0 }}
+              />
+              {search.trim() && (
+                <span style={{ fontSize: "0.85rem", color: "var(--muted)", whiteSpace: "nowrap" }}>
+                  {filtered.length} / {definitions.length}
                 </span>
-              </div>
+              )}
+            </div>
+            {tableSection}
+          </section>
 
-              <label className="field" style={{ gridColumn: "1 / -1" }}>
-                <span>Ana Bakır Adı</span>
-                <input
-                  className="input"
-                  value={mainDraft.name}
-                  onChange={(e) => setMainDraft((v) => ({ ...v, name: e.target.value }))}
-                  required
-                />
-              </label>
-
-              <label className="field">
-                <span>Genişlik (mm)</span>
-                <input
-                  className="input"
-                  type="number"
-                  min={1}
-                  value={mainDraft.width_mm}
-                  onChange={(e) => setMainDraft((v) => ({ ...v, width_mm: Number(e.target.value) }))}
-                />
-              </label>
-              <label className="field">
-                <span>Kalınlık (mm)</span>
-                <input
-                  className="input"
-                  type="number"
-                  min={1}
-                  value={mainDraft.thickness_mm}
-                  onChange={(e) => setMainDraft((v) => ({ ...v, thickness_mm: Number(e.target.value) }))}
-                />
-              </label>
-              <label className="field">
-                <span>Kat Tipi</span>
-                <select
-                  className="input"
-                  value={mainDraft.layer_type}
-                  onChange={(e) => setMainDraft((v) => ({ ...v, layer_type: e.target.value }))}
-                >
-                  <option value="Tek Kat">Tek Kat</option>
-                  <option value="Çift Kat">Çift Kat</option>
-                </select>
-              </label>
-
-              {/* ── Elektriksel Yerleşim ── */}
-              <div style={{ gridColumn: "1 / -1", marginTop: "0.6rem", marginBottom: "0.25rem" }}>
-                <span style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted)" }}>
-                  Elektriksel Yerleşim
+          {/* SAĞ: Inline form */}
+          <section className="card">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+              <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 600 }}>
+                {editingDef ? "Düzenleniyor" : "Yeni Ana Bakır"}
+              </h3>
+              {editingDef && (
+                <span style={{ fontSize: "0.82rem", color: "var(--muted)", fontStyle: "italic" }}>
+                  {editingDef.name}
                 </span>
-              </div>
-
-              <label className="field">
-                <span>Faz Tipi</span>
-                <select
-                  className="input"
-                  value={mainDraft.phase_type}
-                  onChange={(e) => setMainDraft((v) => ({ ...v, phase_type: e.target.value }))}
-                >
-                  <option value="L1-L2-L3">L1 — L2 — L3</option>
-                  <option value="N-L1-L2-L3">N — L1 — L2 — L3</option>
-                  <option value="L1-L2-L3-N">L1 — L2 — L3 — N</option>
-                </select>
-              </label>
-
-              <label className="field">
-                <span>Faz Miktarı (adet/faz)</span>
-                <input
-                  className="input"
-                  type="number"
-                  min={1}
-                  max={8}
-                  value={mainDraft.bars_per_phase}
-                  onChange={(e) => setMainDraft((v) => ({ ...v, bars_per_phase: Number(e.target.value) }))}
-                />
-              </label>
-
-              <label className="field">
-                <span>Faz İçi Aralığı (mm)</span>
-                <input
-                  className="input"
-                  type="number"
-                  min={0}
-                  value={mainDraft.bar_gap_mm}
-                  onChange={(e) => setMainDraft((v) => ({ ...v, bar_gap_mm: Number(e.target.value) }))}
-                />
-              </label>
-
-              <label className="field">
-                <span>Fazlar Arası Aralık (mm)</span>
-                <input
-                  className="input"
-                  type="number"
-                  min={1}
-                  value={mainDraft.phase_center_mm}
-                  onChange={(e) => setMainDraft((v) => ({ ...v, phase_center_mm: Number(e.target.value) }))}
-                />
-              </label>
-
-              {hasNeutral(mainDraft.phase_type) && (
-                <label className="field">
-                  <span>Nötr Bakır Miktarı (adet)</span>
-                  <input
-                    className="input"
-                    type="number"
-                    min={1}
-                    max={8}
-                    value={mainDraft.neutral_bar_count}
-                    onChange={(e) => setMainDraft((v) => ({ ...v, neutral_bar_count: Number(e.target.value) }))}
-                  />
-                </label>
               )}
-
-              <label className="field">
-                <span>X (mm)</span>
-                <input className="input" type="number" value={mainDraft.busbar_x_mm} onChange={(e) => setMainDraft((v) => ({ ...v, busbar_x_mm: Number(e.target.value) }))} />
-              </label>
-              <label className="field">
-                <span>Y (mm)</span>
-                <input className="input" type="number" value={mainDraft.busbar_y_mm} onChange={(e) => setMainDraft((v) => ({ ...v, busbar_y_mm: Number(e.target.value) }))} />
-              </label>
-              <label className="field">
-                <span>Z (mm)</span>
-                <input className="input" type="number" value={mainDraft.busbar_z_mm} onChange={(e) => setMainDraft((v) => ({ ...v, busbar_z_mm: Number(e.target.value) }))} />
-              </label>
-              <label className="field">
-                <span>Uzunluk (mm)</span>
-                <input className="input" type="number" value={mainDraft.busbar_length_mm} onChange={(e) => setMainDraft((v) => ({ ...v, busbar_length_mm: Number(e.target.value) }))} />
-              </label>
-
-              {/* ── Canlı Önizleme ── */}
-              <div style={{ gridColumn: "1 / -1", marginTop: "0.9rem" }}>
-                <div style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted)", marginBottom: "0.5rem" }}>
-                  Canlı Önizleme
-                </div>
-                <MainBusbarPreview draft={mainDraft} />
-              </div>
-            </>
-          ) : (
-            <>
-              <label className="field" style={{ gridColumn: "1 / -1" }}>
-                <span>Tali Bakır Adı</span>
-                <input className="input" value={branchDraft.name} onChange={(e) => setBranchDraft((v) => ({ ...v, name: e.target.value }))} required />
-              </label>
-              <label className="field"><span>Genişlik (mm)</span><input className="input" type="number" value={branchDraft.width_mm} onChange={(e) => setBranchDraft((v) => ({ ...v, width_mm: Number(e.target.value) }))} /></label>
-              <label className="field"><span>Kalınlık (mm)</span><input className="input" type="number" value={branchDraft.thickness_mm} onChange={(e) => setBranchDraft((v) => ({ ...v, thickness_mm: Number(e.target.value) }))} /></label>
-              <label className="field"><span>Malzeme</span>
-                <select className="input" value={branchDraft.material} onChange={(e) => setBranchDraft((v) => ({ ...v, material: e.target.value }))}>
-                  <option value="Cu">Cu</option>
-                  <option value="Al">Al</option>
-                </select>
-              </label>
-              <label className="field"><span>Büküm İç R (mm)</span><input className="input" type="number" value={branchDraft.bend_inner_radius_mm} onChange={(e) => setBranchDraft((v) => ({ ...v, bend_inner_radius_mm: Number(e.target.value) }))} /></label>
-              <label className="field"><span>Delik Çapı (mm)</span><input className="input" type="number" value={branchDraft.default_hole_diameter_mm} onChange={(e) => setBranchDraft((v) => ({ ...v, default_hole_diameter_mm: Number(e.target.value) }))} /></label>
-              <label className="field"><span>Min. Delik Kenar (mm)</span><input className="input" type="number" value={branchDraft.min_hole_edge_distance_mm} onChange={(e) => setBranchDraft((v) => ({ ...v, min_hole_edge_distance_mm: Number(e.target.value) }))} /></label>
-              <label className="field"><span>Min. Delik-Büküm (mm)</span><input className="input" type="number" value={branchDraft.min_bend_hole_distance_mm} onChange={(e) => setBranchDraft((v) => ({ ...v, min_bend_hole_distance_mm: Number(e.target.value) }))} /></label>
-              <label className="field" style={{ gridColumn: "1 / -1" }}>
-                <span>Slot Delik</span>
-                <label style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                  <input type="checkbox" checked={branchDraft.use_slot_holes} onChange={(e) => setBranchDraft((v) => ({ ...v, use_slot_holes: e.target.checked }))} />
-                  <span>Oval delik kullanılsın</span>
-                </label>
-              </label>
-              {branchDraft.use_slot_holes && (
-                <>
-                  <label className="field"><span>Slot Genişliği (mm)</span><input className="input" type="number" value={branchDraft.slot_width_mm} onChange={(e) => setBranchDraft((v) => ({ ...v, slot_width_mm: Number(e.target.value) }))} /></label>
-                  <label className="field"><span>Slot Uzunluğu (mm)</span><input className="input" type="number" value={branchDraft.slot_length_mm} onChange={(e) => setBranchDraft((v) => ({ ...v, slot_length_mm: Number(e.target.value) }))} /></label>
-                </>
+            </div>
+            {mainInlineForm}
+          </section>
+        </div>
+      ) : (
+        /* ── Tali bakır: tablo + modal ── */
+        <>
+          <section className="card">
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.9rem", flexWrap: "wrap" }}>
+              <input
+                type="search"
+                className="input"
+                placeholder="Tali bakır ara..."
+                value={search}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                style={{ flex: 1, maxWidth: "320px" }}
+              />
+              {search.trim() && (
+                <span style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
+                  {filtered.length} / {definitions.length} kayıt
+                </span>
               )}
-            </>
-          )}
+            </div>
+            {tableSection}
+          </section>
 
-          <div className="form-actions" style={{ gridColumn: "1 / -1" }}>
-            <button type="submit" className="btn-primary" disabled={isSaving}>
-              {isSaving ? "Kaydediliyor..." : (editingDef ? "Güncelle" : "Kaydet")}
-            </button>
-          </div>
-        </form>
-      </Modal>
+          <Modal title={modalTitle} open={modalOpen} onClose={closeModal}>
+            {branchFormContent}
+          </Modal>
+        </>
+      )}
 
       <ConfirmModal
         open={confirmPending !== null}
