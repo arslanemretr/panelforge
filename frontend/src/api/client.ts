@@ -102,6 +102,8 @@ export const client = {
     (await api.put<CopperSettings>(`/projects/${projectId}/copper-settings`, payload)).data,
   listCopperDefinitions: async (kind?: "main" | "branch") =>
     (await api.get<CopperDefinition[]>("/copper-definitions", { params: kind ? { kind } : undefined })).data,
+  getCopperDefinition: async (id: number) =>
+    (await api.get<CopperDefinition>(`/copper-definitions/${id}`)).data,
   createCopperDefinition: async (payload: Omit<CopperDefinition, "id" | "created_at" | "updated_at">) =>
     (await api.post<CopperDefinition>("/copper-definitions", payload)).data,
   updateCopperDefinition: async (id: number, payload: Omit<CopperDefinition, "id" | "created_at" | "updated_at">) =>

@@ -3,6 +3,8 @@ import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom"
 import { CopperDefinitionsPage } from "./pages/CopperDefinitionsPage";
 import { DeviceDefinitionsPage } from "./pages/DeviceDefinitionsPage";
 import { DeviceEditorPage } from "./pages/DeviceEditorPage";
+import { MainCopperFormPage } from "./pages/MainCopperFormPage";
+import { MainCopperListPage } from "./pages/MainCopperListPage";
 import { PanelDefinitionsPage } from "./pages/PanelDefinitionsPage";
 import { ProjectListPage } from "./pages/ProjectListPage";
 import { ProjectWorkspacePage } from "./pages/ProjectWorkspacePage";
@@ -87,8 +89,10 @@ export default function App() {
           <Route path="/definitions/devices/:id" element={<DeviceEditorPage />} />
           <Route path="/definitions/panels" element={<PanelDefinitionsPage />} />
           <Route path="/definitions/copper" element={<Navigate to="/definitions/copper/main" replace />} />
-          <Route path="/definitions/copper/main" element={<CopperDefinitionsPage kind="main" />} />
-          <Route path="/definitions/copper/branch" element={<CopperDefinitionsPage kind="branch" />} />
+          <Route path="/definitions/copper/main" element={<MainCopperListPage />} />
+          <Route path="/definitions/copper/main/new" element={<MainCopperFormPage />} />
+          <Route path="/definitions/copper/main/:id/edit" element={<MainCopperFormPage />} />
+          <Route path="/definitions/copper/branch" element={<CopperDefinitionsPage />} />
         </Routes>
       </main>
     </div>
