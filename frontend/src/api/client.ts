@@ -10,6 +10,7 @@ import type {
   DeviceConnection,
   Panel,
   PanelDefinition,
+  PanelType,
   Project,
   ProjectCopper,
   ProjectPanel,
@@ -33,9 +34,14 @@ export const client = {
   upsertPanel: async (projectId: number, payload: Panel) =>
     (await api.put<Panel>(`/projects/${projectId}/panel`, payload)).data,
   listPanelDefinitions: async () => (await api.get<PanelDefinition[]>("/panel-definitions")).data,
-  createPanelDefinition: async (payload: Omit<PanelDefinition, "id" | "created_at" | "updated_at">) =>
+  createPanelDefinition: async (payload: Omit<PanelDefinition, "id" | "created_at" | "updated_at" | "panel_type">) =>
     (await api.post<PanelDefinition>("/panel-definitions", payload)).data,
+  updatePanelDefinition: async (id: number, payload: Omit<PanelDefinition, "id" | "created_at" | "updated_at" | "panel_type">) =>
+    (await api.put<PanelDefinition>(`/panel-definitions/${id}`, payload)).data,
   deletePanelDefinition: async (definitionId: number) => api.delete(`/panel-definitions/${definitionId}`),
+  listPanelTypes: async () => (await api.get<PanelType[]>("/panel-types")).data,
+  createPanelType: async (name: string) => (await api.post<PanelType>("/panel-types", { name })).data,
+  deletePanelType: async (id: number) => api.delete(`/panel-types/${id}`),
   listProjectPanels: async (projectId: number) =>
     (await api.get<ProjectPanel[]>(`/projects/${projectId}/panel-layout`)).data,
   createProjectPanel: async (

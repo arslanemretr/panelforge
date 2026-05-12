@@ -4,6 +4,7 @@ from decimal import Decimal
 from pydantic import BaseModel
 
 from app.schemas.common import ORMModel
+from app.schemas.panel_type import PanelTypeRead
 
 
 class PanelDefinitionBase(BaseModel):
@@ -22,6 +23,10 @@ class PanelDefinitionBase(BaseModel):
     phase_system: str | None = None
     busbar_rail_offset_mm: Decimal | None = Decimal("100")
     busbar_end_setback_mm: Decimal | None = Decimal("60")
+    panel_type_id: int | None = None
+    origin_x_mm: Decimal = Decimal("0")
+    origin_y_mm: Decimal = Decimal("0")
+    origin_z_mm: Decimal = Decimal("0")
 
 
 class PanelDefinitionCreate(PanelDefinitionBase):
@@ -36,3 +41,4 @@ class PanelDefinitionRead(PanelDefinitionBase, ORMModel):
     id: int
     created_at: datetime
     updated_at: datetime
+    panel_type: PanelTypeRead | None = None

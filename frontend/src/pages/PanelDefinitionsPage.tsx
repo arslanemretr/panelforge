@@ -6,7 +6,9 @@ import { ConfirmModal } from "../components/ConfirmModal";
 import { Modal } from "../components/Modal";
 import type { PanelDefinition } from "../types";
 
-const emptyPanelDefinition: Omit<PanelDefinition, "id" | "created_at" | "updated_at"> = {
+type DraftDef = Omit<PanelDefinition, "id" | "created_at" | "updated_at" | "panel_type">;
+
+const emptyDraft: DraftDef = {
   name: "",
   description: "",
   width_mm: 2000,
@@ -18,8 +20,10 @@ const emptyPanelDefinition: Omit<PanelDefinition, "id" | "created_at" | "updated
   right_margin_mm: 100,
   top_margin_mm: 100,
   bottom_margin_mm: 100,
-  busbar_orientation: "horizontal",
-  phase_system: "3P",
+  panel_type_id: null,
+  origin_x_mm: 0,
+  origin_y_mm: 0,
+  origin_z_mm: 0,
 };
 
 function fmtDate(s?: string) {
@@ -27,55 +31,74 @@ function fmtDate(s?: string) {
   return new Date(s).toLocaleDateString("tr-TR");
 }
 
-const SEARCH_STORAGE_KEY = "panel-def-search";
+const SEARCH_KEY = "panel-def-search";
 
 export function PanelDefinitionsPage() {
   const queryClient = useQueryClient();
-  const [modalOpen, setModalOpen] = useState(false);
-  const [draft, setDraft] = useState(emptyPanelDefinition);
-  const [cloningId, setCloningId] = useState<number | null>(null);
-  const [confirmPending, setConfirmPending] = useState<{ message: string; onConfirm: () => void } | null>(null);
-  const [search, setSearch] = useState<string>(
-    () => localStorage.getItem(SEARCH_STORAGE_KEY) ?? ""
-  );
 
+  // ── Arama ──────────────────────────────────────────────────────────────────
+  const [search, setSearch] = useState(() => localStorage.getItem(SEARCH_KEY) ?? "");
+
+  // ── Kabin form modal ───────────────────────────────────────────────────────
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingDef, setEditingDef] = useState<PanelDefinition | null>(null);
+  const [draft, setDraft] = useState<DraftDef>(emptyDraft);
+
+  // ── Pano Tipi yönetimi ─────────────────────────────────────────────────────
+  const [newTypeName, setNewTypeName] = useState("");
+
+  // ── Onay modalı ───────────────────────────────────────────────────────────
+  const [confirmPending, setConfirmPending] = useState<{ message: string; onConfirm: () => void } | null>(null);
+
+  // ── Queries ────────────────────────────────────────────────────────────────
   const definitionsQuery = useQuery({
     queryKey: ["panel-definitions"],
     queryFn: client.listPanelDefinitions,
   });
 
+  const panelTypesQuery = useQuery({
+    queryKey: ["panel-types"],
+    queryFn: client.listPanelTypes,
+  });
+
+  // ── Mutations ──────────────────────────────────────────────────────────────
   const createMutation = useMutation({
     mutationFn: () => client.createPanelDefinition(draft),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["panel-definitions"] });
-      setModalOpen(false);
-      setDraft(emptyPanelDefinition);
+      closeModal();
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: () => client.updatePanelDefinition(editingDef!.id, draft),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["panel-definitions"] });
+      closeModal();
     },
   });
 
   const cloneMutation = useMutation({
-    mutationFn: (source: PanelDefinition) =>
+    mutationFn: (src: PanelDefinition) =>
       client.createPanelDefinition({
-        name: source.name + " (Kopya)",
-        description: source.description,
-        width_mm: source.width_mm,
-        height_mm: source.height_mm,
-        depth_mm: source.depth_mm,
-        mounting_plate_width_mm: source.mounting_plate_width_mm,
-        mounting_plate_height_mm: source.mounting_plate_height_mm,
-        left_margin_mm: source.left_margin_mm,
-        right_margin_mm: source.right_margin_mm,
-        top_margin_mm: source.top_margin_mm,
-        bottom_margin_mm: source.bottom_margin_mm,
-        busbar_orientation: source.busbar_orientation,
-        phase_system: source.phase_system,
+        name: src.name + " (Kopya)",
+        description: src.description,
+        width_mm: src.width_mm,
+        height_mm: src.height_mm,
+        depth_mm: src.depth_mm,
+        mounting_plate_width_mm: src.mounting_plate_width_mm,
+        mounting_plate_height_mm: src.mounting_plate_height_mm,
+        left_margin_mm: src.left_margin_mm,
+        right_margin_mm: src.right_margin_mm,
+        top_margin_mm: src.top_margin_mm,
+        bottom_margin_mm: src.bottom_margin_mm,
+        panel_type_id: src.panel_type_id ?? null,
+        origin_x_mm: src.origin_x_mm ?? 0,
+        origin_y_mm: src.origin_y_mm ?? 0,
+        origin_z_mm: src.origin_z_mm ?? 0,
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["panel-definitions"] });
-      setCloningId(null);
-    },
-    onError: () => {
-      setCloningId(null);
     },
   });
 
@@ -86,16 +109,68 @@ export function PanelDefinitionsPage() {
     },
   });
 
-  function update<K extends keyof typeof draft>(key: K, value: (typeof draft)[K]) {
-    setDraft((current) => ({ ...current, [key]: value }));
+  const createTypeMutation = useMutation({
+    mutationFn: () => client.createPanelType(newTypeName.trim()),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["panel-types"] });
+      setNewTypeName("");
+    },
+  });
+
+  const deleteTypeMutation = useMutation({
+    mutationFn: (id: number) => client.deletePanelType(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["panel-types"] });
+      await queryClient.invalidateQueries({ queryKey: ["panel-definitions"] });
+    },
+  });
+
+  // ── Yardımcılar ────────────────────────────────────────────────────────────
+  function openCreate() {
+    setEditingDef(null);
+    setDraft(emptyDraft);
+    setModalOpen(true);
+  }
+
+  function openEdit(def: PanelDefinition) {
+    setEditingDef(def);
+    setDraft({
+      name: def.name,
+      description: def.description ?? "",
+      width_mm: def.width_mm,
+      height_mm: def.height_mm,
+      depth_mm: def.depth_mm ?? null,
+      mounting_plate_width_mm: def.mounting_plate_width_mm ?? null,
+      mounting_plate_height_mm: def.mounting_plate_height_mm ?? null,
+      left_margin_mm: def.left_margin_mm,
+      right_margin_mm: def.right_margin_mm,
+      top_margin_mm: def.top_margin_mm,
+      bottom_margin_mm: def.bottom_margin_mm,
+      panel_type_id: def.panel_type_id ?? null,
+      origin_x_mm: def.origin_x_mm ?? 0,
+      origin_y_mm: def.origin_y_mm ?? 0,
+      origin_z_mm: def.origin_z_mm ?? 0,
+    });
+    setModalOpen(true);
+  }
+
+  function closeModal() {
+    setModalOpen(false);
+    setEditingDef(null);
+    setDraft(emptyDraft);
+  }
+
+  function update<K extends keyof DraftDef>(key: K, value: DraftDef[K]) {
+    setDraft((prev) => ({ ...prev, [key]: value }));
   }
 
   function handleSearchChange(value: string) {
     setSearch(value);
-    localStorage.setItem(SEARCH_STORAGE_KEY, value);
+    localStorage.setItem(SEARCH_KEY, value);
   }
 
-  const filteredDefinitions = (definitionsQuery.data ?? []).filter((def) => {
+  const panelTypes = panelTypesQuery.data ?? [];
+  const filteredDefs = (definitionsQuery.data ?? []).filter((def) => {
     if (!search.trim()) return true;
     const term = search.toLowerCase();
     return (
@@ -104,19 +179,100 @@ export function PanelDefinitionsPage() {
     );
   });
 
+  const isEditing = editingDef !== null;
+  const isSaving = createMutation.isPending || updateMutation.isPending;
+
   return (
     <div className="stack">
+      {/* ── Sayfa başlığı ── */}
       <section className="card page-heading">
         <div>
-          <span className="eyebrow">Tanimlamalar</span>
-          <h1>Kabin Tanimlama</h1>
-          <p>Tanimli kabin olculerini liste halinde yonetin ve yeni kabin kayitlarini modal ile ekleyin.</p>
+          <span className="eyebrow">Tanımlamalar</span>
+          <h1>Kabin Tanımlama</h1>
+          <p>Kabin ölçülerini ve pano tiplerini yönetin.</p>
         </div>
-        <button type="button" onClick={() => setModalOpen(true)}>
+        <button type="button" onClick={openCreate}>
           Yeni Kabin
         </button>
       </section>
 
+      {/* ── Pano Tipleri ── */}
+      <section className="card">
+        <div className="section-header" style={{ marginBottom: "0.75rem" }}>
+          <h3 style={{ margin: 0 }}>Pano Tipleri</h3>
+        </div>
+        <div className="table-wrap" style={{ marginBottom: "0.75rem" }}>
+          <table>
+            <thead>
+              <tr>
+                <th style={{ padding: "0.45rem 0.65rem" }}>Tip Adı</th>
+                <th style={{
+                  padding: "0.45rem 0.9rem",
+                  borderLeft: "2px solid var(--line)",
+                  background: "rgba(255,255,255,0.03)",
+                  width: 80,
+                }}>İşlem</th>
+              </tr>
+            </thead>
+            <tbody>
+              {panelTypes.map((pt) => (
+                <tr key={pt.id}>
+                  <td style={{ padding: "0.4rem 0.65rem" }}>{pt.name}</td>
+                  <td className="actions-cell" style={{
+                    padding: "0.4rem 0.9rem",
+                    borderLeft: "2px solid var(--line)",
+                    background: "rgba(255,255,255,0.02)",
+                  }}>
+                    <button
+                      type="button"
+                      className="ghost danger"
+                      disabled={deleteTypeMutation.isPending}
+                      onClick={() =>
+                        setConfirmPending({
+                          message: `"${pt.name}" tipini silmek istediğinizden emin misiniz?`,
+                          onConfirm: () => { deleteTypeMutation.mutate(pt.id); setConfirmPending(null); },
+                        })
+                      }
+                    >
+                      Sil
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {panelTypes.length === 0 && (
+                <tr>
+                  <td colSpan={2}>
+                    <div className="empty-state">Henüz pano tipi tanımlanmamış.</div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Yeni tip ekle — inline */}
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+          <input
+            type="text"
+            placeholder="Yeni tip adı..."
+            value={newTypeName}
+            onChange={(e) => setNewTypeName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && newTypeName.trim()) createTypeMutation.mutate();
+            }}
+            style={{ maxWidth: 260 }}
+          />
+          <button
+            type="button"
+            disabled={!newTypeName.trim() || createTypeMutation.isPending}
+            onClick={() => createTypeMutation.mutate()}
+          >
+            {createTypeMutation.isPending ? "Ekleniyor..." : "Ekle"}
+          </button>
+        </div>
+      </section>
+
+      {/* ── Kabin Tanımları ── */}
       <section className="card">
         <div style={{ marginBottom: "0.75rem" }}>
           <input
@@ -133,10 +289,10 @@ export function PanelDefinitionsPage() {
               <tr>
                 <th style={{ padding: "0.5rem 0.65rem" }}>Kabin Adı</th>
                 <th style={{ padding: "0.5rem 0.65rem" }}>Açıklama</th>
-                <th style={{ padding: "0.5rem 0.65rem" }}>Ölçü</th>
+                <th style={{ padding: "0.5rem 0.65rem" }}>Pano Tipi</th>
+                <th style={{ padding: "0.5rem 0.65rem" }}>Ölçü (G×Y×D mm)</th>
                 <th style={{ padding: "0.5rem 0.65rem" }}>Montaj Plakası</th>
-                <th style={{ padding: "0.5rem 0.65rem" }}>Yön</th>
-                <th style={{ padding: "0.5rem 0.65rem" }}>Faz</th>
+                <th style={{ padding: "0.5rem 0.65rem" }}>Orijin (X, Y, Z)</th>
                 <th style={{ padding: "0.5rem 0.65rem" }}>Oluşturma</th>
                 <th style={{ padding: "0.5rem 0.65rem" }}>Revizyon</th>
                 <th style={{
@@ -147,27 +303,31 @@ export function PanelDefinitionsPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredDefinitions.map((definition) => (
-                <tr key={definition.id}>
+              {filteredDefs.map((def) => (
+                <tr key={def.id}>
                   <td style={{ padding: "0.45rem 0.65rem" }}>
-                    <strong>{definition.name}</strong>
+                    <strong>{def.name}</strong>
                   </td>
                   <td style={{ padding: "0.45rem 0.65rem", color: "var(--muted)", fontSize: "0.85rem" }}>
-                    {definition.description || "—"}
-                  </td>
-                  <td style={{ padding: "0.45rem 0.65rem", fontVariantNumeric: "tabular-nums", fontSize: "0.85rem" }}>
-                    {definition.width_mm}×{definition.height_mm}×{definition.depth_mm ?? 0}
+                    {def.description || "—"}
                   </td>
                   <td style={{ padding: "0.45rem 0.65rem", fontSize: "0.85rem" }}>
-                    {definition.mounting_plate_width_mm ?? 0}×{definition.mounting_plate_height_mm ?? 0}
+                    {def.panel_type?.name ?? "—"}
                   </td>
-                  <td style={{ padding: "0.45rem 0.65rem" }}>{definition.busbar_orientation || "—"}</td>
-                  <td style={{ padding: "0.45rem 0.65rem" }}>{definition.phase_system || "—"}</td>
-                  <td style={{ padding: "0.45rem 0.65rem", fontSize: "0.82rem", color: "var(--muted)" }}>
-                    {fmtDate(definition.created_at)}
+                  <td style={{ padding: "0.45rem 0.65rem", fontVariantNumeric: "tabular-nums", fontSize: "0.85rem" }}>
+                    {def.width_mm}×{def.height_mm}×{def.depth_mm ?? 0}
+                  </td>
+                  <td style={{ padding: "0.45rem 0.65rem", fontSize: "0.85rem" }}>
+                    {def.mounting_plate_width_mm ?? 0}×{def.mounting_plate_height_mm ?? 0}
+                  </td>
+                  <td style={{ padding: "0.45rem 0.65rem", fontSize: "0.82rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>
+                    {def.origin_x_mm ?? 0}, {def.origin_y_mm ?? 0}, {def.origin_z_mm ?? 0}
                   </td>
                   <td style={{ padding: "0.45rem 0.65rem", fontSize: "0.82rem", color: "var(--muted)" }}>
-                    {fmtDate(definition.updated_at)}
+                    {fmtDate(def.created_at)}
+                  </td>
+                  <td style={{ padding: "0.45rem 0.65rem", fontSize: "0.82rem", color: "var(--muted)" }}>
+                    {fmtDate(def.updated_at)}
                   </td>
                   <td
                     className="actions-cell"
@@ -180,13 +340,17 @@ export function PanelDefinitionsPage() {
                     <button
                       type="button"
                       className="ghost"
-                      disabled={cloningId === definition.id}
-                      onClick={() => {
-                        setCloningId(definition.id);
-                        cloneMutation.mutate(definition);
-                      }}
+                      onClick={() => openEdit(def)}
                     >
-                      {cloningId === definition.id ? "..." : "Kopyala"}
+                      Düzenle
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost"
+                      disabled={cloneMutation.isPending}
+                      onClick={() => cloneMutation.mutate(def)}
+                    >
+                      Kopyala
                     </button>
                     <button
                       type="button"
@@ -194,8 +358,8 @@ export function PanelDefinitionsPage() {
                       disabled={deleteMutation.isPending}
                       onClick={() =>
                         setConfirmPending({
-                          message: `"${definition.name}" kabin tanımını silmek istediğinizden emin misiniz?`,
-                          onConfirm: () => { deleteMutation.mutate(definition.id); setConfirmPending(null); },
+                          message: `"${def.name}" kabin tanımını silmek istediğinizden emin misiniz?`,
+                          onConfirm: () => { deleteMutation.mutate(def.id); setConfirmPending(null); },
                         })
                       }
                     >
@@ -204,7 +368,7 @@ export function PanelDefinitionsPage() {
                   </td>
                 </tr>
               ))}
-              {!filteredDefinitions.length && (
+              {!filteredDefs.length && (
                 <tr>
                   <td colSpan={9}>
                     <div className="empty-state">
@@ -218,83 +382,116 @@ export function PanelDefinitionsPage() {
         </div>
       </section>
 
-      <Modal title="Yeni Kabin Ekleme" open={modalOpen} onClose={() => setModalOpen(false)}>
+      {/* ── Kabin Ekle / Düzenle Modal ── */}
+      <Modal
+        title={isEditing ? "Kabini Düzenle" : "Yeni Kabin Ekle"}
+        open={modalOpen}
+        onClose={closeModal}
+      >
         <form
           className="form-grid"
-          onSubmit={(event) => {
-            event.preventDefault();
-            createMutation.mutate();
+          onSubmit={(e) => {
+            e.preventDefault();
+            isEditing ? updateMutation.mutate() : createMutation.mutate();
           }}
         >
           <label>
-            <span>Kabin adi</span>
-            <input value={draft.name} onChange={(event) => update("name", event.target.value)} required />
+            <span>Kabin adı</span>
+            <input value={draft.name} onChange={(e) => update("name", e.target.value)} required />
           </label>
           <label>
-            <span>Aciklama</span>
-            <input value={draft.description ?? ""} onChange={(event) => update("description", event.target.value)} />
+            <span>Açıklama</span>
+            <input value={draft.description ?? ""} onChange={(e) => update("description", e.target.value)} />
+          </label>
+
+          <label>
+            <span>Pano Tipi</span>
+            <select
+              value={draft.panel_type_id ?? ""}
+              onChange={(e) => update("panel_type_id", e.target.value ? Number(e.target.value) : null)}
+            >
+              <option value="">— Seçiniz —</option>
+              {panelTypes.map((pt) => (
+                <option key={pt.id} value={pt.id}>{pt.name}</option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            <span>Genişlik (mm)</span>
+            <input type="number" value={draft.width_mm} onChange={(e) => update("width_mm", Number(e.target.value))} />
           </label>
           <label>
-            <span>Genislik</span>
-            <input type="number" value={draft.width_mm} onChange={(event) => update("width_mm", Number(event.target.value))} />
+            <span>Yükseklik (mm)</span>
+            <input type="number" value={draft.height_mm} onChange={(e) => update("height_mm", Number(e.target.value))} />
           </label>
           <label>
-            <span>Yukseklik</span>
-            <input type="number" value={draft.height_mm} onChange={(event) => update("height_mm", Number(event.target.value))} />
+            <span>Derinlik (mm)</span>
+            <input type="number" value={draft.depth_mm ?? 0} onChange={(e) => update("depth_mm", Number(e.target.value))} />
           </label>
+
           <label>
-            <span>Derinlik</span>
-            <input type="number" value={draft.depth_mm ?? 0} onChange={(event) => update("depth_mm", Number(event.target.value))} />
-          </label>
-          <label>
-            <span>Montaj genisligi</span>
+            <span>Montaj genişliği (mm)</span>
             <input
               type="number"
               value={draft.mounting_plate_width_mm ?? 0}
-              onChange={(event) => update("mounting_plate_width_mm", Number(event.target.value))}
+              onChange={(e) => update("mounting_plate_width_mm", Number(e.target.value))}
             />
           </label>
           <label>
-            <span>Montaj yuksekligi</span>
+            <span>Montaj yüksekliği (mm)</span>
             <input
               type="number"
               value={draft.mounting_plate_height_mm ?? 0}
-              onChange={(event) => update("mounting_plate_height_mm", Number(event.target.value))}
+              onChange={(e) => update("mounting_plate_height_mm", Number(e.target.value))}
             />
           </label>
+
           <label>
-            <span>Sol bosluk</span>
-            <input type="number" value={draft.left_margin_mm} onChange={(event) => update("left_margin_mm", Number(event.target.value))} />
+            <span>Sol boşluk (mm)</span>
+            <input type="number" value={draft.left_margin_mm} onChange={(e) => update("left_margin_mm", Number(e.target.value))} />
           </label>
           <label>
-            <span>Sag bosluk</span>
-            <input type="number" value={draft.right_margin_mm} onChange={(event) => update("right_margin_mm", Number(event.target.value))} />
+            <span>Sağ boşluk (mm)</span>
+            <input type="number" value={draft.right_margin_mm} onChange={(e) => update("right_margin_mm", Number(e.target.value))} />
           </label>
           <label>
-            <span>Ust bosluk</span>
-            <input type="number" value={draft.top_margin_mm} onChange={(event) => update("top_margin_mm", Number(event.target.value))} />
+            <span>Üst boşluk (mm)</span>
+            <input type="number" value={draft.top_margin_mm} onChange={(e) => update("top_margin_mm", Number(e.target.value))} />
           </label>
           <label>
-            <span>Alt bosluk</span>
-            <input type="number" value={draft.bottom_margin_mm} onChange={(event) => update("bottom_margin_mm", Number(event.target.value))} />
+            <span>Alt boşluk (mm)</span>
+            <input type="number" value={draft.bottom_margin_mm} onChange={(e) => update("bottom_margin_mm", Number(e.target.value))} />
           </label>
-          <label>
-            <span>Bara yonu</span>
-            <select value={draft.busbar_orientation ?? "horizontal"} onChange={(event) => update("busbar_orientation", event.target.value)}>
-              <option value="horizontal">Yatay</option>
-              <option value="vertical">Dikey</option>
-            </select>
-          </label>
-          <label>
-            <span>Faz yapisi</span>
-            <select value={draft.phase_system ?? "3P"} onChange={(event) => update("phase_system", event.target.value)}>
-              <option value="3P">3P</option>
-              <option value="3P+N">3P+N</option>
-              <option value="3P+N+PE">3P+N+PE</option>
-            </select>
-          </label>
+
+          {/* XYZ Orijin */}
+          <div style={{ gridColumn: "1 / -1" }}>
+            <span style={{ display: "block", marginBottom: "0.4rem", fontSize: "0.85rem", color: "var(--muted)" }}>
+              Koordinat Orijini (0,0,0 noktası — mm)
+            </span>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5rem" }}>
+              <label style={{ margin: 0 }}>
+                <span>X</span>
+                <input type="number" value={draft.origin_x_mm ?? 0} onChange={(e) => update("origin_x_mm", Number(e.target.value))} />
+              </label>
+              <label style={{ margin: 0 }}>
+                <span>Y</span>
+                <input type="number" value={draft.origin_y_mm ?? 0} onChange={(e) => update("origin_y_mm", Number(e.target.value))} />
+              </label>
+              <label style={{ margin: 0 }}>
+                <span>Z</span>
+                <input type="number" value={draft.origin_z_mm ?? 0} onChange={(e) => update("origin_z_mm", Number(e.target.value))} />
+              </label>
+            </div>
+          </div>
+
           <div className="form-actions">
-            <button type="submit">Kabini Kaydet</button>
+            <button type="submit" disabled={isSaving}>
+              {isSaving ? "Kaydediliyor..." : isEditing ? "Güncelle" : "Kabini Kaydet"}
+            </button>
+            <button type="button" className="ghost" onClick={closeModal}>
+              İptal
+            </button>
           </div>
         </form>
       </Modal>

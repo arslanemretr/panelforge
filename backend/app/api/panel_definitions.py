@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.dependencies import db_session
 from app.db import models
@@ -12,9 +12,26 @@ from app.schemas.panel_definition import (
 router = APIRouter(tags=["panel-definitions"])
 
 
+def _load_definition(db: Session, definition_id: int) -> models.PanelDefinition:
+    definition = (
+        db.query(models.PanelDefinition)
+        .options(selectinload(models.PanelDefinition.panel_type))
+        .filter(models.PanelDefinition.id == definition_id)
+        .one_or_none()
+    )
+    if not definition:
+        raise HTTPException(status_code=404, detail="Panel definition not found")
+    return definition
+
+
 @router.get("/panel-definitions", response_model=list[PanelDefinitionRead])
 def list_panel_definitions(db: Session = Depends(db_session)) -> list[models.PanelDefinition]:
-    return db.query(models.PanelDefinition).order_by(models.PanelDefinition.updated_at.desc()).all()
+    return (
+        db.query(models.PanelDefinition)
+        .options(selectinload(models.PanelDefinition.panel_type))
+        .order_by(models.PanelDefinition.updated_at.desc())
+        .all()
+    )
 
 
 @router.post("/panel-definitions", response_model=PanelDefinitionRead, status_code=status.HTTP_201_CREATED)
@@ -22,16 +39,12 @@ def create_panel_definition(payload: PanelDefinitionCreate, db: Session = Depend
     definition = models.PanelDefinition(**payload.model_dump())
     db.add(definition)
     db.commit()
-    db.refresh(definition)
-    return definition
+    return _load_definition(db, definition.id)
 
 
 @router.get("/panel-definitions/{definition_id}", response_model=PanelDefinitionRead)
 def get_panel_definition(definition_id: int, db: Session = Depends(db_session)) -> models.PanelDefinition:
-    definition = db.get(models.PanelDefinition, definition_id)
-    if not definition:
-        raise HTTPException(status_code=404, detail="Panel definition not found")
-    return definition
+    return _load_definition(db, definition_id)
 
 
 @router.put("/panel-definitions/{definition_id}", response_model=PanelDefinitionRead)
@@ -46,8 +59,7 @@ def update_panel_definition(
     for field, value in payload.model_dump().items():
         setattr(definition, field, value)
     db.commit()
-    db.refresh(definition)
-    return definition
+    return _load_definition(db, definition_id)
 
 
 @router.delete("/panel-definitions/{definition_id}", status_code=status.HTTP_204_NO_CONTENT)

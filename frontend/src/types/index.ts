@@ -27,10 +27,20 @@ export interface Panel {
   busbar_end_setback_mm?: number | null;
 }
 
+export interface PanelType {
+  id: number;
+  name: string;
+}
+
 export interface PanelDefinition extends Panel {
   id: number;
   name: string;
   description?: string | null;
+  panel_type_id?: number | null;
+  panel_type?: PanelType | null;
+  origin_x_mm?: number;
+  origin_y_mm?: number;
+  origin_z_mm?: number;
   created_at: string;
   updated_at: string;
 }

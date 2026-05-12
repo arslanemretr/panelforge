@@ -39,6 +39,15 @@ class Project(Base):
     device_connections: Mapped[list["DeviceConnection"]] = relationship(back_populates="project", cascade="all, delete-orphan")
 
 
+class PanelType(Base):
+    __tablename__ = "panel_types"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+
+    panel_definitions: Mapped[list["PanelDefinition"]] = relationship(back_populates="panel_type")
+
+
 class PanelDefinition(Base):
     __tablename__ = "panel_definitions"
 
@@ -58,6 +67,10 @@ class PanelDefinition(Base):
     phase_system: Mapped[str | None] = mapped_column(Text)
     busbar_rail_offset_mm: Mapped[Decimal | None] = mapped_column(Numeric, default=Decimal("100"))
     busbar_end_setback_mm: Mapped[Decimal | None] = mapped_column(Numeric, default=Decimal("60"))
+    panel_type_id: Mapped[int | None] = mapped_column(ForeignKey("panel_types.id", ondelete="SET NULL"), nullable=True)
+    origin_x_mm: Mapped[Decimal] = mapped_column(Numeric, default=Decimal("0"))
+    origin_y_mm: Mapped[Decimal] = mapped_column(Numeric, default=Decimal("0"))
+    origin_z_mm: Mapped[Decimal] = mapped_column(Numeric, default=Decimal("0"))
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -65,6 +78,7 @@ class PanelDefinition(Base):
         onupdate=func.now(),
         nullable=False,
     )
+    panel_type: Mapped["PanelType | None"] = relationship(back_populates="panel_definitions")
     project_layout_items: Mapped[list["ProjectPanel"]] = relationship(back_populates="panel_definition")
 
 
