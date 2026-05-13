@@ -373,6 +373,42 @@ class BendType(Base):
     )
 
 
+class BranchConductor(Base):
+    __tablename__ = "branch_conductors"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    conductor_kind: Mapped[str] = mapped_column(Text, nullable=False, default="dahili")  # "dahili" | "harici"
+
+    # Malzeme referansı (standart) veya manuel
+    copper_definition_id: Mapped[int | None] = mapped_column(ForeignKey("copper_definitions.id", ondelete="SET NULL"), nullable=True)
+    thickness_mm: Mapped[Decimal | None] = mapped_column(Numeric)
+    width_mm: Mapped[Decimal | None] = mapped_column(Numeric)
+
+    # Büküm tipi
+    bend_type_id: Mapped[int | None] = mapped_column(ForeignKey("bend_types.id", ondelete="SET NULL"), nullable=True)
+
+    # Cihaz / Terminal bağlantısı (opsiyonel)
+    device_id: Mapped[int | None] = mapped_column(ForeignKey("devices.id", ondelete="SET NULL"), nullable=True)
+    terminal_label: Mapped[str | None] = mapped_column(Text)
+
+    # Elektrik
+    phase: Mapped[str | None] = mapped_column(Text)           # "L1"|"L2"|"L3"|"N"|"PE"|"3P"
+    parallel_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+    # Bağlantı noktaları
+    start_point: Mapped[str | None] = mapped_column(Text)
+    end_point: Mapped[str | None] = mapped_column(Text)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    copper_definition: Mapped["CopperDefinition | None"] = relationship()
+    bend_type: Mapped["BendType | None"] = relationship()
+    device: Mapped["Device | None"] = relationship()
+
+
 class BendParameter(Base):
     __tablename__ = "bend_parameters"
 

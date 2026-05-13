@@ -2,6 +2,7 @@ import axios from "axios";
 
 import type {
   BendType,
+  BranchConductor,
   CalculationResults,
   CopperDefinition,
   CopperSettings,
@@ -75,6 +76,16 @@ export const client = {
   updateBendType: async (id: number, payload: Omit<BendType, "id" | "created_at" | "updated_at" | "bend_count">) =>
     (await api.put<BendType>(`/bend-types/${id}`, payload)).data,
   deleteBendType: async (id: number) => api.delete(`/bend-types/${id}`),
+
+  listBranchConductors: async () =>
+    (await api.get<BranchConductor[]>("/branch-conductors")).data,
+  getBranchConductor: async (id: number) =>
+    (await api.get<BranchConductor>(`/branch-conductors/${id}`)).data,
+  createBranchConductor: async (payload: Omit<BranchConductor, "id" | "created_at" | "updated_at" | "copper_definition" | "bend_type" | "device">) =>
+    (await api.post<BranchConductor>("/branch-conductors", payload)).data,
+  updateBranchConductor: async (id: number, payload: Omit<BranchConductor, "id" | "created_at" | "updated_at" | "copper_definition" | "bend_type" | "device">) =>
+    (await api.put<BranchConductor>(`/branch-conductors/${id}`, payload)).data,
+  deleteBranchConductor: async (id: number) => api.delete(`/branch-conductors/${id}`),
 
   listTerminalDefinitions: async () =>
     (await api.get<TerminalDefinition[]>("/terminal-definitions")).data,

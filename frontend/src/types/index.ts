@@ -245,6 +245,35 @@ export interface CopperDefinition {
   updated_at: string;
 }
 
+export interface BranchConductor {
+  id: number;
+  name: string;
+  description?: string | null;
+  conductor_kind: "dahili" | "harici";
+
+  copper_definition_id?: number | null;
+  thickness_mm?: number | null;
+  width_mm?: number | null;
+
+  bend_type_id?: number | null;
+  device_id?: number | null;
+  terminal_label?: string | null;
+
+  phase?: string | null;
+  parallel_count: number;
+
+  start_point?: string | null;
+  end_point?: string | null;
+
+  // nested (Read)
+  copper_definition?: CopperDefinition | null;
+  bend_type?: BendType | null;
+  device?: Device | null;
+
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface ProjectCopper {
   id: number;
   project_id: number;
