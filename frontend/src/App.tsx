@@ -11,6 +11,7 @@ import { PanelDefinitionsPage } from "./pages/PanelDefinitionsPage";
 import { ProjectListPage } from "./pages/ProjectListPage";
 import { ProjectWorkspacePage } from "./pages/ProjectWorkspacePage";
 import { TerminalDefinitionsPage } from "./pages/TerminalDefinitionsPage";
+import { TerminalFormPage } from "./pages/TerminalFormPage";
 import { useTheme } from "./hooks/useTheme";
 
 const navSections = [
@@ -91,6 +92,8 @@ export default function App() {
           <Route path="/projects" element={<ProjectListPage />} />
           <Route path="/definitions/devices" element={<DeviceDefinitionsPage />} />
           <Route path="/definitions/terminal-types" element={<TerminalDefinitionsPage />} />
+          <Route path="/definitions/terminal-types/new" element={<TerminalFormPage />} />
+          <Route path="/definitions/terminal-types/:id/edit" element={<TerminalFormPage />} />
           <Route path="/definitions/bend-types" element={<BendTypesListPage />} />
           <Route path="/definitions/bend-types/new" element={<BendTypeFormPage />} />
           <Route path="/definitions/bend-types/:id/edit" element={<BendTypeFormPage />} />
