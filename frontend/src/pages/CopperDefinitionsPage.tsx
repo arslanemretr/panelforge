@@ -145,6 +145,9 @@ function buildConductorPayload(draft: ConductorDraft) {
 export function CopperDefinitionsPage() {
   const qc = useQueryClient();
 
+  // ── Tab state ──────────────────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState<"conductors" | "materials">("conductors");
+
   // ── Malzeme state ──────────────────────────────────────────────────────────
   const [matModalOpen, setMatModalOpen]     = useState(false);
   const [editingMat, setEditingMat]         = useState<CopperDefinition | null>(null);
@@ -348,16 +351,44 @@ export function CopperDefinitionsPage() {
             Dahili ve harici iletkenleri; cihaz, terminal ve büküm tipi ilişkisiyle tanımlayın.
           </p>
         </div>
-        <button type="button" onClick={openCondCreate}>
-          Yeni İletken Konfigürasyonu
-        </button>
+        {activeTab === "conductors"
+          ? <button type="button" onClick={openCondCreate}>Yeni İletken Konfigürasyonu</button>
+          : <button type="button" onClick={openMatCreate}>Yeni Malzeme Standardı</button>
+        }
       </section>
 
-      {/* ── İletken Konfigürasyonları ───────────────────────────────────────── */}
-      <section className="card">
+      {/* ── Tab Bar ─────────────────────────────────────────────────────────── */}
+      <div style={{ display: "flex", gap: 0, borderBottom: "2px solid var(--line)" }}>
+        {([
+          ["conductors", "İletken Konfigürasyonları"],
+          ["materials",  "Malzeme Standartları"],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setActiveTab(key)}
+            style={{
+              padding: "0.6rem 1.2rem",
+              fontSize: "0.88rem",
+              fontWeight: activeTab === key ? 700 : 400,
+              border: "none",
+              borderBottom: activeTab === key ? "2px solid var(--accent)" : "2px solid transparent",
+              background: "transparent",
+              color: activeTab === key ? "var(--accent)" : "var(--muted)",
+              cursor: "pointer",
+              marginBottom: "-2px",
+              transition: "color 0.15s",
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── İletken Konfigürasyonları Tab ───────────────────────────────────── */}
+      {activeTab === "conductors" && <section className="card">
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.9rem", flexWrap: "wrap" }}>
-          <h2 style={{ margin: 0, fontSize: "1rem", fontWeight: 700 }}>İletken Konfigürasyonları</h2>
-          <div style={{ display: "flex", gap: "0.4rem", marginLeft: "auto" }}>
+          <div style={{ display: "flex", gap: "0.4rem" }}>
             {(["all", "dahili", "harici"] as const).map((k) => (
               <button
                 key={k}
@@ -376,7 +407,7 @@ export function CopperDefinitionsPage() {
             placeholder="İletken ara..."
             value={condSearch}
             onChange={(e) => setCondSearch(e.target.value)}
-            style={{ maxWidth: "220px" }}
+            style={{ maxWidth: "220px", marginLeft: "auto" }}
           />
         </div>
 
@@ -451,22 +482,18 @@ export function CopperDefinitionsPage() {
             </tbody>
           </table>
         </div>
-      </section>
+      </section>}
 
-      {/* ── Malzeme Standartları ────────────────────────────────────────────── */}
-      <section className="card">
+      {/* ── Malzeme Standartları Tab ────────────────────────────────────────── */}
+      {activeTab === "materials" && <section className="card">
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.9rem", flexWrap: "wrap" }}>
-          <h2 style={{ margin: 0, fontSize: "1rem", fontWeight: 700 }}>Malzeme Standartları</h2>
-          <button type="button" className="ghost" style={{ marginLeft: "auto", fontSize: "0.82rem" }} onClick={openMatCreate}>
-            + Yeni Malzeme
-          </button>
           <input
             type="search"
             className="input"
             placeholder="Malzeme ara..."
             value={matSearch}
             onChange={(e) => setMatSearch(e.target.value)}
-            style={{ maxWidth: "200px" }}
+            style={{ maxWidth: "220px" }}
           />
         </div>
 
@@ -521,7 +548,7 @@ export function CopperDefinitionsPage() {
             </tbody>
           </table>
         </div>
-      </section>
+      </section>}
 
       {/* ═══════════════════════════════════════════════════════════════════════
           İLETKEN KONFİGÜRASYON MODAL
