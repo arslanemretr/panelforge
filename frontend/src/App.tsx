@@ -1,5 +1,7 @@
 import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 
+import { BendTypeFormPage } from "./pages/BendTypeFormPage";
+import { BendTypesListPage } from "./pages/BendTypesListPage";
 import { CopperDefinitionsPage } from "./pages/CopperDefinitionsPage";
 import { DeviceDefinitionsPage } from "./pages/DeviceDefinitionsPage";
 import { DeviceEditorPage } from "./pages/DeviceEditorPage";
@@ -23,6 +25,7 @@ const navSections = [
     items: [
       ["/definitions/devices", "Cihaz Tanimlama"],
       ["/definitions/terminal-types", "Terminal Tipleri"],
+      ["/definitions/bend-types", "Bukum Tipleri"],
       ["/definitions/panels", "Kabin Tanimlama"],
       ["/definitions/copper/main", "Ana Bakir Tanimlama"],
       ["/definitions/copper/branch", "Tali Bakir Tanimlama"],
@@ -88,6 +91,9 @@ export default function App() {
           <Route path="/projects" element={<ProjectListPage />} />
           <Route path="/definitions/devices" element={<DeviceDefinitionsPage />} />
           <Route path="/definitions/terminal-types" element={<TerminalDefinitionsPage />} />
+          <Route path="/definitions/bend-types" element={<BendTypesListPage />} />
+          <Route path="/definitions/bend-types/new" element={<BendTypeFormPage />} />
+          <Route path="/definitions/bend-types/:id/edit" element={<BendTypeFormPage />} />
           <Route path="/definitions/devices/new" element={<DeviceEditorPage />} />
           <Route path="/definitions/devices/:id" element={<DeviceEditorPage />} />
           <Route path="/definitions/panels" element={<PanelDefinitionsPage />} />

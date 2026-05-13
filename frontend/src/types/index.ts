@@ -55,6 +55,39 @@ export interface ProjectPanel {
   panel_definition: PanelDefinition;
 }
 
+export interface BendParameter {
+  id?: number;
+  order_no: number;
+  name: string;           // "A1", "B", "C"
+  label: string;          // "Alt Ayak Uzunluğu"
+  default_value: number;
+  formula?: string | null; // hesaplananlar: "A1+A2"
+  is_calculated: boolean;
+}
+
+export interface BendSegment {
+  id?: number;
+  order_no: number;
+  label: string;           // "A1 Kolu", "Yatay B"
+  length_expr: string;     // "A1", "A1+A2", "B+25"
+  angle_from_prev: number; // 0=düz, +90=sola, -90=sağa
+}
+
+export interface BendType {
+  id: number;
+  name: string;
+  description?: string | null;
+  template_type: string;   // "Z"|"ZL"|"Tip-1"|"Tip-2"|"Özel"
+  thickness_mm: number;
+  parallel_count: number;  // 1-4
+  start_direction: string; // "up"|"right"
+  parameters: BendParameter[];
+  segments: BendSegment[];
+  bend_count?: number;     // liste endpoint'i için
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface TerminalDefinition {
   id: number;
   name: string;

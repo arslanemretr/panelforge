@@ -348,6 +348,60 @@ class CopperDefinition(Base):
     neutral_bar_count: Mapped[int | None] = mapped_column(Integer, default=1)   # nötr bara miktarı
 
 
+class BendType(Base):
+    __tablename__ = "bend_types"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    template_type: Mapped[str] = mapped_column(Text, nullable=False, default="Özel")  # "Z"|"ZL"|"Tip-1"|"Tip-2"|"Özel"
+    thickness_mm: Mapped[Decimal] = mapped_column(Numeric, nullable=False, default=Decimal("5"))
+    parallel_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1)   # 1-4
+    start_direction: Mapped[str] = mapped_column(Text, nullable=False, default="up")  # "up"|"right"
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    parameters: Mapped[list["BendParameter"]] = relationship(
+        back_populates="bend_type",
+        cascade="all, delete-orphan",
+        order_by="BendParameter.order_no",
+    )
+    segments: Mapped[list["BendSegment"]] = relationship(
+        back_populates="bend_type",
+        cascade="all, delete-orphan",
+        order_by="BendSegment.order_no",
+    )
+
+
+class BendParameter(Base):
+    __tablename__ = "bend_parameters"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    bend_type_id: Mapped[int] = mapped_column(ForeignKey("bend_types.id", ondelete="CASCADE"))
+    order_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)          # "A1", "B", "C"
+    label: Mapped[str] = mapped_column(Text, nullable=False)         # "Alt Ayak Uzunluğu"
+    default_value: Mapped[Decimal] = mapped_column(Numeric, nullable=False, default=Decimal("0"))
+    formula: Mapped[str | None] = mapped_column(Text)                # hesaplananlar: "A1+A2"
+    is_calculated: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    bend_type: Mapped["BendType"] = relationship(back_populates="parameters")
+
+
+class BendSegment(Base):
+    __tablename__ = "bend_segments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    bend_type_id: Mapped[int] = mapped_column(ForeignKey("bend_types.id", ondelete="CASCADE"))
+    order_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    label: Mapped[str] = mapped_column(Text, nullable=False)         # "A1 Kolu", "Yatay B"
+    length_expr: Mapped[str] = mapped_column(Text, nullable=False)   # "A1", "A1+A2", "B+25"
+    angle_from_prev: Mapped[Decimal] = mapped_column(Numeric, nullable=False, default=Decimal("0"))
+    # 0=düz devam, +90=sola dön, -90=sağa dön (önceki segmente göre)
+
+    bend_type: Mapped["BendType"] = relationship(back_populates="segments")
+
+
 class Busbar(Base):
     __tablename__ = "busbars"
 

@@ -1,6 +1,7 @@
 import axios from "axios";
 
 import type {
+  BendType,
   CalculationResults,
   CopperDefinition,
   CopperSettings,
@@ -64,6 +65,16 @@ export const client = {
   ) => (await api.post<ProjectCopper>(`/projects/${projectId}/copper-layout`, payload)).data,
   deleteProjectCopper: async (projectId: number, copperId: number) =>
     api.delete(`/projects/${projectId}/copper-layout/${copperId}`),
+
+  listBendTypes: async () =>
+    (await api.get<BendType[]>("/bend-types")).data,
+  getBendType: async (id: number) =>
+    (await api.get<BendType>(`/bend-types/${id}`)).data,
+  createBendType: async (payload: Omit<BendType, "id" | "created_at" | "updated_at" | "bend_count">) =>
+    (await api.post<BendType>("/bend-types", payload)).data,
+  updateBendType: async (id: number, payload: Omit<BendType, "id" | "created_at" | "updated_at" | "bend_count">) =>
+    (await api.put<BendType>(`/bend-types/${id}`, payload)).data,
+  deleteBendType: async (id: number) => api.delete(`/bend-types/${id}`),
 
   listTerminalDefinitions: async () =>
     (await api.get<TerminalDefinition[]>("/terminal-definitions")).data,
