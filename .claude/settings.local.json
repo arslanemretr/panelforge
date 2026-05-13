@@ -14,7 +14,8 @@
       "Bash(git -C /d/PanelForge push)",
       "Bash(git -C /d/PanelForge add frontend/src/pages/DeviceEditorPage.tsx)",
       "Bash(git -C /d/PanelForge commit -m \"fix\\(ui\\): teknik çizim yüksekliği 960px \\(2×\\)\")",
-      "Bash(git -C /d/PanelForge add backend/)"
+      "Bash(git -C /d/PanelForge add backend/)",
+      "Bash(cd /mnt/d/PanelForge/frontend && npx tsc --noEmit 2>&1)"
     ]
   }
 }

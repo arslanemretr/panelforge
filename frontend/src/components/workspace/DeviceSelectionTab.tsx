@@ -30,6 +30,8 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
   const [configY, setConfigY] = useState(0);   // mm, alttan
   const [configZ, setConfigZ] = useState(0);   // mm, derinlik (ön yüzeyden)
   const [configRotation, setConfigRotation] = useState(0);
+  const [configRotationX, setConfigRotationX] = useState(0);
+  const [configRotationY, setConfigRotationY] = useState(0);
   const [configQuantity, setConfigQuantity] = useState(1);
   const [confirmPending, setConfirmPending] = useState<{ message: string; onConfirm: () => void } | null>(null);
 
@@ -104,6 +106,8 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
     setConfigY(0);
     setConfigZ(0);
     setConfigRotation(0);
+    setConfigRotationX(0);
+    setConfigRotationY(0);
     setConfigQuantity(1);
     setSelectedPanel(projectPanels.length === 1 ? projectPanels[0] : null);
     setConfigStep(projectPanels.length === 1 ? "enter-coords" : "pick-cabinet");
@@ -118,6 +122,8 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
     setConfigY(pd.y_mm);
     setConfigZ(pd.z_mm ?? 0);
     setConfigRotation(pd.rotation_deg);
+    setConfigRotationX(pd.rotation_x_deg ?? 0);
+    setConfigRotationY(pd.rotation_y_deg ?? 0);
     setConfigQuantity(pd.quantity);
     setConfigStep("enter-coords");
   }
@@ -137,6 +143,8 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
       y_mm: configY,
       z_mm: configZ,
       rotation_deg: configRotation,
+      rotation_x_deg: configRotationX,
+      rotation_y_deg: configRotationY,
       quantity: configQuantity,
     });
   }
@@ -153,6 +161,8 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
         y_mm: configY,
         z_mm: configZ,
         rotation_deg: configRotation,
+        rotation_x_deg: configRotationX,
+        rotation_y_deg: configRotationY,
         quantity: configQuantity,
       },
     });
@@ -430,7 +440,7 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
                 </label>
 
                 <label className="field">
-                  <span>Dönüş</span>
+                  <span>Dönüş Z (°)</span>
                   <select
                     className="input"
                     value={configRotation}
@@ -441,6 +451,28 @@ export function DeviceSelectionTab({ projectId }: DeviceSelectionTabProps) {
                     <option value={180}>180°</option>
                     <option value={270}>270°</option>
                   </select>
+                </label>
+
+                <label className="field">
+                  <span>Dönüş X (°)</span>
+                  <input
+                    className="input"
+                    type="number"
+                    step={1}
+                    value={configRotationX}
+                    onChange={(e) => setConfigRotationX(Number(e.target.value))}
+                  />
+                </label>
+
+                <label className="field">
+                  <span>Dönüş Y (°)</span>
+                  <input
+                    className="input"
+                    type="number"
+                    step={1}
+                    value={configRotationY}
+                    onChange={(e) => setConfigRotationY(Number(e.target.value))}
+                  />
                 </label>
 
                 <label className="field">

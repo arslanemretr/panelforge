@@ -15,6 +15,7 @@ import type {
   ProjectCopper,
   ProjectPanel,
   ProjectDevice,
+  TerminalDefinition,
   ValidationResult,
 } from "../types";
 
@@ -63,6 +64,14 @@ export const client = {
   ) => (await api.post<ProjectCopper>(`/projects/${projectId}/copper-layout`, payload)).data,
   deleteProjectCopper: async (projectId: number, copperId: number) =>
     api.delete(`/projects/${projectId}/copper-layout/${copperId}`),
+
+  listTerminalDefinitions: async () =>
+    (await api.get<TerminalDefinition[]>("/terminal-definitions")).data,
+  createTerminalDefinition: async (payload: Omit<TerminalDefinition, "id" | "created_at" | "updated_at">) =>
+    (await api.post<TerminalDefinition>("/terminal-definitions", payload)).data,
+  updateTerminalDefinition: async (id: number, payload: Omit<TerminalDefinition, "id" | "created_at" | "updated_at">) =>
+    (await api.put<TerminalDefinition>(`/terminal-definitions/${id}`, payload)).data,
+  deleteTerminalDefinition: async (id: number) => api.delete(`/terminal-definitions/${id}`),
 
   listDevices: async () => (await api.get<Device[]>("/devices")).data,
   createDevice: async (payload: Omit<Device, "id">) => (await api.post<Device>("/devices", payload)).data,

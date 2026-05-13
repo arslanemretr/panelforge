@@ -55,28 +55,45 @@ export interface ProjectPanel {
   panel_definition: PanelDefinition;
 }
 
+export interface TerminalDefinition {
+  id: number;
+  name: string;
+  terminal_type: string;                     // "Ön Bakır Basmalı" | "Arka Yatay Taraklı" | "Yandan Taraklı"
+  surface: string;                           // "front" | "back" | "left" | "right" | "top" | "bottom"
+  bolt_type?: string | null;
+  bolt_count?: number | null;
+  bolt_center_distance_mm?: number | null;
+  hole_diameter_mm?: number | null;
+  terminal_width_mm?: number | null;
+  terminal_height_mm?: number | null;
+  terminal_depth_mm?: number | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface DeviceTerminal {
   id?: number;
   device_id?: number;
+  terminal_definition_id?: number | null;   // FK → terminal_definitions
   terminal_name: string;
   phase: string;
   x_mm: number;
   y_mm: number;
   z_mm?: number;
-  terminal_face?: string | null;         // "front" | "back" | "left" | "right" | "top" | "bottom"
+  terminal_face?: string | null;            // "front" | "back" | "left" | "right" | "top" | "bottom"
   hole_diameter_mm?: number | null;
   slot_width_mm?: number | null;
   slot_length_mm?: number | null;
-  terminal_role?: string | null;         // "input" | "output"
-  terminal_group?: string | null;        // "line" | "load" | "bus" | "branch"
-  // Genişletilmiş alanlar
-  terminal_type?: string | null;         // "Ön Terminal" | "Arka Terminal" vb.
-  terminal_width_mm?: number | null;     // terminal bloğu fiziksel genişliği
-  terminal_height_mm?: number | null;    // terminal bloğu fiziksel yüksekliği
-  terminal_depth_mm?: number | null;     // terminal bloğu fiziksel derinliği
-  bolt_type?: string | null;             // "M12", "M10" vb.
-  bolt_count?: number | null;            // vida miktarı
-  bolt_center_distance_mm?: number | null; // merkez ölçüsü (mm)
+  terminal_role?: string | null;            // "input" | "output"
+  terminal_group?: string | null;           // "line" | "load" | "bus" | "branch"
+  // Geriye dönük uyumluluk alanları
+  terminal_type?: string | null;
+  terminal_width_mm?: number | null;
+  terminal_height_mm?: number | null;
+  terminal_depth_mm?: number | null;
+  bolt_type?: string | null;
+  bolt_count?: number | null;
+  bolt_center_distance_mm?: number | null;
 }
 
 export interface DeviceConnection {
@@ -102,6 +119,7 @@ export interface Device {
   width_mm: number;
   height_mm: number;
   depth_mm?: number | null;
+  reference_origin?: string | null; // "Ön-Sol-Alt" | "Ön-Merkez-Alt" | "Arka-Merkez-Alt" | "Merkez Nokta"
   terminals: DeviceTerminal[];
   created_at?: string;
   updated_at?: string;

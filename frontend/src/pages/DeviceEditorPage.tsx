@@ -1,9 +1,9 @@
 /**
  * DeviceEditorPage — Tam ekran cihaz tanımlama / düzenleme sayfası
  *
- * Üst: Şalter Bilgileri (marka, model, tip, kasa, kutup, akım, boyutlar)
- * Orta: Terminal tablosu (tüm genişletilmiş alanlar dahil)
- * Alt: Canlı 3-görünüm teknik çizim
+ * Üst: Şalter Bilgileri (marka, model, tip, kasa, referans nokta, kutup, akım, boyutlar)
+ * Orta: Terminal tablosu — sadeleştirilmiş (terminal tipi dropdown'dan seçilir)
+ * Alt: Canlı 4-görünüm teknik çizim
  */
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -11,22 +11,22 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { client } from "../api/client";
 import { DeviceTechDrawing } from "../components/DeviceTechDrawing";
-import type { Device, DeviceTerminal } from "../types";
+import type { Device, DeviceTerminal, TerminalDefinition } from "../types";
 
 // ── Yardımcı: boş terminal satırı ────────────────────────────────────────────
 function emptyTerminal(name: string, phase: string, x: number): DeviceTerminal {
   return {
+    terminal_definition_id: null,
     terminal_name: name,
     phase,
     x_mm: x,
     y_mm: 20,
     z_mm: 0,
     terminal_face: null,
-    hole_diameter_mm: 11,
-    slot_width_mm: null,
-    slot_length_mm: null,
     terminal_role: null,
     terminal_group: null,
+    // legacy alanlar boş
+    hole_diameter_mm: null,
     terminal_type: null,
     terminal_width_mm: null,
     terminal_height_mm: null,
@@ -43,6 +43,7 @@ interface DeviceForm {
   model: string;
   device_type: string;
   enclosure_type: string;
+  reference_origin: string;
   poles: number;
   current_a: number;
   width_mm: number;
@@ -55,6 +56,7 @@ const EMPTY_FORM: DeviceForm = {
   model: "",
   device_type: "",
   enclosure_type: "",
+  reference_origin: "Ön-Sol-Alt",
   poles: 3,
   current_a: 0,
   width_mm: 100,
@@ -63,6 +65,7 @@ const EMPTY_FORM: DeviceForm = {
 };
 
 const ENCLOSURE_TYPES = ["Sabit", "Çekme", "Eklenti", "Modüler"];
+const REFERENCE_ORIGINS = ["Ön-Sol-Alt", "Ön-Merkez-Alt", "Arka-Merkez-Alt", "Merkez Nokta"];
 const PHASES = ["L1", "L2", "L3", "N", "PE"];
 const FACES = [
   { value: "", label: "—" },
@@ -74,6 +77,15 @@ const FACES = [
   { value: "bottom", label: "Alt" },
 ];
 
+// Terminal tipi kısa özet (tooltip için)
+function termDefSummary(def: TerminalDefinition): string {
+  const parts: string[] = [];
+  if (def.bolt_type) parts.push(def.bolt_type);
+  if (def.hole_diameter_mm) parts.push(`Ø${def.hole_diameter_mm}`);
+  if (def.terminal_width_mm) parts.push(`${def.terminal_width_mm}×${def.terminal_height_mm ?? "?"}mm`);
+  return parts.join(", ") || def.terminal_type;
+}
+
 // ── Ana bileşen ───────────────────────────────────────────────────────────────
 export function DeviceEditorPage() {
   const { id } = useParams<{ id: string }>();
@@ -84,12 +96,18 @@ export function DeviceEditorPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
-  // Mevcut cihazı yükle (düzenleme veya kopyalama modunda)
   const deviceQ = useQuery({
     queryKey: ["device", loadId],
-    queryFn: () => client.listDevices().then((list) => list.find((d) => d.id === Number(loadId)) ?? null),
+    queryFn: () =>
+      client.listDevices().then((list) => list.find((d) => d.id === Number(loadId)) ?? null),
     enabled: Boolean(loadId),
   });
+
+  const terminalDefsQ = useQuery({
+    queryKey: ["terminal-definitions"],
+    queryFn: client.listTerminalDefinitions,
+  });
+  const terminalDefs = terminalDefsQ.data ?? [];
 
   const [form, setForm] = useState<DeviceForm>(EMPTY_FORM);
   const [terminals, setTerminals] = useState<DeviceTerminal[]>([
@@ -108,6 +126,7 @@ export function DeviceEditorPage() {
       model: device.model,
       device_type: device.device_type,
       enclosure_type: device.enclosure_type ?? "",
+      reference_origin: device.reference_origin ?? "Ön-Sol-Alt",
       poles: device.poles,
       current_a: Number(device.current_a ?? 0),
       width_mm: Number(device.width_mm),
@@ -123,10 +142,11 @@ export function DeviceEditorPage() {
         terminal_width_mm: t.terminal_width_mm != null ? Number(t.terminal_width_mm) : null,
         terminal_height_mm: t.terminal_height_mm != null ? Number(t.terminal_height_mm) : null,
         terminal_depth_mm: t.terminal_depth_mm != null ? Number(t.terminal_depth_mm) : null,
-        bolt_center_distance_mm: t.bolt_center_distance_mm != null ? Number(t.bolt_center_distance_mm) : null,
+        bolt_center_distance_mm:
+          t.bolt_center_distance_mm != null ? Number(t.bolt_center_distance_mm) : null,
         hole_diameter_mm: t.hole_diameter_mm != null ? Number(t.hole_diameter_mm) : null,
         bolt_count: t.bolt_count != null ? Number(t.bolt_count) : null,
-      }))
+      })),
     );
   }, [deviceQ.data, cloneId]);
 
@@ -155,17 +175,41 @@ export function DeviceEditorPage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaveError(null);
+
+    // terminal_definition_id seçiliyse o tanımdan fiziksel alanları otomatik doldur
+    const enrichedTerminals = terminals.map((t) => {
+      if (t.terminal_definition_id) {
+        const def = terminalDefs.find((d) => d.id === t.terminal_definition_id);
+        if (def) {
+          return {
+            ...t,
+            terminal_type: def.terminal_type,
+            terminal_face: t.terminal_face || def.surface,
+            hole_diameter_mm: t.hole_diameter_mm ?? def.hole_diameter_mm ?? null,
+            terminal_width_mm: def.terminal_width_mm ?? null,
+            terminal_height_mm: def.terminal_height_mm ?? null,
+            terminal_depth_mm: def.terminal_depth_mm ?? null,
+            bolt_type: def.bolt_type ?? null,
+            bolt_count: def.bolt_count ?? null,
+            bolt_center_distance_mm: def.bolt_center_distance_mm ?? null,
+          };
+        }
+      }
+      return t;
+    });
+
     const payload: Omit<Device, "id"> = {
       brand: form.brand,
       model: form.model,
       device_type: form.device_type,
       enclosure_type: form.enclosure_type || null,
+      reference_origin: form.reference_origin || null,
       poles: form.poles,
       current_a: form.current_a || null,
       width_mm: form.width_mm,
       height_mm: form.height_mm,
       depth_mm: form.depth_mm || null,
-      terminals,
+      terminals: enrichedTerminals,
     };
     if (isEdit) {
       updateMut.mutate(payload);
@@ -192,6 +236,28 @@ export function DeviceEditorPage() {
   function removeTerminal(idx: number) {
     setTerminals((ts) => ts.filter((_, i) => i !== idx));
   }
+
+  // Terminalleri çizim için zenginleştir (terminal_def'ten fiziksel boyutları çek)
+  const terminalsForDrawing = terminals.map((t) => {
+    if (t.terminal_definition_id) {
+      const def = terminalDefs.find((d) => d.id === t.terminal_definition_id);
+      if (def) {
+        return {
+          ...t,
+          terminal_type: def.terminal_type,
+          terminal_face: t.terminal_face || def.surface,
+          hole_diameter_mm: t.hole_diameter_mm ?? def.hole_diameter_mm ?? null,
+          terminal_width_mm: def.terminal_width_mm ?? null,
+          terminal_height_mm: def.terminal_height_mm ?? null,
+          terminal_depth_mm: def.terminal_depth_mm ?? null,
+          bolt_type: def.bolt_type ?? null,
+          bolt_count: def.bolt_count ?? null,
+          bolt_center_distance_mm: def.bolt_center_distance_mm ?? null,
+        };
+      }
+    }
+    return t;
+  });
 
   if (Boolean(loadId) && deviceQ.isLoading) {
     return <div className="loading-state">Cihaz yükleniyor…</div>;
@@ -225,9 +291,7 @@ export function DeviceEditorPage() {
         </div>
       </section>
 
-      {saveError && (
-        <div className="alert alert-warning">{saveError}</div>
-      )}
+      {saveError && <div className="alert alert-warning">{saveError}</div>}
 
       {/* ── Şalter Bilgileri ─────────────────────────────────────────────────── */}
       <section className="card">
@@ -265,13 +329,23 @@ export function DeviceEditorPage() {
           <label>
             <span>Kasa Tipi</span>
             <select
-              className="form-input"
               value={form.enclosure_type}
               onChange={(e) => updateField("enclosure_type", e.target.value)}
             >
               <option value="">— Seçin —</option>
               {ENCLOSURE_TYPES.map((t) => (
                 <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Referans Nokta</span>
+            <select
+              value={form.reference_origin}
+              onChange={(e) => updateField("reference_origin", e.target.value)}
+            >
+              {REFERENCE_ORIGINS.map((o) => (
+                <option key={o} value={o}>{o}</option>
               ))}
             </select>
           </label>
@@ -331,14 +405,7 @@ export function DeviceEditorPage() {
         <div className="section-header">
           <h3 style={{ margin: 0, fontSize: "0.95rem", color: "var(--accent)" }}>
             Terminal Bilgileri
-            <span
-              style={{
-                marginLeft: "0.6rem",
-                fontSize: "0.75rem",
-                fontWeight: 400,
-                color: "var(--muted)",
-              }}
-            >
+            <span style={{ marginLeft: "0.6rem", fontSize: "0.75rem", fontWeight: 400, color: "var(--muted)" }}>
               {terminals.length} terminal
             </span>
           </h3>
@@ -348,19 +415,12 @@ export function DeviceEditorPage() {
         </div>
 
         <div style={{ overflowX: "auto", marginTop: "0.5rem" }}>
-          <table style={{ minWidth: 1400, borderCollapse: "collapse", fontSize: "0.82rem" }}>
+          <table style={{ minWidth: 860, borderCollapse: "collapse", fontSize: "0.82rem" }}>
             <thead>
               <tr>
-                {/* Referans grubu */}
                 <th colSpan={3} style={thGroupStyle("rgba(255,138,61,0.18)")}>Referans</th>
-                {/* Terminal Koordinat */}
                 <th colSpan={3} style={thGroupStyle("rgba(96,165,250,0.18)")}>Koordinat (mm)</th>
-                {/* Terminal Boyutu */}
-                <th colSpan={3} style={thGroupStyle("rgba(87,211,140,0.18)")}>Terminal Boyutu (mm)</th>
-                {/* Vida */}
-                <th colSpan={3} style={thGroupStyle("rgba(255,179,71,0.18)")}>Vida Bilgisi</th>
-                {/* Diğer */}
-                <th colSpan={4} style={thGroupStyle("rgba(161,188,220,0.1)")}>Diğer</th>
+                <th colSpan={3} style={thGroupStyle("rgba(161,188,220,0.1)")}>Bağlantı</th>
                 <th style={{ padding: "0.4rem 0.5rem" }}></th>
               </tr>
               <tr style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
@@ -370,116 +430,133 @@ export function DeviceEditorPage() {
                 <Th>X</Th>
                 <Th>Y</Th>
                 <Th>Z</Th>
-                <Th>Gen. X</Th>
-                <Th>Yük. Y</Th>
-                <Th>Der. Z</Th>
-                <Th>Vida Tipi</Th>
-                <Th>Adet</Th>
-                <Th>Merkez (mm)</Th>
                 <Th>Yüzey</Th>
-                <Th>Delik Ø</Th>
                 <Th>Rol</Th>
                 <Th>Grup</Th>
                 <th style={{ padding: "0.4rem 0.5rem" }}></th>
               </tr>
             </thead>
             <tbody>
-              {terminals.map((t, idx) => (
-                <tr
-                  key={idx}
-                  style={{
-                    borderBottom: "1px solid var(--line)",
-                    background: idx % 2 === 0 ? "transparent" : "rgba(161,188,220,0.03)",
-                  }}
-                >
-                  {/* Referans */}
-                  <Td>
-                    <input
-                      style={cellInput}
-                      value={t.terminal_name}
-                      onChange={(e) => updateTerminal(idx, "terminal_name", e.target.value)}
-                      placeholder="L1.1"
-                    />
-                  </Td>
-                  <Td>
-                    <select style={cellInput} value={t.phase} onChange={(e) => updateTerminal(idx, "phase", e.target.value)}>
-                      {PHASES.map((p) => <option key={p} value={p}>{p}</option>)}
-                    </select>
-                  </Td>
-                  <Td>
-                    <input
-                      style={cellInput}
-                      value={t.terminal_type ?? ""}
-                      onChange={(e) => updateTerminal(idx, "terminal_type", e.target.value || null)}
-                      placeholder="Ön Terminal"
-                    />
-                  </Td>
-                  {/* Koordinat */}
-                  <Td><NumInput value={t.x_mm} onChange={(v) => updateTerminal(idx, "x_mm", v)} /></Td>
-                  <Td><NumInput value={t.y_mm} onChange={(v) => updateTerminal(idx, "y_mm", v)} /></Td>
-                  <Td><NumInput value={t.z_mm ?? 0} onChange={(v) => updateTerminal(idx, "z_mm", v)} /></Td>
-                  {/* Terminal boyutu */}
-                  <Td><NullableNum value={t.terminal_width_mm} onChange={(v) => updateTerminal(idx, "terminal_width_mm", v)} /></Td>
-                  <Td><NullableNum value={t.terminal_height_mm} onChange={(v) => updateTerminal(idx, "terminal_height_mm", v)} /></Td>
-                  <Td><NullableNum value={t.terminal_depth_mm} onChange={(v) => updateTerminal(idx, "terminal_depth_mm", v)} /></Td>
-                  {/* Vida */}
-                  <Td>
-                    <input
-                      style={cellInput}
-                      value={t.bolt_type ?? ""}
-                      onChange={(e) => updateTerminal(idx, "bolt_type", e.target.value || null)}
-                      placeholder="M12"
-                    />
-                  </Td>
-                  <Td>
-                    <NullableNum
-                      value={t.bolt_count}
-                      onChange={(v) => updateTerminal(idx, "bolt_count", v != null ? Math.round(v) : null)}
-                      placeholder="2"
-                      step={1}
-                    />
-                  </Td>
-                  <Td><NullableNum value={t.bolt_center_distance_mm} onChange={(v) => updateTerminal(idx, "bolt_center_distance_mm", v)} placeholder="25" /></Td>
-                  {/* Diğer */}
-                  <Td>
-                    <select style={cellInput} value={t.terminal_face ?? ""} onChange={(e) => updateTerminal(idx, "terminal_face", e.target.value || null)}>
-                      {FACES.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
-                    </select>
-                  </Td>
-                  <Td><NullableNum value={t.hole_diameter_mm} onChange={(v) => updateTerminal(idx, "hole_diameter_mm", v)} placeholder="11" /></Td>
-                  <Td>
-                    <select style={cellInput} value={t.terminal_role ?? ""} onChange={(e) => updateTerminal(idx, "terminal_role", e.target.value || null)}>
-                      <option value="">—</option>
-                      <option value="input">input</option>
-                      <option value="output">output</option>
-                    </select>
-                  </Td>
-                  <Td>
-                    <select style={cellInput} value={t.terminal_group ?? ""} onChange={(e) => updateTerminal(idx, "terminal_group", e.target.value || null)}>
-                      <option value="">—</option>
-                      <option value="line">line</option>
-                      <option value="load">load</option>
-                      <option value="bus">bus</option>
-                      <option value="branch">branch</option>
-                    </select>
-                  </Td>
-                  {/* Sil */}
-                  <Td>
-                    <button
-                      type="button"
-                      className="ghost danger"
-                      style={{ padding: "0.2rem 0.5rem", fontSize: "0.8rem" }}
-                      onClick={() => removeTerminal(idx)}
-                      title="Terminali sil"
-                    >
-                      ✕
-                    </button>
-                  </Td>
-                </tr>
-              ))}
+              {terminals.map((t, idx) => {
+                const selectedDef = t.terminal_definition_id
+                  ? terminalDefs.find((d) => d.id === t.terminal_definition_id)
+                  : null;
+                return (
+                  <tr
+                    key={idx}
+                    style={{
+                      borderBottom: "1px solid var(--line)",
+                      background: idx % 2 === 0 ? "transparent" : "rgba(161,188,220,0.03)",
+                    }}
+                  >
+                    {/* Referans adı */}
+                    <Td>
+                      <input
+                        style={cellInput}
+                        value={t.terminal_name}
+                        onChange={(e) => updateTerminal(idx, "terminal_name", e.target.value)}
+                        placeholder="L1.1"
+                      />
+                    </Td>
+                    {/* Faz */}
+                    <Td>
+                      <select
+                        style={cellInput}
+                        value={t.phase}
+                        onChange={(e) => updateTerminal(idx, "phase", e.target.value)}
+                      >
+                        {PHASES.map((p) => <option key={p} value={p}>{p}</option>)}
+                      </select>
+                    </Td>
+                    {/* Terminal Tipi dropdown */}
+                    <Td>
+                      <select
+                        style={{ ...cellInput, minWidth: 160 }}
+                        value={t.terminal_definition_id ?? ""}
+                        onChange={(e) =>
+                          updateTerminal(
+                            idx,
+                            "terminal_definition_id",
+                            e.target.value === "" ? null : Number(e.target.value),
+                          )
+                        }
+                        title={selectedDef ? termDefSummary(selectedDef) : ""}
+                      >
+                        <option value="">— Seçin —</option>
+                        {terminalDefs.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name}
+                          </option>
+                        ))}
+                      </select>
+                    </Td>
+                    {/* Koordinatlar */}
+                    <Td>
+                      <NumInput value={t.x_mm} onChange={(v) => updateTerminal(idx, "x_mm", v)} />
+                    </Td>
+                    <Td>
+                      <NumInput value={t.y_mm} onChange={(v) => updateTerminal(idx, "y_mm", v)} />
+                    </Td>
+                    <Td>
+                      <NumInput value={t.z_mm ?? 0} onChange={(v) => updateTerminal(idx, "z_mm", v)} />
+                    </Td>
+                    {/* Yüzey */}
+                    <Td>
+                      <select
+                        style={cellInput}
+                        value={t.terminal_face ?? ""}
+                        onChange={(e) => updateTerminal(idx, "terminal_face", e.target.value || null)}
+                      >
+                        {FACES.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+                      </select>
+                    </Td>
+                    {/* Rol */}
+                    <Td>
+                      <select
+                        style={cellInput}
+                        value={t.terminal_role ?? ""}
+                        onChange={(e) => updateTerminal(idx, "terminal_role", e.target.value || null)}
+                      >
+                        <option value="">—</option>
+                        <option value="input">Giriş</option>
+                        <option value="output">Çıkış</option>
+                      </select>
+                    </Td>
+                    {/* Grup */}
+                    <Td>
+                      <select
+                        style={cellInput}
+                        value={t.terminal_group ?? ""}
+                        onChange={(e) => updateTerminal(idx, "terminal_group", e.target.value || null)}
+                      >
+                        <option value="">—</option>
+                        <option value="line">Hat</option>
+                        <option value="load">Yük</option>
+                        <option value="bus">Bara</option>
+                        <option value="branch">Tali</option>
+                      </select>
+                    </Td>
+                    {/* Sil */}
+                    <Td>
+                      <button
+                        type="button"
+                        className="ghost danger"
+                        style={{ padding: "0.2rem 0.5rem", fontSize: "0.8rem" }}
+                        onClick={() => removeTerminal(idx)}
+                        title="Terminali sil"
+                      >
+                        ✕
+                      </button>
+                    </Td>
+                  </tr>
+                );
+              })}
               {terminals.length === 0 && (
                 <tr>
-                  <td colSpan={17} style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}>
+                  <td
+                    colSpan={10}
+                    style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}
+                  >
                     Terminal yok — "Terminal Ekle" butonuna tıklayın
                   </td>
                 </tr>
@@ -498,14 +575,19 @@ export function DeviceEditorPage() {
           widthMm={form.width_mm}
           heightMm={form.height_mm}
           depthMm={form.depth_mm}
-          terminals={terminals}
+          terminals={terminalsForDrawing}
+          terminalDefs={terminalDefs}
           height={960}
         />
       </section>
 
       {/* ── Alt Kaydet Butonu ────────────────────────────────────────────────── */}
       <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
-        <button type="button" className="ghost" onClick={() => navigate("/definitions/devices")}>
+        <button
+          type="button"
+          className="ghost"
+          onClick={() => navigate("/definitions/devices")}
+        >
           ← Geri
         </button>
         <button type="submit" disabled={isPending}>
@@ -520,7 +602,14 @@ export function DeviceEditorPage() {
 
 function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th style={{ padding: "0.4rem 0.5rem", whiteSpace: "nowrap", textAlign: "left", fontWeight: 600 }}>
+    <th
+      style={{
+        padding: "0.4rem 0.5rem",
+        whiteSpace: "nowrap",
+        textAlign: "left",
+        fontWeight: 600,
+      }}
+    >
       {children}
     </th>
   );
@@ -530,7 +619,12 @@ function Td({ children }: { children: React.ReactNode }) {
   return <td style={{ padding: "0.3rem 0.4rem", verticalAlign: "middle" }}>{children}</td>;
 }
 
-function NumInput({ value, onChange, placeholder = "0", step = "any" }: {
+function NumInput({
+  value,
+  onChange,
+  placeholder = "0",
+  step = "any",
+}: {
   value: number;
   onChange: (v: number) => void;
   placeholder?: string;
@@ -548,29 +642,11 @@ function NumInput({ value, onChange, placeholder = "0", step = "any" }: {
   );
 }
 
-function NullableNum({ value, onChange, placeholder = "—", step = "any" }: {
-  value: number | null | undefined;
-  onChange: (v: number | null) => void;
-  placeholder?: string;
-  step?: string | number;
-}) {
-  return (
-    <input
-      type="number"
-      step={step}
-      style={cellInput}
-      value={value ?? ""}
-      placeholder={placeholder}
-      onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
-    />
-  );
-}
-
 // ── Style sabitleri ───────────────────────────────────────────────────────────
 
 const cellInput: React.CSSProperties = {
   width: "100%",
-  minWidth: 72,
+  minWidth: 64,
   padding: "0.3rem 0.4rem",
   fontSize: "0.82rem",
   border: "1px solid var(--line)",

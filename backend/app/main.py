@@ -14,6 +14,7 @@ from app.api.project_coppers import router as project_coppers_router
 from app.api.project_devices import router as project_devices_router
 from app.api.project_panels import router as project_panels_router
 from app.api.projects import router as projects_router
+from app.api.terminal_definitions import router as terminal_definitions_router
 
 app = FastAPI(title="PanelForge API", version="0.1.0")
 
@@ -36,6 +37,7 @@ app.include_router(copper_router, prefix="/api")
 app.include_router(panel_definitions_router, prefix="/api")
 app.include_router(panel_types_router, prefix="/api")
 app.include_router(copper_definitions_router, prefix="/api")
+app.include_router(terminal_definitions_router, prefix="/api")
 app.include_router(calculations_router, prefix="/api")
 app.include_router(exports_router, prefix="/api")
 

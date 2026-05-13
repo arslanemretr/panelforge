@@ -8,6 +8,7 @@ import { MainCopperListPage } from "./pages/MainCopperListPage";
 import { PanelDefinitionsPage } from "./pages/PanelDefinitionsPage";
 import { ProjectListPage } from "./pages/ProjectListPage";
 import { ProjectWorkspacePage } from "./pages/ProjectWorkspacePage";
+import { TerminalDefinitionsPage } from "./pages/TerminalDefinitionsPage";
 import { useTheme } from "./hooks/useTheme";
 
 const navSections = [
@@ -21,6 +22,7 @@ const navSections = [
     title: "Tanimlamalar",
     items: [
       ["/definitions/devices", "Cihaz Tanimlama"],
+      ["/definitions/terminal-types", "Terminal Tipleri"],
       ["/definitions/panels", "Kabin Tanimlama"],
       ["/definitions/copper/main", "Ana Bakir Tanimlama"],
       ["/definitions/copper/branch", "Tali Bakir Tanimlama"],
@@ -85,6 +87,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/projects" replace />} />
           <Route path="/projects" element={<ProjectListPage />} />
           <Route path="/definitions/devices" element={<DeviceDefinitionsPage />} />
+          <Route path="/definitions/terminal-types" element={<TerminalDefinitionsPage />} />
           <Route path="/definitions/devices/new" element={<DeviceEditorPage />} />
           <Route path="/definitions/devices/:id" element={<DeviceEditorPage />} />
           <Route path="/definitions/panels" element={<PanelDefinitionsPage />} />

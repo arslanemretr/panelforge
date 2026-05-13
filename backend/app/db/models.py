@@ -132,6 +132,26 @@ class Panel(Base):
     project: Mapped["Project"] = relationship(back_populates="panel")
 
 
+class TerminalDefinition(Base):
+    __tablename__ = "terminal_definitions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(Text, nullable=False)                    # "ABB Emax Ön Terminal M12"
+    terminal_type: Mapped[str] = mapped_column(Text, nullable=False)           # "Ön Bakır Basmalı" | "Arka Yatay Taraklı" | "Yandan Taraklı"
+    surface: Mapped[str] = mapped_column(Text, nullable=False)                 # "front" | "back" | "left" | "right" | "top" | "bottom"
+    bolt_type: Mapped[str | None] = mapped_column(Text)                        # "M12" | "M10" vb.
+    bolt_count: Mapped[int | None] = mapped_column(Integer)                    # vida miktarı
+    bolt_center_distance_mm: Mapped[Decimal | None] = mapped_column(Numeric)  # merkez ölçüsü (mm)
+    hole_diameter_mm: Mapped[Decimal | None] = mapped_column(Numeric)         # delik çapı (mm)
+    terminal_width_mm: Mapped[Decimal | None] = mapped_column(Numeric)
+    terminal_height_mm: Mapped[Decimal | None] = mapped_column(Numeric)
+    terminal_depth_mm: Mapped[Decimal | None] = mapped_column(Numeric)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    device_terminals: Mapped[list["DeviceTerminal"]] = relationship(back_populates="terminal_definition")
+
+
 class Device(Base):
     __tablename__ = "devices"
 
@@ -145,6 +165,7 @@ class Device(Base):
     width_mm: Mapped[Decimal] = mapped_column(Numeric, nullable=False)
     height_mm: Mapped[Decimal] = mapped_column(Numeric, nullable=False)
     depth_mm: Mapped[Decimal | None] = mapped_column(Numeric)
+    reference_origin: Mapped[str | None] = mapped_column(Text)         # "Ön-Sol-Alt" | "Ön-Merkez-Alt" | "Arka-Merkez-Alt" | "Merkez Nokta"
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
 
@@ -157,6 +178,7 @@ class DeviceTerminal(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     device_id: Mapped[int] = mapped_column(ForeignKey("devices.id", ondelete="CASCADE"))
+    terminal_definition_id: Mapped[int | None] = mapped_column(ForeignKey("terminal_definitions.id", ondelete="SET NULL"), nullable=True)
     terminal_name: Mapped[str] = mapped_column(Text, nullable=False)
     phase: Mapped[str] = mapped_column(Text, nullable=False)
     x_mm: Mapped[Decimal] = mapped_column(Numeric, nullable=False)
@@ -168,16 +190,17 @@ class DeviceTerminal(Base):
     slot_length_mm: Mapped[Decimal | None] = mapped_column(Numeric)
     terminal_role: Mapped[str | None] = mapped_column(Text)          # input | output
     terminal_group: Mapped[str | None] = mapped_column(Text)         # line | load | bus | branch
-    # Genişletilmiş terminal bilgileri
+    # Geriye dönük uyumluluk için saklanan fiziksel alanlar (terminal_definition_id varsa buralar boş kalabilir)
     terminal_type: Mapped[str | None] = mapped_column(Text)          # "Ön Terminal" | "Arka Terminal" vb.
-    terminal_width_mm: Mapped[Decimal | None] = mapped_column(Numeric)   # terminal bloğu fiziksel gen.
-    terminal_height_mm: Mapped[Decimal | None] = mapped_column(Numeric)  # terminal bloğu fiziksel yük.
-    terminal_depth_mm: Mapped[Decimal | None] = mapped_column(Numeric)   # terminal bloğu fiziksel der.
-    bolt_type: Mapped[str | None] = mapped_column(Text)              # "M12", "M10" vb.
-    bolt_count: Mapped[int | None] = mapped_column(Integer)          # vida miktarı
-    bolt_center_distance_mm: Mapped[Decimal | None] = mapped_column(Numeric)  # merkez ölçüsü (mm)
+    terminal_width_mm: Mapped[Decimal | None] = mapped_column(Numeric)
+    terminal_height_mm: Mapped[Decimal | None] = mapped_column(Numeric)
+    terminal_depth_mm: Mapped[Decimal | None] = mapped_column(Numeric)
+    bolt_type: Mapped[str | None] = mapped_column(Text)
+    bolt_count: Mapped[int | None] = mapped_column(Integer)
+    bolt_center_distance_mm: Mapped[Decimal | None] = mapped_column(Numeric)
 
     device: Mapped["Device"] = relationship(back_populates="terminals")
+    terminal_definition: Mapped["TerminalDefinition | None"] = relationship(back_populates="device_terminals")
 
 
 class ProjectDevice(Base):
