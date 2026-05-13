@@ -733,11 +733,14 @@ export function CopperDefinitionsPage() {
                   </span>
                 </div>
                 <BendPreview
-                  bendType={selectedBendType}
+                  segments={selectedBendType.segments ?? []}
+                  parameters={selectedBendType.parameters ?? []}
                   paramValues={Object.fromEntries(
                     (selectedBendType.parameters ?? []).map((p) => [p.name, Number(p.default_value)])
                   )}
-                  width={280}
+                  thickness_mm={Number(selectedBendType.thickness_mm)}
+                  parallel_count={selectedBendType.parallel_count}
+                  start_direction={selectedBendType.start_direction as "up" | "right"}
                   height={200}
                 />
                 <div style={{ marginTop: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
