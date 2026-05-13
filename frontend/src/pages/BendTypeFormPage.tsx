@@ -87,7 +87,7 @@ const cellStyle: React.CSSProperties = {
   minWidth: 60,
 };
 
-function TH({ children, w }: { children: React.ReactNode; w?: string | number }) {
+function TH({ children, w }: { children?: React.ReactNode; w?: string | number }) {
   return (
     <th style={{ padding: "0.3rem 0.4rem", fontSize: "0.72rem", fontWeight: 700,
       color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em",
