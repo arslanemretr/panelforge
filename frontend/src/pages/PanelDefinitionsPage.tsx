@@ -201,33 +201,45 @@ export function PanelDefinitionsPage() {
       </section>
 
       {/* ── Tab çubuğu ── */}
-      <div className="subtabs">
-        <button
-          type="button"
-          className={activeTab === "definitions" ? "tab-active" : "tab-idle"}
-          onClick={() => setActiveTab("definitions")}
-        >
-          Kabin Tanımları
-        </button>
-        <button
-          type="button"
-          className={activeTab === "types" ? "tab-active" : "tab-idle"}
-          onClick={() => setActiveTab("types")}
-        >
-          Pano Tipleri
-          {panelTypes.length > 0 && (
-            <span style={{
-              marginLeft: "0.4rem",
-              fontSize: "0.75rem",
-              background: "var(--accent-soft)",
-              color: "var(--accent)",
-              borderRadius: "999px",
-              padding: "0.1rem 0.45rem",
-            }}>
-              {panelTypes.length}
-            </span>
-          )}
-        </button>
+      <div style={{ display: "flex", gap: 0, borderBottom: "2px solid var(--line)" }}>
+        {([
+          ["definitions", "Kabin Tanımları"],
+          ["types",       "Pano Tipleri"],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setActiveTab(key)}
+            style={{
+              padding: "0.6rem 1.2rem",
+              fontSize: "0.88rem",
+              fontWeight: activeTab === key ? 700 : 400,
+              border: "none",
+              borderBottom: activeTab === key ? "2px solid var(--accent)" : "2px solid transparent",
+              background: "transparent",
+              color: activeTab === key ? "var(--accent)" : "var(--muted)",
+              cursor: "pointer",
+              marginBottom: "-2px",
+              transition: "color 0.15s",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.4rem",
+            }}
+          >
+            {label}
+            {key === "types" && panelTypes.length > 0 && (
+              <span style={{
+                fontSize: "0.75rem",
+                background: "var(--accent-soft)",
+                color: "var(--accent)",
+                borderRadius: "999px",
+                padding: "0.1rem 0.45rem",
+              }}>
+                {panelTypes.length}
+              </span>
+            )}
+          </button>
+        ))}
       </div>
 
       {/* ── Kabin Tanımları tab ── */}
