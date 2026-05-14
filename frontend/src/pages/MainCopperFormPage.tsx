@@ -532,7 +532,6 @@ function BusbarPreview({ draft }: { draft: MainDraft }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
       <CrossSectionView draft={draft} />
-      <FrontView draft={draft} />
       <TopView draft={draft} />
     </div>
   );
