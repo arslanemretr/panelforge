@@ -182,14 +182,17 @@ function ViewHeader({ svgW, label, accent, id }: {
   );
 }
 
-// ─── Görünüş 1: Enine Kesit (bara ucundan) ──────────────────────────────────
+// ─── Görünüş 1: Enine Kesit (bara ucundan, X yönüne bakış) ──────────────────
+// Fiziksel eksenler: SVG-X = Z (derinlik), SVG-Y = Y (yükseklik)
+// Fazlar Z yönünde (yatay) sıralıdır, phase_center_mm merkez-merkez aralığıdır.
+// Her bar: kalınlık_mm genişliğinde (Z), genişlik_mm yüksekliğinde (Y).
 function CrossSectionView({ draft }: { draft: MainDraft }) {
   const phases   = phaseList(draft.phase_type);
   const nInd     = isNIndependent(draft.phase_type);
   const isDouble = draft.layer_type === "Çift Kat";
 
-  const barWmm  = Math.max(draft.width_mm, 1);      // bar genişliği (yatayda görünür)
-  const barTmm  = Math.max(draft.thickness_mm, 1);  // bar kalınlığı (dikeyde görünür)
+  const barWmm  = Math.max(draft.width_mm, 1);      // Y yönü — dikeyde görünür yükseklik
+  const barTmm  = Math.max(draft.thickness_mm, 1);  // Z yönü — yatayda görünür kalınlık
   const bpc     = Math.max(draft.bars_per_phase, 1);
   const nBC     = Math.max(draft.neutral_bar_count || 1, 1);
   const gapMm   = Math.max(draft.bar_gap_mm, 0);
@@ -200,44 +203,42 @@ function CrossSectionView({ draft }: { draft: MainDraft }) {
   const nLPh    = lPhases.length;
   const getBC   = (ph: string) => (ph === "N" ? nBC : bpc);
 
-  // Bir faz grubunun yatay genişliği (bars_per_phase bar yan yana)
-  const phGroupW = (bc: number) => bc * barWmm + Math.max(0, bc - 1) * gapMm;
-  // Bir faz grubunun dikey yüksekliği (çift kat = 2 katman)
-  const phGroupH = () => isDouble ? barTmm * 2 + layerGapMm : barTmm;
+  // Faz grubunun Z genişliği (bpc bar yan yana, Z yönünde)
+  const phGroupW = (bc: number) => bc * barTmm + Math.max(0, bc - 1) * gapMm;
+  // Faz grubunun Y yüksekliği (çift kat = üst üste 2 bar)
+  const phGroupH = () => isDouble ? barWmm * 2 + layerGapMm : barWmm;
 
-  const lGroupW  = phGroupW(bpc);
-  const nGroupW  = phGroupW(nBC);
-
-  // İçerik: genişlik = en geniş grup, yükseklik = fazlar dikey dizilir
-  const contentW = Math.max(lGroupW, nGroupW);
-  const nGapMm   = 40;
-  const lTotalH  = (nLPh - 1) * pCenMm + phGroupH();
-  const nTotalH  = phGroupH();
-  const contentH = nInd ? lTotalH + nGapMm + nTotalH : lTotalH;
+  const lGroupW = phGroupW(bpc);
+  const nGroupW = phGroupW(nBC);
+  const nGapMm  = 40;
+  const lTotalW = (nLPh - 1) * pCenMm + lGroupW;
+  const contentW = nInd ? lTotalW + nGapMm + nGroupW : lTotalW;
+  const contentH = phGroupH();
 
   const SVG_W  = 520;
   const HEADER = 26;
   const LEFT   = 60;
-  const RIGHT  = 60;  // faz etiketleri için
-  const TOP    = HEADER + 14;
-  const BOT    = 36;
+  const RIGHT  = 14;
+  const TOP    = HEADER + 36;  // faz aralığı dim okları için boşluk
+  const MID    = 22;
+  const BOT    = 30;
   const availW = SVG_W - LEFT - RIGHT;
-  const availH = 140;
+  const availH = 90;
   const sc     = Math.min(availW / Math.max(contentW, 1), availH / Math.max(contentH, 1), 5.5);
 
-  const barsW  = contentW * sc;
-  const barsH  = contentH * sc;
-  const bx0    = LEFT + (availW - barsW) / 2;
-  const by0    = TOP + (availH - barsH) / 2;
-  const SVG_H  = TOP + availH + BOT;
+  const barsW = contentW * sc;
+  const barsH = contentH * sc;
+  const bx0   = LEFT + (availW - barsW) / 2;
+  const by0   = TOP;
+  const SVG_H = TOP + barsH + MID + BOT;
 
-  // Her faz grubunun üst Y koordinatı
-  const pTopY: Record<string, number> = {};
+  // Her fazın Z başlangıç X'i (SVG-X = physical-Z)
+  const pStartX: Record<string, number> = {};
   if (nInd) {
-    lPhases.forEach((ph, i) => { pTopY[ph] = by0 + i * pCenMm * sc; });
-    pTopY["N"] = by0 + (lTotalH + nGapMm) * sc;
+    lPhases.forEach((ph, i) => { pStartX[ph] = bx0 + i * pCenMm * sc; });
+    pStartX["N"] = bx0 + (lTotalW + nGapMm) * sc;
   } else {
-    phases.forEach((ph, i) => { pTopY[ph] = by0 + i * pCenMm * sc; });
+    phases.forEach((ph, i) => { pStartX[ph] = bx0 + i * pCenMm * sc; });
   }
 
   return (
@@ -245,34 +246,41 @@ function CrossSectionView({ draft }: { draft: MainDraft }) {
       style={{ width: "100%", border: "1px solid var(--line)", borderRadius: 6, background: "#1a1f2b", display: "block" }}>
       <ViewHeader svgW={SVG_W} label="ENİNE KESİT — BARA UCUNDAN GÖRÜNÜŞ" accent="#e74c3c" id="hdr-cross" />
 
+      {/* Faz merkez aralığı dim okları (üstte yatay) */}
+      {phases.map((ph, pi) => {
+        if (pi === 0) return null;
+        const prev = phases[pi - 1];
+        if (nInd && (ph === "N" || prev === "N")) return null;
+        const c1 = pStartX[prev] + phGroupW(getBC(prev)) * sc / 2;
+        const c2 = pStartX[ph]   + phGroupW(getBC(ph))   * sc / 2;
+        if (c1 == null || c2 == null) return null;
+        return <DimLineH key={`dim-${pi}`} x1={c1} x2={c2} y={TOP - 16}
+          label={`${pCenMm} mm`} color="#e74c3c" />;
+      })}
+
+      {/* Barlar */}
       {phases.map((ph) => {
         const bc    = getBC(ph);
         const color = PHASE_COLORS[ph] ?? "#aaa";
-        const topY  = pTopY[ph];
-        if (topY == null) return null;
-        const bWpx   = barWmm * sc;
-        const bTpx   = barTmm * sc;
-        const gWpx   = phGroupW(bc) * sc;
-        const groupCY = topY + phGroupH() * sc / 2;
-        // Bar grubu yatayda ortalı
-        const gStartX = bx0 + (barsW - gWpx) / 2;
+        const startX = pStartX[ph];
+        if (startX == null) return null;
+        const bTpx = barTmm * sc;  // yatay (Z yönü)
+        const bWpx = barWmm * sc;  // dikey (Y yönü)
+        const groupCX = startX + phGroupW(bc) * sc / 2;
 
         return (
           <g key={ph}>
-            {/* Faz etiketi (sağ) */}
-            <text x={bx0 + barsW + 8} y={groupCY + 4} fontSize={11}
-              fill={color} fontWeight="bold" fontFamily="monospace">{ph}</text>
+            <text x={groupCX} y={by0 + barsH + MID + 8} textAnchor="middle"
+              fontSize={11} fill={color} fontWeight="bold" fontFamily="monospace">{ph}</text>
 
             {Array.from({ length: bc }, (_, bi) => {
-              const barX = gStartX + bi * (barWmm + gapMm) * sc;
+              const barX = startX + bi * (barTmm + gapMm) * sc;
               return (
                 <g key={bi}>
-                  {/* 1. kat */}
-                  <rect x={barX} y={topY} width={bWpx} height={bTpx}
+                  <rect x={barX} y={by0} width={bTpx} height={bWpx}
                     fill={color} opacity={0.88} rx={1} stroke={color} strokeWidth={0.5} />
-                  {/* 2. kat (çift kat) */}
                   {isDouble && (
-                    <rect x={barX} y={topY + bTpx + layerGapMm * sc} width={bWpx} height={bTpx}
+                    <rect x={barX} y={by0 + bWpx + layerGapMm * sc} width={bTpx} height={bWpx}
                       fill={color} opacity={0.55} rx={1} stroke={color} strokeWidth={0.5} />
                   )}
                 </g>
@@ -282,144 +290,121 @@ function CrossSectionView({ draft }: { draft: MainDraft }) {
         );
       })}
 
-      {/* Faz aralığı dim oku (sol dikey) */}
-      {lPhases.length >= 2 && (() => {
-        const y1 = pTopY[lPhases[0]];
-        const y2 = pTopY[lPhases[1]];
-        if (y1 == null || y2 == null) return null;
-        return <DimLineV x={bx0 - 14} y1={y1} y2={y2} label={`${pCenMm} mm`} color="#e74c3c" />;
-      })()}
-
-      {/* Bar genişliği dim oku (alt yatay) */}
+      {/* Kalınlık dim oku (alt yatay — tek barın Z genişliği) */}
       {(() => {
         const ph = lPhases[0] ?? phases[0]; if (!ph) return null;
-        const bc = getBC(ph);
-        const gWpx = phGroupW(bc) * sc;
-        const bWpx = barWmm * sc;
-        const gStartX = bx0 + (barsW - gWpx) / 2;
-        return <DimLineH x1={gStartX} x2={gStartX + bWpx} y={by0 + barsH + 16}
-          label={`${draft.width_mm} mm`} color="#9b59b6" />;
-      })()}
-
-      {/* Bar kalınlığı dim oku (sol dikey) */}
-      {(() => {
-        const ph = lPhases[0] ?? phases[0]; if (!ph) return null;
-        const topY = pTopY[ph]; if (topY == null) return null;
-        return <DimLineV x={bx0 - 36} y1={topY} y2={topY + barTmm * sc}
+        const sx = pStartX[ph]; if (sx == null) return null;
+        return <DimLineH x1={sx} x2={sx + barTmm * sc} y={by0 + barsH + 14}
           label={`${draft.thickness_mm} mm`} color="#3498db" />;
       })()}
+
+      {/* Genişlik dim oku (sol dikey — barın Y yüksekliği) */}
+      <DimLineV x={LEFT - 14} y1={by0} y2={by0 + barWmm * sc}
+        label={`${draft.width_mm} mm`} color="#9b59b6" />
+
+      {isDouble && (
+        <text x={LEFT - 14} y={by0 + barWmm * sc + layerGapMm * sc / 2 + 4}
+          textAnchor="middle" fontSize={7} fill="#475569" fontFamily="system-ui">×2</text>
+      )}
     </svg>
   );
 }
 
-// ─── Görünüş 2: Ön Görünüş ───────────────────────────────────────────────────
+// ─── Görünüş 2: Ön Görünüş (Z yönüne bakış) ──────────────────────────────────
+// Fiziksel eksenler: SVG-X = X (uzunluk), SVG-Y = Y (yükseklik)
+// Fazlar Z yönünde derinlikte ayrılır → hepsi aynı Y'de, perspektif ofset ile gösterilir.
+// En öndeki faz (L1) tam opak, arkadakiler sağa+yukarı kaydırılmış daha soluk görünür.
 function FrontView({ draft }: { draft: MainDraft }) {
   const phases   = phaseList(draft.phase_type);
-  const nInd     = isNIndependent(draft.phase_type);
   const isDouble = draft.layer_type === "Çift Kat";
+  const bpc      = Math.max(draft.bars_per_phase, 1);
 
-  const barWmm  = Math.max(draft.width_mm, 1);          // bar genişliği (dikeyde görünür)
-  const barLmm  = Math.max(draft.busbar_length_mm, 1);  // bar uzunluğu (yatayda)
-  const barTmm  = Math.max(draft.thickness_mm, 1);
-  const pCenMm  = Math.max(draft.phase_center_mm, 1);
-  const bpc     = Math.max(draft.bars_per_phase, 1);
-  const nBC     = Math.max(draft.neutral_bar_count || 1, 1);
+  const barWmm  = Math.max(draft.width_mm, 1);
+  const barLmm  = Math.max(draft.busbar_length_mm, 1);
+  const layerGapMm = 6;
 
-  const lPhases = nInd ? phases.filter((p) => p !== "N") : phases;
-  const nLPh    = lPhases.length;
-  const getBC   = (ph: string) => (ph === "N" ? nBC : bpc);
-
-  // İçerik boyutları mm — fazlar dikey dizilir
-  const contentW = barLmm;
-  const nGapMm   = 40;
-  const lTotalH  = (nLPh - 1) * pCenMm + barWmm;
-  const contentH = nInd
-    ? lTotalH + nGapMm + barWmm
-    : (phases.length - 1) * pCenMm + barWmm;
+  // Toplam bar yüksekliği (çift kat ise 2 × genişlik + boşluk)
+  const totalBarH_mm = isDouble ? barWmm * 2 + layerGapMm : barWmm;
 
   const SVG_W  = 520;
   const HEADER = 26;
   const LEFT   = 58;
-  const RIGHT  = 14;
+  const RIGHT  = 16;
   const TOP    = HEADER + 14;
   const BOT    = 34;
   const availW = SVG_W - LEFT - RIGHT;
-  const availH = 160;
-  const sc     = Math.min(availW / Math.max(contentW, 1), availH / Math.max(contentH, 1), 4.0);
 
-  const barsW  = contentW * sc;
-  const barsH  = contentH * sc;
-  const bx0    = LEFT + (availW - barsW) / 2;
-  const by0    = TOP + (availH - barsH) / 2;
-  const SVG_H  = TOP + availH + BOT;
+  // Faz başına perspektif piksel ofseti (sağ+yukarı = derinliğe gidiş)
+  const nPh    = phases.length;
+  const DEPTH_DX = 14;   // px / faz — yatay
+  const DEPTH_DY = 10;   // px / faz — dikey (yukarı)
 
-  // Her fazın bar üst Y koordinatı — fazlar dikey dizilir
-  const pTopY: Record<string, number> = {};
-  if (nInd) {
-    lPhases.forEach((ph, i) => { pTopY[ph] = by0 + i * pCenMm * sc; });
-    pTopY["N"] = by0 + (lTotalH + nGapMm) * sc;
-  } else {
-    phases.forEach((ph, i) => { pTopY[ph] = by0 + i * pCenMm * sc; });
-  }
+  const totalOffW = (nPh - 1) * DEPTH_DX;
+  const totalOffH = (nPh - 1) * DEPTH_DY;
 
-  // Çoklu bar / çift kat için gölge ofset
-  const shadowOff = Math.max(3, barTmm * sc * 0.12);
+  const sc = Math.min(
+    (availW - totalOffW) / Math.max(barLmm, 1),
+    110 / Math.max(totalBarH_mm, 1),
+    4.0,
+  );
+
+  const barsW = barLmm * sc;
+  const barsH = totalBarH_mm * sc;
+
+  const bx0 = LEFT + (availW - barsW - totalOffW) / 2;
+  const by0 = TOP + totalOffH;
+  const SVG_H = TOP + totalOffH + barsH + BOT;
 
   return (
     <svg viewBox={`0 0 ${SVG_W} ${Math.ceil(SVG_H)}`}
       style={{ width: "100%", border: "1px solid var(--line)", borderRadius: 6, background: "#1a1f2b", display: "block" }}>
       <ViewHeader svgW={SVG_W} label="ÖN GÖRÜNÜŞ — UZUNLUK × GENİŞLİK" accent="#3498db" id="hdr-front" />
 
-      {phases.map((ph) => {
-        const bc    = getBC(ph);
+      {/* Arkadan öne çiz (en öndeki faz en üstte kalır) */}
+      {[...phases].reverse().map((ph) => {
+        const idx   = phases.indexOf(ph);   // 0 = öndeki faz
         const color = PHASE_COLORS[ph] ?? "#aaa";
-        const topY  = pTopY[ph];
-        if (topY == null) return null;
-        const barH  = barWmm * sc;    // dikey boyut = bar genişliği
-        const barW  = barsW;          // yatay boyut = bar uzunluğu
+        const x     = bx0 + idx * DEPTH_DX;
+        const y     = by0 - idx * DEPTH_DY;
+        const opacity = idx === 0 ? 0.90 : Math.max(0.45, 0.80 - idx * 0.12);
 
-        // Kaç arka gölge gösterilecek (bars_per_phase + çift kat)
-        const shadowCount = Math.min((bc - 1) + (isDouble ? 1 : 0), 3);
+        // bars_per_phase için ek perspektif gölgesi (Z içinde çoklu bar)
+        const extraShadows = Math.min(bpc - 1, 2);
 
         return (
           <g key={ph}>
-            {/* Faz etiketi (sol) */}
-            <text x={bx0 - 6} y={topY + barH / 2 + 4} textAnchor="end"
-              fontSize={11} fill={color} fontWeight="bold" fontFamily="monospace">{ph}</text>
-
-            {/* Arka gölge katmanlar (çoklu bar / çift kat) */}
-            {Array.from({ length: shadowCount }, (_, si) => (
-              <rect key={`sh-${si}`}
-                x={bx0 + (si + 1) * shadowOff} y={topY - (si + 1) * shadowOff}
-                width={barW} height={barH}
-                fill={color} opacity={0.22} rx={1} />
+            {/* bars_per_phase gölgeleri */}
+            {Array.from({ length: extraShadows }, (_, si) => (
+              <rect key={`bsh-${si}`}
+                x={x + (si + 1) * 4} y={y - (si + 1) * 3}
+                width={barsW} height={barsH}
+                fill={color} opacity={opacity * 0.3} rx={1} />
             ))}
 
-            {/* Ana bar (ön yüz) */}
-            <rect x={bx0} y={topY} width={barW} height={barH}
-              fill={color} opacity={0.85} rx={1} stroke={color} strokeWidth={0.6} />
+            {/* Ana bar yüzeyi */}
+            <rect x={x} y={y} width={barsW} height={barsH}
+              fill={color} opacity={opacity} rx={1}
+              stroke={color} strokeWidth={0.6} />
+
+            {/* Çift kat bölme çizgisi */}
+            {isDouble && (
+              <line x1={x} y1={y + barWmm * sc} x2={x + barsW} y2={y + barWmm * sc}
+                stroke={color} strokeWidth={0.6} strokeDasharray="5,3" opacity={0.55} />
+            )}
+
+            {/* Faz etiketi */}
+            <text x={x - 5} y={y + barsH / 2 + 4} textAnchor="end"
+              fontSize={11} fill={color} fontWeight="bold" fontFamily="monospace"
+              opacity={Math.max(0.6, opacity)}>{ph}</text>
           </g>
         );
       })}
 
-      {/* Faz aralığı dim oku (sol dikey) */}
-      {lPhases.length >= 2 && (() => {
-        const y1 = pTopY[lPhases[0]];
-        const y2 = pTopY[lPhases[1]];
-        if (y1 == null || y2 == null) return null;
-        return <DimLineV x={bx0 - 28} y1={y1} y2={y2} label={`${pCenMm} mm`} color="#e74c3c" />;
-      })()}
+      {/* Genişlik dim oku (sağda dikey — öndeki bara göre) */}
+      <DimLineV x={bx0 + barsW + 14} y1={by0} y2={by0 + barsH}
+        label={isDouble ? `${draft.width_mm}×2 mm` : `${draft.width_mm} mm`} color="#9b59b6" />
 
-      {/* Bar genişliği dim oku (sağ dikey) */}
-      {(() => {
-        const ph = lPhases[0] ?? phases[0]; if (!ph) return null;
-        const topY = pTopY[ph]; if (topY == null) return null;
-        const barH = barWmm * sc;
-        return <DimLineV x={bx0 + barsW + 14} y1={topY} y2={topY + barH}
-          label={`${draft.width_mm} mm`} color="#9b59b6" />;
-      })()}
-
-      {/* Uzunluk dim oku (alt yatay) */}
+      {/* Uzunluk dim oku (altta yatay) */}
       <DimLineH x1={bx0} x2={bx0 + barsW} y={by0 + barsH + 18}
         label={`${draft.busbar_length_mm} mm`} color="#3498db" />
     </svg>
