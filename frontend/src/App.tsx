@@ -25,11 +25,11 @@ const navSections = [
   {
     title: "Tanimlamalar",
     items: [
-      ["/definitions/devices", "Cihaz Tanimlama"],
-      ["/definitions/terminal-types", "Terminal Tipleri"],
-      ["/definitions/bend-types", "Bukum Tipleri"],
       ["/definitions/panels", "Kabin Tanimlama"],
+      ["/definitions/terminal-types", "Terminal Tanimlama"],
+      ["/definitions/devices", "Cihaz Tanimlama"],
       ["/definitions/copper/main", "Ana Bakir Tanimlama"],
+      ["/definitions/bend-types", "Bukum Tipleri"],
       ["/definitions/copper/branch", "Tali Bakir Tanimlama"],
     ],
   },
