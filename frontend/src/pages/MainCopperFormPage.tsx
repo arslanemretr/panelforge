@@ -182,96 +182,98 @@ function ViewHeader({ svgW, label, accent, id }: {
   );
 }
 
-// ─── Görünüş 1: Enine Kesit ───────────────────────────────────────────────────
+// ─── Görünüş 1: Enine Kesit (bara ucundan) ──────────────────────────────────
 function CrossSectionView({ draft }: { draft: MainDraft }) {
-  const phases  = phaseList(draft.phase_type);
-  const nInd    = isNIndependent(draft.phase_type);
+  const phases   = phaseList(draft.phase_type);
+  const nInd     = isNIndependent(draft.phase_type);
   const isDouble = draft.layer_type === "Çift Kat";
 
-  const barWmm  = Math.max(draft.width_mm, 1);
-  const barTmm  = Math.max(draft.thickness_mm, 1);
+  const barWmm  = Math.max(draft.width_mm, 1);      // bar genişliği (yatayda görünür)
+  const barTmm  = Math.max(draft.thickness_mm, 1);  // bar kalınlığı (dikeyde görünür)
   const bpc     = Math.max(draft.bars_per_phase, 1);
+  const nBC     = Math.max(draft.neutral_bar_count || 1, 1);
   const gapMm   = Math.max(draft.bar_gap_mm, 0);
   const pCenMm  = Math.max(draft.phase_center_mm, 1);
-  const nBC     = Math.max(draft.neutral_bar_count || 1, 1);
   const layerGapMm = 8;
 
+  const lPhases = nInd ? phases.filter((p) => p !== "N") : phases;
+  const nLPh    = lPhases.length;
+  const getBC   = (ph: string) => (ph === "N" ? nBC : bpc);
+
+  // Bir faz grubunun yatay genişliği (bars_per_phase bar yan yana)
   const phGroupW = (bc: number) => bc * barWmm + Math.max(0, bc - 1) * gapMm;
+  // Bir faz grubunun dikey yüksekliği (çift kat = 2 katman)
+  const phGroupH = () => isDouble ? barTmm * 2 + layerGapMm : barTmm;
+
   const lGroupW  = phGroupW(bpc);
   const nGroupW  = phGroupW(nBC);
-  const lPhases  = nInd ? phases.filter((p) => p !== "N") : phases;
-  const nLPh     = lPhases.length;
-  const lTotalW  = (nLPh - 1) * pCenMm + lGroupW;
-  const nGapMm   = 50;
-  const contentW = nInd ? lTotalW + nGapMm + nGroupW : lTotalW;
-  const contentH = isDouble ? 2 * barTmm + layerGapMm : barTmm;
+
+  // İçerik: genişlik = en geniş grup, yükseklik = fazlar dikey dizilir
+  const contentW = Math.max(lGroupW, nGroupW);
+  const nGapMm   = 40;
+  const lTotalH  = (nLPh - 1) * pCenMm + phGroupH();
+  const nTotalH  = phGroupH();
+  const contentH = nInd ? lTotalH + nGapMm + nTotalH : lTotalH;
 
   const SVG_W  = 520;
   const HEADER = 26;
-  const LEFT   = 58;
-  const RIGHT  = 14;
-  const TOP    = HEADER + 38;   // faz merkez dim okları için boşluk
-  const MID    = 26;
-  const BOT    = 28;
+  const LEFT   = 60;
+  const RIGHT  = 60;  // faz etiketleri için
+  const TOP    = HEADER + 14;
+  const BOT    = 36;
   const availW = SVG_W - LEFT - RIGHT;
-  const availH = 100;
+  const availH = 140;
   const sc     = Math.min(availW / Math.max(contentW, 1), availH / Math.max(contentH, 1), 5.5);
 
   const barsW  = contentW * sc;
   const barsH  = contentH * sc;
   const bx0    = LEFT + (availW - barsW) / 2;
-  const by0    = TOP;
-  const SVG_H  = TOP + barsH + MID + BOT;
+  const by0    = TOP + (availH - barsH) / 2;
+  const SVG_H  = TOP + availH + BOT;
 
-  const centers: Record<string, number> = {};
-  lPhases.forEach((ph, i) => {
-    centers[ph] = bx0 + (i * pCenMm + lGroupW / 2) * sc;
-  });
+  // Her faz grubunun üst Y koordinatı
+  const pTopY: Record<string, number> = {};
   if (nInd) {
-    centers["N"] = bx0 + (lTotalW + nGapMm + nGroupW / 2) * sc;
+    lPhases.forEach((ph, i) => { pTopY[ph] = by0 + i * pCenMm * sc; });
+    pTopY["N"] = by0 + (lTotalH + nGapMm) * sc;
   } else {
-    const nIdx = phases.indexOf("N");
-    if (nIdx >= 0) centers["N"] = bx0 + (nIdx * pCenMm + lGroupW / 2) * sc;
+    phases.forEach((ph, i) => { pTopY[ph] = by0 + i * pCenMm * sc; });
   }
-
-  const getBC    = (ph: string) => (ph === "N" ? nBC : bpc);
-  const getGWpx  = (ph: string) => phGroupW(getBC(ph)) * sc;
 
   return (
     <svg viewBox={`0 0 ${SVG_W} ${Math.ceil(SVG_H)}`}
       style={{ width: "100%", border: "1px solid var(--line)", borderRadius: 6, background: "#1a1f2b", display: "block" }}>
-      <ViewHeader svgW={SVG_W} label="ENİNE KESİT — YAN GÖRÜNÜŞ" accent="#e74c3c" id="hdr-cross" />
-
-      {/* Faz merkez boyut okları */}
-      {phases.map((ph, pi) => {
-        if (pi === 0) return null;
-        const prev = phases[pi - 1];
-        if (nInd && (ph === "N" || prev === "N")) return null;
-        const c1 = centers[prev]; const c2 = centers[ph];
-        if (c1 == null || c2 == null) return null;
-        return <DimLineH key={`dim-${pi}`} x1={c1} x2={c2} y={TOP - 14} label={`${pCenMm} mm`} color="#e74c3c" />;
-      })}
+      <ViewHeader svgW={SVG_W} label="ENİNE KESİT — BARA UCUNDAN GÖRÜNÜŞ" accent="#e74c3c" id="hdr-cross" />
 
       {phases.map((ph) => {
-        const bc = getBC(ph); const gWpx = getGWpx(ph);
-        const bWpx = barWmm * sc; const bTpx = barTmm * sc;
+        const bc    = getBC(ph);
         const color = PHASE_COLORS[ph] ?? "#aaa";
-        const cx = centers[ph];
-        if (cx == null) return null;
-        const gStartX = cx - gWpx / 2;
+        const topY  = pTopY[ph];
+        if (topY == null) return null;
+        const bWpx   = barWmm * sc;
+        const bTpx   = barTmm * sc;
+        const gWpx   = phGroupW(bc) * sc;
+        const groupCY = topY + phGroupH() * sc / 2;
+        // Bar grubu yatayda ortalı
+        const gStartX = bx0 + (barsW - gWpx) / 2;
+
         return (
           <g key={ph}>
-            <text x={cx} y={by0 + barsH + MID + 15} textAnchor="middle"
-              fontSize={11} fill={color} fontWeight="bold" fontFamily="monospace">{ph}</text>
+            {/* Faz etiketi (sağ) */}
+            <text x={bx0 + barsW + 8} y={groupCY + 4} fontSize={11}
+              fill={color} fontWeight="bold" fontFamily="monospace">{ph}</text>
+
             {Array.from({ length: bc }, (_, bi) => {
               const barX = gStartX + bi * (barWmm + gapMm) * sc;
               return (
                 <g key={bi}>
-                  <rect x={barX} y={by0} width={bWpx} height={bTpx}
+                  {/* 1. kat */}
+                  <rect x={barX} y={topY} width={bWpx} height={bTpx}
                     fill={color} opacity={0.88} rx={1} stroke={color} strokeWidth={0.5} />
+                  {/* 2. kat (çift kat) */}
                   {isDouble && (
-                    <rect x={barX} y={by0 + bTpx + layerGapMm * sc} width={bWpx} height={bTpx}
-                      fill={color} opacity={0.62} rx={1} stroke={color} strokeWidth={0.5} />
+                    <rect x={barX} y={topY + bTpx + layerGapMm * sc} width={bWpx} height={bTpx}
+                      fill={color} opacity={0.55} rx={1} stroke={color} strokeWidth={0.5} />
                   )}
                 </g>
               );
@@ -280,22 +282,32 @@ function CrossSectionView({ draft }: { draft: MainDraft }) {
         );
       })}
 
-      {/* Genişlik dim oku */}
-      {(() => {
-        const ph = lPhases[0] ?? phases[0]; if (!ph) return null;
-        const gWpx = getGWpx(ph); const bWpx = barWmm * sc;
-        const cx = centers[ph]; if (cx == null) return null;
-        const gStartX = cx - gWpx / 2;
-        return <DimLineH x1={gStartX} x2={gStartX + bWpx} y={by0 + barsH + 14} label={`${draft.width_mm} mm`} color="#9b59b6" />;
+      {/* Faz aralığı dim oku (sol dikey) */}
+      {lPhases.length >= 2 && (() => {
+        const y1 = pTopY[lPhases[0]];
+        const y2 = pTopY[lPhases[1]];
+        if (y1 == null || y2 == null) return null;
+        return <DimLineV x={bx0 - 14} y1={y1} y2={y2} label={`${pCenMm} mm`} color="#e74c3c" />;
       })()}
 
-      {/* Kalınlık dim oku */}
-      <DimLineV x={LEFT - 14} y1={by0} y2={by0 + barTmm * sc} label={`${draft.thickness_mm} mm`} color="#3498db" />
+      {/* Bar genişliği dim oku (alt yatay) */}
+      {(() => {
+        const ph = lPhases[0] ?? phases[0]; if (!ph) return null;
+        const bc = getBC(ph);
+        const gWpx = phGroupW(bc) * sc;
+        const bWpx = barWmm * sc;
+        const gStartX = bx0 + (barsW - gWpx) / 2;
+        return <DimLineH x1={gStartX} x2={gStartX + bWpx} y={by0 + barsH + 16}
+          label={`${draft.width_mm} mm`} color="#9b59b6" />;
+      })()}
 
-      {isDouble && (
-        <text x={LEFT - 14} y={by0 + barTmm * sc + layerGapMm * sc / 2 + 4}
-          textAnchor="middle" fontSize={7} fill="#475569" fontFamily="system-ui">×2</text>
-      )}
+      {/* Bar kalınlığı dim oku (sol dikey) */}
+      {(() => {
+        const ph = lPhases[0] ?? phases[0]; if (!ph) return null;
+        const topY = pTopY[ph]; if (topY == null) return null;
+        return <DimLineV x={bx0 - 36} y1={topY} y2={topY + barTmm * sc}
+          label={`${draft.thickness_mm} mm`} color="#3498db" />;
+      })()}
     </svg>
   );
 }
@@ -306,32 +318,31 @@ function FrontView({ draft }: { draft: MainDraft }) {
   const nInd     = isNIndependent(draft.phase_type);
   const isDouble = draft.layer_type === "Çift Kat";
 
-  const barWmm   = Math.max(draft.width_mm, 1);       // barın eni (dikey görünür)
-  const barTmm   = Math.max(draft.thickness_mm, 1);   // barın kalınlığı (çift kat için)
-  const barLmm   = Math.max(draft.busbar_length_mm, 1); // bara uzunluğu (yatay)
-  const pCenMm   = Math.max(draft.phase_center_mm, 1);
-  const bpc      = Math.max(draft.bars_per_phase, 1);
-  const nBC      = Math.max(draft.neutral_bar_count || 1, 1);
-  const layerOffMm = barTmm + 3; // çift katta iki barın Y kayması (hafif)
+  const barWmm  = Math.max(draft.width_mm, 1);          // bar genişliği (dikeyde görünür)
+  const barLmm  = Math.max(draft.busbar_length_mm, 1);  // bar uzunluğu (yatayda)
+  const barTmm  = Math.max(draft.thickness_mm, 1);
+  const pCenMm  = Math.max(draft.phase_center_mm, 1);
+  const bpc     = Math.max(draft.bars_per_phase, 1);
+  const nBC     = Math.max(draft.neutral_bar_count || 1, 1);
 
-  const getBC  = (ph: string) => (ph === "N" ? nBC : bpc);
   const lPhases = nInd ? phases.filter((p) => p !== "N") : phases;
-  const nLPh   = lPhases.length;
+  const nLPh    = lPhases.length;
+  const getBC   = (ph: string) => (ph === "N" ? nBC : bpc);
 
-  // İçerik boyutları mm
+  // İçerik boyutları mm — fazlar dikey dizilir
   const contentW = barLmm;
-  const lContentH = (nLPh - 1) * pCenMm + barWmm;
-  const nContentH = nInd ? (getBC("N") > 1 ? pCenMm : 0) + barWmm : 0;
-  const contentH  = nInd
-    ? Math.max(lContentH, nContentH)
+  const nGapMm   = 40;
+  const lTotalH  = (nLPh - 1) * pCenMm + barWmm;
+  const contentH = nInd
+    ? lTotalH + nGapMm + barWmm
     : (phases.length - 1) * pCenMm + barWmm;
 
   const SVG_W  = 520;
   const HEADER = 26;
-  const LEFT   = 58;   // faz etiketleri
+  const LEFT   = 58;
   const RIGHT  = 14;
   const TOP    = HEADER + 14;
-  const BOT    = 30;   // uzunluk dim oku
+  const BOT    = 34;
   const availW = SVG_W - LEFT - RIGHT;
   const availH = 160;
   const sc     = Math.min(availW / Math.max(contentW, 1), availH / Math.max(contentH, 1), 4.0);
@@ -342,81 +353,75 @@ function FrontView({ draft }: { draft: MainDraft }) {
   const by0    = TOP + (availH - barsH) / 2;
   const SVG_H  = TOP + availH + BOT;
 
-  // Faz merkez Y pozisyonları
-  const pCenterY: Record<string, number> = {};
+  // Her fazın bar üst Y koordinatı — fazlar dikey dizilir
+  const pTopY: Record<string, number> = {};
   if (nInd) {
-    lPhases.forEach((ph, i) => { pCenterY[ph] = by0 + (i * pCenMm + barWmm / 2) * sc; });
-    pCenterY["N"] = by0 + (barWmm / 2) * sc; // N sola hizalı (ayrı grup)
+    lPhases.forEach((ph, i) => { pTopY[ph] = by0 + i * pCenMm * sc; });
+    pTopY["N"] = by0 + (lTotalH + nGapMm) * sc;
   } else {
-    phases.forEach((ph, i) => { pCenterY[ph] = by0 + (i * pCenMm + barWmm / 2) * sc; });
+    phases.forEach((ph, i) => { pTopY[ph] = by0 + i * pCenMm * sc; });
   }
 
-  // Çift kat X offset (iki bar üst üste görünmesi için hafif kayma)
-  const doubleOffX = isDouble ? Math.max(3, layerOffMm * sc * 0.15) : 0;
+  // Çoklu bar / çift kat için gölge ofset
+  const shadowOff = Math.max(3, barTmm * sc * 0.12);
 
   return (
     <svg viewBox={`0 0 ${SVG_W} ${Math.ceil(SVG_H)}`}
       style={{ width: "100%", border: "1px solid var(--line)", borderRadius: 6, background: "#1a1f2b", display: "block" }}>
       <ViewHeader svgW={SVG_W} label="ÖN GÖRÜNÜŞ — UZUNLUK × GENİŞLİK" accent="#3498db" id="hdr-front" />
 
-      {/* Barlar */}
       {phases.map((ph) => {
-        const bc     = getBC(ph);
-        const color  = PHASE_COLORS[ph] ?? "#aaa";
-        const cy     = pCenterY[ph];
-        if (cy == null) return null;
-        const barH   = barWmm * sc;
-        const barY   = cy - barH / 2;
+        const bc    = getBC(ph);
+        const color = PHASE_COLORS[ph] ?? "#aaa";
+        const topY  = pTopY[ph];
+        if (topY == null) return null;
+        const barH  = barWmm * sc;    // dikey boyut = bar genişliği
+        const barW  = barsW;          // yatay boyut = bar uzunluğu
 
-        // N bağımsız ise sağa kaydır
-        const barX = (nInd && ph === "N")
-          ? bx0 + barsW + 20
-          : bx0;
-        const barW2 = (nInd && ph === "N") ? barH * 1.2 : barsW; // N dar göster
+        // Kaç arka gölge gösterilecek (bars_per_phase + çift kat)
+        const shadowCount = Math.min((bc - 1) + (isDouble ? 1 : 0), 3);
 
         return (
           <g key={ph}>
-            {/* Faz etiketi (sol taraf) */}
-            <text x={barX - 6} y={cy + 4} textAnchor="end"
+            {/* Faz etiketi (sol) */}
+            <text x={bx0 - 6} y={topY + barH / 2 + 4} textAnchor="end"
               fontSize={11} fill={color} fontWeight="bold" fontFamily="monospace">{ph}</text>
 
-            {/* Çift kat gölge (arka bar) */}
-            {isDouble && (
-              <rect x={barX + doubleOffX * 2} y={barY + 3} width={barW2} height={barH}
-                fill={color} opacity={0.28} rx={1} />
-            )}
-            {/* Ana bar */}
-            <rect x={barX} y={barY} width={barW2} height={barH}
-              fill={color} opacity={0.85} rx={1} stroke={color} strokeWidth={0.6} />
+            {/* Arka gölge katmanlar (çoklu bar / çift kat) */}
+            {Array.from({ length: shadowCount }, (_, si) => (
+              <rect key={`sh-${si}`}
+                x={bx0 + (si + 1) * shadowOff} y={topY - (si + 1) * shadowOff}
+                width={barW} height={barH}
+                fill={color} opacity={0.22} rx={1} />
+            ))}
 
-            {/* bars_per_phase > 1: ince çizgi ile ikinci bar vurgusu */}
-            {bc > 1 && !isDouble && (
-              <rect x={barX} y={barY + barH + 2} width={barW2} height={barH}
-                fill={color} opacity={0.45} rx={1} stroke={color} strokeWidth={0.4} />
-            )}
+            {/* Ana bar (ön yüz) */}
+            <rect x={bx0} y={topY} width={barW} height={barH}
+              fill={color} opacity={0.85} rx={1} stroke={color} strokeWidth={0.6} />
           </g>
         );
       })}
 
-      {/* Faz aralığı dim oku (solda dikey) — ilk iki faz arası */}
+      {/* Faz aralığı dim oku (sol dikey) */}
       {lPhases.length >= 2 && (() => {
-        const y1 = pCenterY[lPhases[0]];
-        const y2 = pCenterY[lPhases[1]];
+        const y1 = pTopY[lPhases[0]];
+        const y2 = pTopY[lPhases[1]];
         if (y1 == null || y2 == null) return null;
-        return <DimLineV x={bx0 - 14} y1={y1} y2={y2} label={`${pCenMm} mm`} color="#e74c3c" />;
+        return <DimLineV x={bx0 - 28} y1={y1} y2={y2} label={`${pCenMm} mm`} color="#e74c3c" />;
       })()}
 
-      {/* Bar genişliği dim oku (sağda dikey) */}
+      {/* Bar genişliği dim oku (sağ dikey) */}
       {(() => {
         const ph = lPhases[0] ?? phases[0]; if (!ph) return null;
-        const cy = pCenterY[ph]; if (cy == null) return null;
+        const topY = pTopY[ph]; if (topY == null) return null;
         const barH = barWmm * sc;
-        return <DimLineV x={bx0 + barsW + 14} y1={cy - barH / 2} y2={cy + barH / 2}
+        return <DimLineV x={bx0 + barsW + 14} y1={topY} y2={topY + barH}
           label={`${draft.width_mm} mm`} color="#9b59b6" />;
       })()}
 
-      {/* Uzunluk dim oku (altta yatay) */}
-      <DimLineH x1={bx0} x2={bx0 + barsW} y={by0 + barsH + 18} label={`${draft.busbar_length_mm} mm`} color="#3498db" />
+      {/* Uzunluk dim oku (alt yatay) */}
+      <DimLineH x1={bx0} x2={bx0 + barsW} y={by0 + barsH + 18}
+        label={`${draft.busbar_length_mm} mm`} color="#3498db" />
     </svg>
   );
 }
@@ -537,64 +542,13 @@ function TopView({ draft }: { draft: MainDraft }) {
   );
 }
 
-// ─── Ana önizleme bileşeni (tab switcher) ────────────────────────────────────
-type ViewKey = "cross" | "front" | "top";
-
-const VIEW_TABS: { key: ViewKey; label: string; accent: string }[] = [
-  { key: "cross", label: "Enine Kesit",  accent: "#e74c3c" },
-  { key: "front", label: "Ön Görünüş",  accent: "#3498db" },
-  { key: "top",   label: "Üst Görünüş", accent: "#27ae60" },
-];
-
+// ─── Ana önizleme bileşeni (üç görünüş alt alta) ─────────────────────────────
 function BusbarPreview({ draft }: { draft: MainDraft }) {
-  const [view, setView] = useState<ViewKey>("cross");
-  const activeAccent = VIEW_TABS.find((t) => t.key === view)?.accent ?? "#e74c3c";
-
   return (
-    <div>
-      {/* Tab bar */}
-      <div style={{ display: "flex", gap: 0, marginBottom: "0.6rem", borderBottom: "2px solid var(--line)" }}>
-        {VIEW_TABS.map(({ key, label, accent }) => {
-          const isActive = view === key;
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setView(key)}
-              style={{
-                padding: "0.45rem 1rem",
-                fontSize: "0.82rem",
-                fontWeight: isActive ? 700 : 400,
-                border: "none",
-                borderBottom: isActive ? `2px solid ${accent}` : "2px solid transparent",
-                background: "transparent",
-                color: isActive ? accent : "var(--muted)",
-                cursor: "pointer",
-                marginBottom: "-2px",
-                transition: "color 0.12s",
-                display: "flex",
-                alignItems: "center",
-                gap: "0.35rem",
-              }}
-            >
-              {isActive && (
-                <span style={{
-                  width: 7, height: 7, borderRadius: "50%",
-                  background: accent, display: "inline-block", flexShrink: 0,
-                }} />
-              )}
-              {label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Aktif görünüş */}
-      <div style={{ border: `1px solid ${activeAccent}22`, borderRadius: 7 }}>
-        {view === "cross" && <CrossSectionView draft={draft} />}
-        {view === "front" && <FrontView draft={draft} />}
-        {view === "top"   && <TopView draft={draft} />}
-      </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+      <CrossSectionView draft={draft} />
+      <FrontView draft={draft} />
+      <TopView draft={draft} />
     </div>
   );
 }
