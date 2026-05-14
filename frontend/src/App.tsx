@@ -8,6 +8,7 @@ import { DeviceEditorPage } from "./pages/DeviceEditorPage";
 import { MainCopperFormPage } from "./pages/MainCopperFormPage";
 import { MainCopperListPage } from "./pages/MainCopperListPage";
 import { PanelDefinitionsPage } from "./pages/PanelDefinitionsPage";
+import { PanelFormPage } from "./pages/PanelFormPage";
 import { ProjectListPage } from "./pages/ProjectListPage";
 import { ProjectWorkspacePage } from "./pages/ProjectWorkspacePage";
 import { TerminalDefinitionsPage } from "./pages/TerminalDefinitionsPage";
@@ -100,6 +101,8 @@ export default function App() {
           <Route path="/definitions/devices/new" element={<DeviceEditorPage />} />
           <Route path="/definitions/devices/:id" element={<DeviceEditorPage />} />
           <Route path="/definitions/panels" element={<PanelDefinitionsPage />} />
+          <Route path="/definitions/panels/new" element={<PanelFormPage />} />
+          <Route path="/definitions/panels/:id/edit" element={<PanelFormPage />} />
           <Route path="/definitions/copper" element={<Navigate to="/definitions/copper/main" replace />} />
           <Route path="/definitions/copper/main" element={<MainCopperListPage />} />
           <Route path="/definitions/copper/main/new" element={<MainCopperFormPage />} />

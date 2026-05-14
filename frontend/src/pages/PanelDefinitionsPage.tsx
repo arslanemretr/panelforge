@@ -1,30 +1,10 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 
 import { client } from "../api/client";
 import { ConfirmModal } from "../components/ConfirmModal";
-import { Modal } from "../components/Modal";
 import type { PanelDefinition } from "../types";
-
-type DraftDef = Omit<PanelDefinition, "id" | "created_at" | "updated_at" | "panel_type">;
-
-const emptyDraft: DraftDef = {
-  name: "",
-  description: "",
-  width_mm: 2000,
-  height_mm: 2200,
-  depth_mm: 600,
-  mounting_plate_width_mm: 1800,
-  mounting_plate_height_mm: 2000,
-  left_margin_mm: 100,
-  right_margin_mm: 100,
-  top_margin_mm: 100,
-  bottom_margin_mm: 100,
-  panel_type_id: null,
-  origin_x_mm: 0,
-  origin_y_mm: 0,
-  origin_z_mm: 0,
-};
 
 function fmtDate(s?: string) {
   if (!s) return "—";
@@ -35,14 +15,10 @@ const SEARCH_KEY = "panel-def-search";
 
 export function PanelDefinitionsPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   // ── Arama ──────────────────────────────────────────────────────────────────
   const [search, setSearch] = useState(() => localStorage.getItem(SEARCH_KEY) ?? "");
-
-  // ── Kabin form modal ───────────────────────────────────────────────────────
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingDef, setEditingDef] = useState<PanelDefinition | null>(null);
-  const [draft, setDraft] = useState<DraftDef>(emptyDraft);
 
   // ── Pano Tipi yönetimi ─────────────────────────────────────────────────────
   const [newTypeName, setNewTypeName] = useState("");
@@ -62,22 +38,6 @@ export function PanelDefinitionsPage() {
   });
 
   // ── Mutations ──────────────────────────────────────────────────────────────
-  const createMutation = useMutation({
-    mutationFn: () => client.createPanelDefinition(draft),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["panel-definitions"] });
-      closeModal();
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: () => client.updatePanelDefinition(editingDef!.id, draft),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["panel-definitions"] });
-      closeModal();
-    },
-  });
-
   const cloneMutation = useMutation({
     mutationFn: (src: PanelDefinition) =>
       client.createPanelDefinition({
@@ -125,45 +85,6 @@ export function PanelDefinitionsPage() {
     },
   });
 
-  // ── Yardımcılar ────────────────────────────────────────────────────────────
-  function openCreate() {
-    setEditingDef(null);
-    setDraft(emptyDraft);
-    setModalOpen(true);
-  }
-
-  function openEdit(def: PanelDefinition) {
-    setEditingDef(def);
-    setDraft({
-      name: def.name,
-      description: def.description ?? "",
-      width_mm: def.width_mm,
-      height_mm: def.height_mm,
-      depth_mm: def.depth_mm ?? null,
-      mounting_plate_width_mm: def.mounting_plate_width_mm ?? null,
-      mounting_plate_height_mm: def.mounting_plate_height_mm ?? null,
-      left_margin_mm: def.left_margin_mm,
-      right_margin_mm: def.right_margin_mm,
-      top_margin_mm: def.top_margin_mm,
-      bottom_margin_mm: def.bottom_margin_mm,
-      panel_type_id: def.panel_type_id ?? null,
-      origin_x_mm: def.origin_x_mm ?? 0,
-      origin_y_mm: def.origin_y_mm ?? 0,
-      origin_z_mm: def.origin_z_mm ?? 0,
-    });
-    setModalOpen(true);
-  }
-
-  function closeModal() {
-    setModalOpen(false);
-    setEditingDef(null);
-    setDraft(emptyDraft);
-  }
-
-  function update<K extends keyof DraftDef>(key: K, value: DraftDef[K]) {
-    setDraft((prev) => ({ ...prev, [key]: value }));
-  }
-
   function handleSearchChange(value: string) {
     setSearch(value);
     localStorage.setItem(SEARCH_KEY, value);
@@ -181,9 +102,6 @@ export function PanelDefinitionsPage() {
     );
   });
 
-  const isEditing = editingDef !== null;
-  const isSaving = createMutation.isPending || updateMutation.isPending;
-
   return (
     <div className="stack">
       {/* ── Sayfa başlığı ── */}
@@ -194,7 +112,7 @@ export function PanelDefinitionsPage() {
           <p>Kabin ölçülerini ve pano tiplerini yönetin.</p>
         </div>
         {activeTab === "definitions" && (
-          <button type="button" onClick={openCreate}>
+          <button type="button" onClick={() => navigate("new")}>
             Yeni Kabin
           </button>
         )}
@@ -311,7 +229,7 @@ export function PanelDefinitionsPage() {
                       <button
                         type="button"
                         className="ghost"
-                        onClick={() => openEdit(def)}
+                        onClick={() => navigate(`${def.id}/edit`)}
                       >
                         Düzenle
                       </button>
@@ -431,120 +349,6 @@ export function PanelDefinitionsPage() {
           </div>
         </section>
       )}
-
-      {/* ── Kabin Ekle / Düzenle Modal ── */}
-      <Modal
-        title={isEditing ? "Kabini Düzenle" : "Yeni Kabin Ekle"}
-        open={modalOpen}
-        onClose={closeModal}
-      >
-        <form
-          className="form-grid"
-          onSubmit={(e) => {
-            e.preventDefault();
-            isEditing ? updateMutation.mutate() : createMutation.mutate();
-          }}
-        >
-          <label>
-            <span>Kabin adı</span>
-            <input value={draft.name} onChange={(e) => update("name", e.target.value)} required />
-          </label>
-          <label>
-            <span>Açıklama</span>
-            <input value={draft.description ?? ""} onChange={(e) => update("description", e.target.value)} />
-          </label>
-
-          <label>
-            <span>Pano Tipi</span>
-            <select
-              value={draft.panel_type_id ?? ""}
-              onChange={(e) => update("panel_type_id", e.target.value ? Number(e.target.value) : null)}
-            >
-              <option value="">— Seçiniz —</option>
-              {panelTypes.map((pt) => (
-                <option key={pt.id} value={pt.id}>{pt.name}</option>
-              ))}
-            </select>
-          </label>
-
-          <label>
-            <span>Genişlik (mm)</span>
-            <input type="number" value={draft.width_mm} onChange={(e) => update("width_mm", Number(e.target.value))} />
-          </label>
-          <label>
-            <span>Yükseklik (mm)</span>
-            <input type="number" value={draft.height_mm} onChange={(e) => update("height_mm", Number(e.target.value))} />
-          </label>
-          <label>
-            <span>Derinlik (mm)</span>
-            <input type="number" value={draft.depth_mm ?? 0} onChange={(e) => update("depth_mm", Number(e.target.value))} />
-          </label>
-
-          <label>
-            <span>Montaj genişliği (mm)</span>
-            <input
-              type="number"
-              value={draft.mounting_plate_width_mm ?? 0}
-              onChange={(e) => update("mounting_plate_width_mm", Number(e.target.value))}
-            />
-          </label>
-          <label>
-            <span>Montaj yüksekliği (mm)</span>
-            <input
-              type="number"
-              value={draft.mounting_plate_height_mm ?? 0}
-              onChange={(e) => update("mounting_plate_height_mm", Number(e.target.value))}
-            />
-          </label>
-
-          <label>
-            <span>Sol boşluk (mm)</span>
-            <input type="number" value={draft.left_margin_mm} onChange={(e) => update("left_margin_mm", Number(e.target.value))} />
-          </label>
-          <label>
-            <span>Sağ boşluk (mm)</span>
-            <input type="number" value={draft.right_margin_mm} onChange={(e) => update("right_margin_mm", Number(e.target.value))} />
-          </label>
-          <label>
-            <span>Üst boşluk (mm)</span>
-            <input type="number" value={draft.top_margin_mm} onChange={(e) => update("top_margin_mm", Number(e.target.value))} />
-          </label>
-          <label>
-            <span>Alt boşluk (mm)</span>
-            <input type="number" value={draft.bottom_margin_mm} onChange={(e) => update("bottom_margin_mm", Number(e.target.value))} />
-          </label>
-
-          {/* XYZ Orijin */}
-          <div style={{ gridColumn: "1 / -1" }}>
-            <span style={{ display: "block", marginBottom: "0.4rem", fontSize: "0.85rem", color: "var(--muted)" }}>
-              Koordinat Orijini (0,0,0 noktası — mm)
-            </span>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5rem" }}>
-              <label style={{ margin: 0 }}>
-                <span>X</span>
-                <input type="number" value={draft.origin_x_mm ?? 0} onChange={(e) => update("origin_x_mm", Number(e.target.value))} />
-              </label>
-              <label style={{ margin: 0 }}>
-                <span>Y</span>
-                <input type="number" value={draft.origin_y_mm ?? 0} onChange={(e) => update("origin_y_mm", Number(e.target.value))} />
-              </label>
-              <label style={{ margin: 0 }}>
-                <span>Z</span>
-                <input type="number" value={draft.origin_z_mm ?? 0} onChange={(e) => update("origin_z_mm", Number(e.target.value))} />
-              </label>
-            </div>
-          </div>
-
-          <div className="form-actions">
-            <button type="submit" disabled={isSaving}>
-              {isSaving ? "Kaydediliyor..." : isEditing ? "Güncelle" : "Kabini Kaydet"}
-            </button>
-            <button type="button" className="ghost" onClick={closeModal}>
-              İptal
-            </button>
-          </div>
-        </form>
-      </Modal>
 
       <ConfirmModal
         open={confirmPending !== null}
