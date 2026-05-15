@@ -344,7 +344,7 @@ export function TerminalFormPage() {
         </form>
 
         {/* ── Sağ: Önizleme ── */}
-        <div style={{ position: "sticky", top: "1rem" }}>
+        <div>
           <section className="card">
             <h3 style={{ margin: "0 0 0.75rem", fontSize: "0.85rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
               Terminal Önizleme
@@ -393,8 +393,6 @@ export function TerminalFormPage() {
                 hole_diameter_mm={draft.hole_diameter_mm}
                 slot_width_mm={draft.slot_width_mm}
                 slot_length_mm={draft.slot_length_mm}
-                width={300}
-                height={340}
               />
             </div>
 
