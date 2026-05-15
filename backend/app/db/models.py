@@ -145,6 +145,8 @@ class TerminalDefinition(Base):
     hole_diameter_mm: Mapped[Decimal | None] = mapped_column(Numeric)         # yuvarlak delik çapı (mm)
     slot_width_mm: Mapped[Decimal | None] = mapped_column(Numeric)            # slot delik genişliği (mm)
     slot_length_mm: Mapped[Decimal | None] = mapped_column(Numeric)           # slot delik uzunluğu (mm)
+    fin_count: Mapped[int | None] = mapped_column(Integer, nullable=True)           # fin (tarak) adedi
+    fin_spacing_mm: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)  # fin aralığı (mm)
     terminal_width_mm: Mapped[Decimal | None] = mapped_column(Numeric)
     terminal_height_mm: Mapped[Decimal | None] = mapped_column(Numeric)
     terminal_depth_mm: Mapped[Decimal | None] = mapped_column(Numeric)

@@ -19,6 +19,8 @@ class TerminalDefinitionBase(BaseModel):
     terminal_width_mm: Decimal | None = None
     terminal_height_mm: Decimal | None = None
     terminal_depth_mm: Decimal | None = None
+    fin_count: int | None = None
+    fin_spacing_mm: Decimal | None = None
 
 
 class TerminalDefinitionCreate(TerminalDefinitionBase):

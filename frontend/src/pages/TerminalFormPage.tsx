@@ -8,21 +8,39 @@ import type { TerminalDefinition } from "../types";
 
 // ─── Sabitler ─────────────────────────────────────────────────────────────────
 export const TERMINAL_TYPES = [
-  "Ön Bakır Basmalı",
+  "Ön Terminal",
   "Arka Yatay Taraklı",
   "Arka Yatay Terminal",
   "Yandan Taraklı",
   "Kablo Pabuçlu",
 ];
 
-const SURFACES = [
+const ALL_SURFACES = [
   { value: "front",  label: "Ön" },
-  { value: "back",   label: "Arka" },
   { value: "left",   label: "Sol" },
   { value: "right",  label: "Sağ" },
   { value: "top",    label: "Üst" },
   { value: "bottom", label: "Alt" },
 ];
+
+// Her terminal tipinde geçerli yüzey seçenekleri
+const SURFACE_OPTIONS_BY_TYPE: Record<string, string[]> = {
+  "Ön Terminal":         ["front"],
+  "Arka Yatay Taraklı":  ["top", "bottom"],
+  "Arka Yatay Terminal": ["top", "bottom"],
+  "Yandan Taraklı":      ["left", "right"],
+  "Kablo Pabuçlu":       ["front"],
+};
+
+function defaultSurface(terminalType: string): string {
+  const opts = SURFACE_OPTIONS_BY_TYPE[terminalType] ?? ["front"];
+  return opts[0];
+}
+
+// Taraklı tipler — fin alanları göster
+function isTarakli(terminalType: string): boolean {
+  return terminalType === "Arka Yatay Taraklı" || terminalType === "Yandan Taraklı";
+}
 
 // ─── Draft ────────────────────────────────────────────────────────────────────
 interface TerminalDraft {
@@ -38,11 +56,13 @@ interface TerminalDraft {
   terminal_width_mm: number | null;
   terminal_height_mm: number | null;
   terminal_depth_mm: number | null;
+  fin_count: number | null;
+  fin_spacing_mm: number | null;
 }
 
 const EMPTY_DRAFT: TerminalDraft = {
   name: "",
-  terminal_type: "Ön Bakır Basmalı",
+  terminal_type: "Ön Terminal",
   surface: "front",
   bolt_type: "M12",
   bolt_count: 2,
@@ -53,6 +73,8 @@ const EMPTY_DRAFT: TerminalDraft = {
   terminal_width_mm: 100,
   terminal_height_mm: 120,
   terminal_depth_mm: 60,
+  fin_count: null,
+  fin_spacing_mm: null,
 };
 
 function buildPayload(d: TerminalDraft): Omit<TerminalDefinition, "id" | "created_at" | "updated_at"> {
@@ -69,6 +91,8 @@ function buildPayload(d: TerminalDraft): Omit<TerminalDefinition, "id" | "create
     terminal_width_mm: d.terminal_width_mm,
     terminal_height_mm: d.terminal_height_mm,
     terminal_depth_mm: d.terminal_depth_mm,
+    fin_count: isTarakli(d.terminal_type) ? d.fin_count : null,
+    fin_spacing_mm: isTarakli(d.terminal_type) ? d.fin_spacing_mm : null,
   };
 }
 
@@ -135,8 +159,9 @@ export function TerminalFormPage() {
         terminal_width_mm: def.terminal_width_mm ?? null,
         terminal_height_mm: def.terminal_height_mm ?? null,
         terminal_depth_mm: def.terminal_depth_mm ?? null,
+        fin_count: def.fin_count ?? null,
+        fin_spacing_mm: def.fin_spacing_mm ?? null,
       });
-      // Delik modunu belirle
       if (def.slot_width_mm || def.slot_length_mm) {
         setHoleMode("slot");
       }
@@ -145,6 +170,17 @@ export function TerminalFormPage() {
 
   function set<K extends keyof TerminalDraft>(key: K, value: TerminalDraft[K]) {
     setDraft((d) => ({ ...d, [key]: value }));
+  }
+
+  // Terminal tipi değişince yüzeyi sıfırla
+  function changeType(newType: string) {
+    const validSurfaces = SURFACE_OPTIONS_BY_TYPE[newType] ?? ["front"];
+    const currentValid = validSurfaces.includes(draft.surface);
+    setDraft((d) => ({
+      ...d,
+      terminal_type: newType,
+      surface: currentValid ? d.surface : validSurfaces[0],
+    }));
   }
 
   // Delik modu değiştiğinde karşı alanları temizle
@@ -190,7 +226,11 @@ export function TerminalFormPage() {
     );
   }
 
-  const surfaceLabel = SURFACES.find(s => s.value === draft.surface)?.label ?? draft.surface;
+  const validSurfaces = ALL_SURFACES.filter(
+    (s) => (SURFACE_OPTIONS_BY_TYPE[draft.terminal_type] ?? ["front"]).includes(s.value)
+  );
+  const surfaceLabel = ALL_SURFACES.find(s => s.value === draft.surface)?.label ?? draft.surface;
+  const showFinFields = isTarakli(draft.terminal_type);
 
   return (
     <div className="stack">
@@ -234,16 +274,16 @@ export function TerminalFormPage() {
               <label className="field">
                 <span>Terminal Tipi</span>
                 <select className="input" value={draft.terminal_type}
-                  onChange={(e) => set("terminal_type", e.target.value)}>
+                  onChange={(e) => changeType(e.target.value)}>
                   {TERMINAL_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
               </label>
 
               <label className="field">
-                <span>Bağlantı Yüzeyi</span>
+                <span>Basma Yüzeyi</span>
                 <select className="input" value={draft.surface}
                   onChange={(e) => set("surface", e.target.value)}>
-                  {SURFACES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  {validSurfaces.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                 </select>
               </label>
             </div>
@@ -331,6 +371,23 @@ export function TerminalFormPage() {
             </div>
           </section>
 
+          {/* D — Fin / Tarak (Taraklı tipler için) */}
+          {showFinFields && (
+            <section className="card" style={{ marginBottom: "1rem" }}>
+              <h3 style={{ margin: "0 0 0.9rem", fontSize: "0.85rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                D — Tarak (Fin) Geometrisi
+              </h3>
+              <div className="form-grid">
+                <NumField label="Fin Adedi" value={draft.fin_count}
+                  onChange={(v) => set("fin_count", v != null ? Math.round(v) : null)}
+                  min={1} />
+                <NumField label="Fin Aralığı" unit="mm"
+                  value={draft.fin_spacing_mm}
+                  onChange={(v) => set("fin_spacing_mm", v)} />
+              </div>
+            </section>
+          )}
+
           {/* Kaydet */}
           <div style={{ display: "flex", gap: "0.75rem" }}>
             <button type="submit" className="btn-primary" disabled={isSaving}>
@@ -379,6 +436,9 @@ export function TerminalFormPage() {
                 ["Boyut", draft.terminal_width_mm && draft.terminal_height_mm
                   ? `${draft.terminal_width_mm}×${draft.terminal_height_mm}×${draft.terminal_depth_mm ?? "?"} mm`
                   : "—"],
+                ...(showFinFields
+                  ? [["Fin", draft.fin_count ? `${draft.fin_count} adet${draft.fin_spacing_mm ? ` / ${draft.fin_spacing_mm} mm` : ""}` : "—"]]
+                  : []),
               ].map(([label, value]) => (
                 <div key={label} style={{
                   background: "var(--surface-alt, rgba(0,0,0,0.03))",
@@ -392,7 +452,7 @@ export function TerminalFormPage() {
             </div>
           </section>
 
-          {/* 4 görünüş — her biri TerminalPreview içinde ayrı panelde */}
+          {/* 4 görünüş */}
           <TerminalPreview
             terminal_type={draft.terminal_type}
             surface={draft.surface}
@@ -404,6 +464,8 @@ export function TerminalFormPage() {
             hole_diameter_mm={draft.hole_diameter_mm}
             slot_width_mm={draft.slot_width_mm}
             slot_length_mm={draft.slot_length_mm}
+            fin_count={draft.fin_count}
+            fin_spacing_mm={draft.fin_spacing_mm}
           />
         </div>
       </div>
