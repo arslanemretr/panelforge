@@ -344,14 +344,11 @@ export function TerminalFormPage() {
         </form>
 
         {/* ── Sağ: Önizleme ── */}
-        <div>
-          <section className="card">
-            <h3 style={{ margin: "0 0 0.75rem", fontSize: "0.85rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              Terminal Önizleme
-            </h3>
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
 
-            {/* Tip + Yüzey rozetleri */}
-            <div style={{ marginBottom: "0.75rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+          {/* Bilgi kartı — rozetler + özet */}
+          <section className="card">
+            <div style={{ marginBottom: "0.6rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
               <span style={{
                 padding: "3px 10px", borderRadius: 6, fontSize: "0.78rem", fontWeight: 600,
                 background: "var(--accent-soft)", color: "var(--accent)",
@@ -372,32 +369,7 @@ export function TerminalFormPage() {
                 {holeMode === "slot" ? "Slot Delik" : "Yuvarlak Delik"}
               </span>
             </div>
-
-            {/* SVG Önizleme */}
-            <div style={{
-              background: "var(--surface-alt, rgba(0,0,0,0.03))",
-              borderRadius: 8,
-              border: "1px solid var(--line)",
-              padding: "0.5rem",
-              display: "flex",
-              justifyContent: "center",
-            }}>
-              <TerminalPreview
-                terminal_type={draft.terminal_type}
-                surface={draft.surface}
-                terminal_width_mm={draft.terminal_width_mm}
-                terminal_height_mm={draft.terminal_height_mm}
-                terminal_depth_mm={draft.terminal_depth_mm}
-                bolt_count={draft.bolt_count}
-                bolt_center_distance_mm={draft.bolt_center_distance_mm}
-                hole_diameter_mm={draft.hole_diameter_mm}
-                slot_width_mm={draft.slot_width_mm}
-                slot_length_mm={draft.slot_length_mm}
-              />
-            </div>
-
-            {/* Özet bilgiler */}
-            <div style={{ marginTop: "0.75rem", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.4rem" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.4rem" }}>
               {[
                 ["Vida", draft.bolt_type ? `${draft.bolt_type} ×${draft.bolt_count ?? "?"}` : "—"],
                 ["Merkez", draft.bolt_center_distance_mm ? `${draft.bolt_center_distance_mm} mm` : "—"],
@@ -419,6 +391,20 @@ export function TerminalFormPage() {
               ))}
             </div>
           </section>
+
+          {/* 4 görünüş — her biri TerminalPreview içinde ayrı panelde */}
+          <TerminalPreview
+            terminal_type={draft.terminal_type}
+            surface={draft.surface}
+            terminal_width_mm={draft.terminal_width_mm}
+            terminal_height_mm={draft.terminal_height_mm}
+            terminal_depth_mm={draft.terminal_depth_mm}
+            bolt_count={draft.bolt_count}
+            bolt_center_distance_mm={draft.bolt_center_distance_mm}
+            hole_diameter_mm={draft.hole_diameter_mm}
+            slot_width_mm={draft.slot_width_mm}
+            slot_length_mm={draft.slot_length_mm}
+          />
         </div>
       </div>
     </div>

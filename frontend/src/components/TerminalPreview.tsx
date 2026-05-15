@@ -558,12 +558,19 @@ export function TerminalPreview({
     holeDmm:   Math.max(hole_diameter_mm   ?? 13,  4),
   };
 
+  const panelStyle: React.CSSProperties = {
+    padding: "0.6rem",
+    borderRadius: 8,
+    border: "1px solid var(--line)",
+    background: "var(--surface)",
+  };
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-      <FrontView g={g} />
-      <BackView  g={g} />
-      <SideView  g={g} />
-      <TopView   g={g} />
+    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+      <div style={panelStyle}><FrontView g={g} /></div>
+      <div style={panelStyle}><BackView  g={g} /></div>
+      <div style={panelStyle}><SideView  g={g} /></div>
+      <div style={panelStyle}><TopView   g={g} /></div>
     </div>
   );
 }
