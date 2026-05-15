@@ -13,6 +13,13 @@ from app.schemas.project_panel import ProjectPanelCreate, ProjectPanelRead
 router = APIRouter(tags=["project-panels"])
 
 
+def _load_options():
+    """Tüm endpoint'lerde kullanılan ortak selectinload zinciri."""
+    return selectinload(models.ProjectPanel.panel_definition).selectinload(
+        models.PanelDefinition.panel_type
+    )
+
+
 def _sync_aggregate_panel(db: Session, project_id: int) -> None:
     items = (
         db.query(models.ProjectPanel)
@@ -76,7 +83,7 @@ def _sync_aggregate_panel(db: Session, project_id: int) -> None:
 def list_project_panels(project_id: int, db: Session = Depends(db_session)) -> list[models.ProjectPanel]:
     return (
         db.query(models.ProjectPanel)
-        .options(selectinload(models.ProjectPanel.panel_definition))
+        .options(_load_options())
         .filter(models.ProjectPanel.project_id == project_id)
         .order_by(models.ProjectPanel.seq.asc(), models.ProjectPanel.id.asc())
         .all()
@@ -113,7 +120,7 @@ def create_project_panel(
     _sync_aggregate_panel(db, project_id)
     return (
         db.query(models.ProjectPanel)
-        .options(selectinload(models.ProjectPanel.panel_definition))
+        .options(_load_options())
         .filter(models.ProjectPanel.id == item.id)
         .one()
     )
@@ -155,7 +162,7 @@ def reorder_project_panel(
 
     return (
         db.query(models.ProjectPanel)
-        .options(selectinload(models.ProjectPanel.panel_definition))
+        .options(_load_options())
         .filter(models.ProjectPanel.project_id == project_id)
         .order_by(models.ProjectPanel.seq.asc(), models.ProjectPanel.id.asc())
         .all()
@@ -171,7 +178,7 @@ def update_project_panel_label(
 ) -> models.ProjectPanel:
     item = (
         db.query(models.ProjectPanel)
-        .options(selectinload(models.ProjectPanel.panel_definition))
+        .options(_load_options())
         .filter(models.ProjectPanel.project_id == project_id, models.ProjectPanel.id == project_panel_id)
         .one_or_none()
     )
@@ -181,7 +188,7 @@ def update_project_panel_label(
     db.commit()
     return (
         db.query(models.ProjectPanel)
-        .options(selectinload(models.ProjectPanel.panel_definition))
+        .options(_load_options())
         .filter(models.ProjectPanel.id == item.id)
         .one()
     )

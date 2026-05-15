@@ -101,14 +101,22 @@ export function PanelSelectionTab({ projectId }: PanelSelectionTabProps) {
               <tr>
                 <th>Sıra</th>
                 <th>Kabin Etiketi</th>
-                <th>Tip (Kütüphane Adı)</th>
+                <th>Pano Tipi</th>
                 <th>Boyutlar (G × Y × D)</th>
+                <th>Orijin (X · Y · Z)</th>
+                <th>Montaj Plakası</th>
                 <th>Adet</th>
                 <th>İşlemler</th>
               </tr>
             </thead>
             <tbody>
-              {items.map((item, idx) => (
+              {items.map((item, idx) => {
+                const def = item.panel_definition;
+                const hasOrigin =
+                  Number(def.origin_x_mm ?? 0) !== 0 ||
+                  Number(def.origin_y_mm ?? 0) !== 0 ||
+                  Number(def.origin_z_mm ?? 0) !== 0;
+                return (
                 <tr key={item.id}>
                   <td>
                     <span
@@ -132,12 +140,46 @@ export function PanelSelectionTab({ projectId }: PanelSelectionTabProps) {
                   <td style={{ fontWeight: 600, color: "var(--accent)" }}>
                     {item.label ?? `${item.seq} nolu Kabin`}
                   </td>
-                  <td style={{ color: "var(--muted)", fontSize: "0.88rem" }}>
-                    {item.panel_definition.name}
+                  <td style={{ fontSize: "0.85rem" }}>
+                    {def.panel_type ? (
+                      <span style={{
+                        display: "inline-block",
+                        padding: "1px 8px",
+                        borderRadius: 10,
+                        fontSize: "0.78rem",
+                        fontWeight: 600,
+                        background: "var(--accent-soft)",
+                        color: "var(--accent)",
+                        whiteSpace: "nowrap",
+                      }}>
+                        {def.panel_type.name}
+                      </span>
+                    ) : (
+                      <span style={{ color: "var(--muted)", fontSize: "0.82rem" }}>—</span>
+                    )}
                   </td>
-                  <td>
-                    {item.panel_definition.width_mm} × {item.panel_definition.height_mm}
-                    {item.panel_definition.depth_mm ? ` × ${item.panel_definition.depth_mm}` : ""} mm
+                  <td style={{ fontSize: "0.88rem", fontFamily: "monospace" }}>
+                    {def.width_mm} × {def.height_mm}
+                    {def.depth_mm ? ` × ${def.depth_mm}` : ""} mm
+                  </td>
+                  <td style={{ fontSize: "0.83rem", fontFamily: "monospace" }}>
+                    {hasOrigin ? (
+                      <span style={{ color: "var(--text)" }}>
+                        {Number(def.origin_x_mm ?? 0)} · {Number(def.origin_y_mm ?? 0)} · {Number(def.origin_z_mm ?? 0)}
+                        <span style={{ color: "var(--muted)", marginLeft: 3 }}>mm</span>
+                      </span>
+                    ) : (
+                      <span style={{ color: "var(--muted)" }}>0 · 0 · 0</span>
+                    )}
+                  </td>
+                  <td style={{ fontSize: "0.85rem" }}>
+                    {def.mounting_plate_width_mm && def.mounting_plate_height_mm ? (
+                      <span style={{ fontFamily: "monospace" }}>
+                        {def.mounting_plate_width_mm} × {def.mounting_plate_height_mm} mm
+                      </span>
+                    ) : (
+                      <span style={{ color: "var(--muted)" }}>—</span>
+                    )}
                   </td>
                   <td>{item.quantity}</td>
                   <td className="actions-cell">
@@ -181,7 +223,8 @@ export function PanelSelectionTab({ projectId }: PanelSelectionTabProps) {
                     </button>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         )}
@@ -199,12 +242,27 @@ export function PanelSelectionTab({ projectId }: PanelSelectionTabProps) {
         title="Kabin Kütüphanesi"
         items={definitions}
         searchPlaceholder="İsim veya boyut ara..."
-        getSearchText={(d) => `${d.name} ${d.width_mm} ${d.height_mm}`}
+        getSearchText={(d) => `${d.name} ${d.panel_type?.name ?? ""} ${d.width_mm} ${d.height_mm}`}
         renderRow={(d) => (
           <>
-            <td style={{ fontWeight: 500 }}>{d.name}</td>
-            <td>
-              {d.width_mm} × {d.height_mm} {d.depth_mm ? `× ${d.depth_mm}` : ""} mm
+            <td style={{ fontWeight: 600 }}>{d.name}</td>
+            <td style={{ fontSize: "0.83rem" }}>
+              {d.panel_type ? (
+                <span style={{
+                  padding: "1px 6px", borderRadius: 8, fontSize: "0.75rem",
+                  background: "var(--accent-soft)", color: "var(--accent)", fontWeight: 600,
+                }}>
+                  {d.panel_type.name}
+                </span>
+              ) : <span style={{ color: "var(--muted)" }}>—</span>}
+            </td>
+            <td style={{ fontFamily: "monospace", fontSize: "0.83rem" }}>
+              {d.width_mm} × {d.height_mm}{d.depth_mm ? ` × ${d.depth_mm}` : ""} mm
+            </td>
+            <td style={{ fontFamily: "monospace", fontSize: "0.8rem", color: "var(--muted)" }}>
+              {(Number(d.origin_x_mm ?? 0) !== 0 || Number(d.origin_y_mm ?? 0) !== 0 || Number(d.origin_z_mm ?? 0) !== 0)
+                ? `${Number(d.origin_x_mm ?? 0)}·${Number(d.origin_y_mm ?? 0)}·${Number(d.origin_z_mm ?? 0)}`
+                : "0·0·0"}
             </td>
           </>
         )}
