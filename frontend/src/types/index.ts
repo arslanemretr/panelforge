@@ -91,12 +91,14 @@ export interface BendType {
 export interface TerminalDefinition {
   id: number;
   name: string;
-  terminal_type: string;                     // "Ön Bakır Basmalı" | "Arka Yatay Taraklı" | "Yandan Taraklı"
+  terminal_type: string;                     // "Ön Bakır Basmalı" | "Arka Yatay Taraklı" | "Arka Yatay Terminal" | "Yandan Taraklı" | "Kablo Pabuçlu"
   surface: string;                           // "front" | "back" | "left" | "right" | "top" | "bottom"
   bolt_type?: string | null;
   bolt_count?: number | null;
   bolt_center_distance_mm?: number | null;
   hole_diameter_mm?: number | null;
+  slot_width_mm?: number | null;
+  slot_length_mm?: number | null;
   terminal_width_mm?: number | null;
   terminal_height_mm?: number | null;
   terminal_depth_mm?: number | null;

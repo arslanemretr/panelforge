@@ -25,6 +25,8 @@ function buildPayload(def: TerminalDefinition): Omit<TerminalDefinition, "id" | 
     bolt_count: def.bolt_count,
     bolt_center_distance_mm: def.bolt_center_distance_mm,
     hole_diameter_mm: def.hole_diameter_mm,
+    slot_width_mm: def.slot_width_mm,
+    slot_length_mm: def.slot_length_mm,
     terminal_width_mm: def.terminal_width_mm,
     terminal_height_mm: def.terminal_height_mm,
     terminal_depth_mm: def.terminal_depth_mm,
@@ -132,7 +134,7 @@ export function TerminalDefinitionsPage() {
                 <th>Yüzey</th>
                 <th>Vida</th>
                 <th>Merkez</th>
-                <th>Delik Ø</th>
+                <th>Delik</th>
                 <th>Boyut (G×Y×D mm)</th>
                 <th>Oluşturma</th>
                 <th style={{ borderLeft: "2px solid var(--line)" }}>İşlem</th>
@@ -149,7 +151,13 @@ export function TerminalDefinitionsPage() {
                     {def.bolt_count ? ` ×${def.bolt_count}` : ""}
                   </td>
                   <td>{def.bolt_center_distance_mm != null ? `${def.bolt_center_distance_mm} mm` : "—"}</td>
-                  <td>{def.hole_diameter_mm != null ? `Ø${def.hole_diameter_mm}` : "—"}</td>
+                  <td>
+                    {def.slot_width_mm != null && def.slot_length_mm != null
+                      ? `Slot ${def.slot_width_mm}×${def.slot_length_mm}`
+                      : def.hole_diameter_mm != null
+                        ? `Ø${def.hole_diameter_mm}`
+                        : "—"}
+                  </td>
                   <td>
                     {[def.terminal_width_mm, def.terminal_height_mm, def.terminal_depth_mm]
                       .map((v) => v ?? "-")

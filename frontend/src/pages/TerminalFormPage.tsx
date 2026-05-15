@@ -7,11 +7,11 @@ import { TerminalPreview } from "../components/TerminalPreview";
 import type { TerminalDefinition } from "../types";
 
 // ─── Sabitler ─────────────────────────────────────────────────────────────────
-const TERMINAL_TYPES = [
+export const TERMINAL_TYPES = [
   "Ön Bakır Basmalı",
   "Arka Yatay Taraklı",
+  "Arka Yatay Terminal",
   "Yandan Taraklı",
-  "Üstten Taraklı",
   "Kablo Pabuçlu",
 ];
 
@@ -33,6 +33,8 @@ interface TerminalDraft {
   bolt_count: number | null;
   bolt_center_distance_mm: number | null;
   hole_diameter_mm: number | null;
+  slot_width_mm: number | null;
+  slot_length_mm: number | null;
   terminal_width_mm: number | null;
   terminal_height_mm: number | null;
   terminal_depth_mm: number | null;
@@ -44,11 +46,13 @@ const EMPTY_DRAFT: TerminalDraft = {
   surface: "front",
   bolt_type: "M12",
   bolt_count: 2,
-  bolt_center_distance_mm: 25,
+  bolt_center_distance_mm: 70,
   hole_diameter_mm: 13,
-  terminal_width_mm: 50,
-  terminal_height_mm: 80,
-  terminal_depth_mm: 40,
+  slot_width_mm: null,
+  slot_length_mm: null,
+  terminal_width_mm: 100,
+  terminal_height_mm: 120,
+  terminal_depth_mm: 60,
 };
 
 function buildPayload(d: TerminalDraft): Omit<TerminalDefinition, "id" | "created_at" | "updated_at"> {
@@ -60,6 +64,8 @@ function buildPayload(d: TerminalDraft): Omit<TerminalDefinition, "id" | "create
     bolt_count: d.bolt_count,
     bolt_center_distance_mm: d.bolt_center_distance_mm,
     hole_diameter_mm: d.hole_diameter_mm,
+    slot_width_mm: d.slot_width_mm,
+    slot_length_mm: d.slot_length_mm,
     terminal_width_mm: d.terminal_width_mm,
     terminal_height_mm: d.terminal_height_mm,
     terminal_depth_mm: d.terminal_depth_mm,
@@ -78,7 +84,10 @@ function NumField({
 }) {
   return (
     <label className="field">
-      <span>{label}{unit ? <span style={{ color: "var(--muted)", fontWeight: 400 }}> ({unit})</span> : ""}</span>
+      <span>
+        {label}
+        {unit && <span style={{ color: "var(--muted)", fontWeight: 400 }}> ({unit})</span>}
+      </span>
       <input
         className="input"
         type="number"
@@ -101,40 +110,56 @@ export function TerminalFormPage() {
 
   const [draft, setDraft] = useState<TerminalDraft>(EMPTY_DRAFT);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [holeMode, setHoleMode] = useState<"round" | "slot">("round");
 
-  // Düzenleme modunda mevcut tanımı çek
+  // Düzenleme modunda tek kayıt çek (GET /{id})
   const detailQuery = useQuery({
-    queryKey: ["terminal-definitions", id],
-    queryFn: () => client.listTerminalDefinitions(),
+    queryKey: ["terminal-definition", id],
+    queryFn: () => client.getTerminalDefinition(Number(id)),
     enabled: isEdit,
   });
 
   useEffect(() => {
     if (isEdit && detailQuery.data) {
-      const def = detailQuery.data.find((d) => d.id === Number(id));
-      if (def) {
-        setDraft({
-          name: def.name,
-          terminal_type: def.terminal_type,
-          surface: def.surface,
-          bolt_type: def.bolt_type ?? "M12",
-          bolt_count: def.bolt_count ?? null,
-          bolt_center_distance_mm: def.bolt_center_distance_mm ?? null,
-          hole_diameter_mm: def.hole_diameter_mm ?? null,
-          terminal_width_mm: def.terminal_width_mm ?? null,
-          terminal_height_mm: def.terminal_height_mm ?? null,
-          terminal_depth_mm: def.terminal_depth_mm ?? null,
-        });
+      const def = detailQuery.data;
+      setDraft({
+        name: def.name,
+        terminal_type: def.terminal_type,
+        surface: def.surface,
+        bolt_type: def.bolt_type ?? "M12",
+        bolt_count: def.bolt_count ?? null,
+        bolt_center_distance_mm: def.bolt_center_distance_mm ?? null,
+        hole_diameter_mm: def.hole_diameter_mm ?? null,
+        slot_width_mm: def.slot_width_mm ?? null,
+        slot_length_mm: def.slot_length_mm ?? null,
+        terminal_width_mm: def.terminal_width_mm ?? null,
+        terminal_height_mm: def.terminal_height_mm ?? null,
+        terminal_depth_mm: def.terminal_depth_mm ?? null,
+      });
+      // Delik modunu belirle
+      if (def.slot_width_mm || def.slot_length_mm) {
+        setHoleMode("slot");
       }
     }
-  }, [isEdit, detailQuery.data, id]);
+  }, [isEdit, detailQuery.data]);
 
   function set<K extends keyof TerminalDraft>(key: K, value: TerminalDraft[K]) {
     setDraft((d) => ({ ...d, [key]: value }));
   }
 
+  // Delik modu değiştiğinde karşı alanları temizle
+  function changeHoleMode(mode: "round" | "slot") {
+    setHoleMode(mode);
+    if (mode === "round") {
+      setDraft((d) => ({ ...d, slot_width_mm: null, slot_length_mm: null }));
+    } else {
+      setDraft((d) => ({ ...d, hole_diameter_mm: null }));
+    }
+  }
+
   const invalidate = async () => {
     await qc.invalidateQueries({ queryKey: ["terminal-definitions"] });
+    await qc.invalidateQueries({ queryKey: ["terminal-definition", id] });
   };
 
   const createMutation = useMutation({
@@ -157,6 +182,16 @@ export function TerminalFormPage() {
     isEdit ? updateMutation.mutate() : createMutation.mutate();
   }
 
+  if (isEdit && detailQuery.isLoading) {
+    return (
+      <div className="stack">
+        <div style={{ padding: "2rem", color: "var(--muted)", textAlign: "center" }}>Yükleniyor...</div>
+      </div>
+    );
+  }
+
+  const surfaceLabel = SURFACES.find(s => s.value === draft.surface)?.label ?? draft.surface;
+
   return (
     <div className="stack">
       {/* ── Başlık ── */}
@@ -164,10 +199,7 @@ export function TerminalFormPage() {
         <div>
           <span className="eyebrow">Terminal Tipleri</span>
           <h1>{isEdit ? "Terminal Tipini Düzenle" : "Yeni Terminal Tipi"}</h1>
-          <p>
-            Terminal geometrisini ve bağlantı özelliklerini tanımlayın.
-            Sağdaki önizleme parametrelerinizi anlık yansıtır.
-          </p>
+          <p>Terminal geometrisini ve bağlantı özelliklerini tanımlayın. Sağdaki önizleme anlık yansıtır.</p>
         </div>
         <button type="button" className="ghost" onClick={() => navigate("/definitions/terminal-types")}>
           ← Listeye Dön
@@ -181,6 +213,7 @@ export function TerminalFormPage() {
 
         {/* ── Sol: Form ── */}
         <form onSubmit={handleSubmit}>
+
           {/* A — Temel Bilgiler */}
           <section className="card" style={{ marginBottom: "1rem" }}>
             <h3 style={{ margin: "0 0 0.9rem", fontSize: "0.85rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
@@ -237,9 +270,46 @@ export function TerminalFormPage() {
                 value={draft.bolt_center_distance_mm}
                 onChange={(v) => set("bolt_center_distance_mm", v)} />
 
-              <NumField label="Delik Çapı" unit="mm"
-                value={draft.hole_diameter_mm}
-                onChange={(v) => set("hole_diameter_mm", v)} />
+              {/* Delik tipi seçimi */}
+              <label className="field" style={{ gridColumn: "1 / -1" }}>
+                <span>Delik Tipi</span>
+                <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.25rem" }}>
+                  {(["round", "slot"] as const).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => changeHoleMode(m)}
+                      style={{
+                        padding: "0.3rem 0.9rem",
+                        borderRadius: 6,
+                        border: "1px solid var(--line)",
+                        background: holeMode === m ? "var(--accent)" : "var(--surface)",
+                        color: holeMode === m ? "#fff" : "var(--fg)",
+                        fontSize: "0.82rem",
+                        cursor: "pointer",
+                        fontWeight: holeMode === m ? 600 : 400,
+                      }}
+                    >
+                      {m === "round" ? "Yuvarlak Delik" : "Slot Delik"}
+                    </button>
+                  ))}
+                </div>
+              </label>
+
+              {holeMode === "round" ? (
+                <NumField label="Delik Çapı" unit="mm"
+                  value={draft.hole_diameter_mm}
+                  onChange={(v) => set("hole_diameter_mm", v)} />
+              ) : (
+                <>
+                  <NumField label="Slot Genişliği" unit="mm"
+                    value={draft.slot_width_mm}
+                    onChange={(v) => set("slot_width_mm", v)} />
+                  <NumField label="Slot Uzunluğu" unit="mm"
+                    value={draft.slot_length_mm}
+                    onChange={(v) => set("slot_length_mm", v)} />
+                </>
+              )}
             </div>
           </section>
 
@@ -280,7 +350,7 @@ export function TerminalFormPage() {
               Terminal Önizleme
             </h3>
 
-            {/* Tip rozeti */}
+            {/* Tip + Yüzey rozetleri */}
             <div style={{ marginBottom: "0.75rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
               <span style={{
                 padding: "3px 10px", borderRadius: 6, fontSize: "0.78rem", fontWeight: 600,
@@ -292,7 +362,14 @@ export function TerminalFormPage() {
                 padding: "3px 10px", borderRadius: 6, fontSize: "0.78rem", fontWeight: 600,
                 background: "rgba(148,163,184,0.12)", color: "var(--muted)",
               }}>
-                {SURFACES.find(s => s.value === draft.surface)?.label ?? draft.surface} Yüzey
+                {surfaceLabel} Yüzey
+              </span>
+              <span style={{
+                padding: "3px 10px", borderRadius: 6, fontSize: "0.78rem", fontWeight: 600,
+                background: holeMode === "slot" ? "rgba(251,191,36,0.15)" : "rgba(148,163,184,0.08)",
+                color: holeMode === "slot" ? "#b45309" : "var(--muted)",
+              }}>
+                {holeMode === "slot" ? "Slot Delik" : "Yuvarlak Delik"}
               </span>
             </div>
 
@@ -307,14 +384,17 @@ export function TerminalFormPage() {
             }}>
               <TerminalPreview
                 terminal_type={draft.terminal_type}
+                surface={draft.surface}
                 terminal_width_mm={draft.terminal_width_mm}
                 terminal_height_mm={draft.terminal_height_mm}
                 terminal_depth_mm={draft.terminal_depth_mm}
                 bolt_count={draft.bolt_count}
                 bolt_center_distance_mm={draft.bolt_center_distance_mm}
                 hole_diameter_mm={draft.hole_diameter_mm}
-                width={280}
-                height={320}
+                slot_width_mm={draft.slot_width_mm}
+                slot_length_mm={draft.slot_length_mm}
+                width={300}
+                height={340}
               />
             </div>
 
@@ -323,7 +403,9 @@ export function TerminalFormPage() {
               {[
                 ["Vida", draft.bolt_type ? `${draft.bolt_type} ×${draft.bolt_count ?? "?"}` : "—"],
                 ["Merkez", draft.bolt_center_distance_mm ? `${draft.bolt_center_distance_mm} mm` : "—"],
-                ["Delik Ø", draft.hole_diameter_mm ? `${draft.hole_diameter_mm} mm` : "—"],
+                ["Delik", holeMode === "round"
+                  ? (draft.hole_diameter_mm ? `Ø${draft.hole_diameter_mm} mm` : "—")
+                  : (draft.slot_width_mm && draft.slot_length_mm ? `${draft.slot_width_mm}×${draft.slot_length_mm} mm` : "—")],
                 ["Boyut", draft.terminal_width_mm && draft.terminal_height_mm
                   ? `${draft.terminal_width_mm}×${draft.terminal_height_mm}×${draft.terminal_depth_mm ?? "?"} mm`
                   : "—"],

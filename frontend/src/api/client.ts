@@ -91,6 +91,8 @@ export const client = {
 
   listTerminalDefinitions: async () =>
     (await api.get<TerminalDefinition[]>("/terminal-definitions")).data,
+  getTerminalDefinition: async (id: number) =>
+    (await api.get<TerminalDefinition>(`/terminal-definitions/${id}`)).data,
   createTerminalDefinition: async (payload: Omit<TerminalDefinition, "id" | "created_at" | "updated_at">) =>
     (await api.post<TerminalDefinition>("/terminal-definitions", payload)).data,
   updateTerminalDefinition: async (id: number, payload: Omit<TerminalDefinition, "id" | "created_at" | "updated_at">) =>

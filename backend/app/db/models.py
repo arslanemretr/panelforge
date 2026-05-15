@@ -142,7 +142,9 @@ class TerminalDefinition(Base):
     bolt_type: Mapped[str | None] = mapped_column(Text)                        # "M12" | "M10" vb.
     bolt_count: Mapped[int | None] = mapped_column(Integer)                    # vida miktarı
     bolt_center_distance_mm: Mapped[Decimal | None] = mapped_column(Numeric)  # merkez ölçüsü (mm)
-    hole_diameter_mm: Mapped[Decimal | None] = mapped_column(Numeric)         # delik çapı (mm)
+    hole_diameter_mm: Mapped[Decimal | None] = mapped_column(Numeric)         # yuvarlak delik çapı (mm)
+    slot_width_mm: Mapped[Decimal | None] = mapped_column(Numeric)            # slot delik genişliği (mm)
+    slot_length_mm: Mapped[Decimal | None] = mapped_column(Numeric)           # slot delik uzunluğu (mm)
     terminal_width_mm: Mapped[Decimal | None] = mapped_column(Numeric)
     terminal_height_mm: Mapped[Decimal | None] = mapped_column(Numeric)
     terminal_depth_mm: Mapped[Decimal | None] = mapped_column(Numeric)

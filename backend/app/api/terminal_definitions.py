@@ -21,6 +21,17 @@ def list_terminal_definitions(db: Session = Depends(db_session)) -> list[models.
     )
 
 
+@router.get("/terminal-definitions/{def_id}", response_model=TerminalDefinitionRead)
+def get_terminal_definition(
+    def_id: int,
+    db: Session = Depends(db_session),
+) -> models.TerminalDefinition:
+    obj = db.get(models.TerminalDefinition, def_id)
+    if not obj:
+        raise HTTPException(status_code=404, detail="Terminal tipi bulunamadı.")
+    return obj
+
+
 @router.post(
     "/terminal-definitions",
     response_model=TerminalDefinitionRead,
