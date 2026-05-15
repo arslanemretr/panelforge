@@ -339,7 +339,7 @@ export function BendTypeFormPage() {
                 <span>Paralel Bakır Adedi</span>
                 <select className="input" value={form.parallel_count}
                   onChange={(e) => setField("parallel_count", Number(e.target.value))}>
-                  {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}'li</option>)}
+                  {[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}'li</option>)}
                 </select>
               </label>
 
