@@ -13,6 +13,8 @@ import type {
   Panel,
   PanelDefinition,
   PanelType,
+  PhaseLabel,
+  PhaseType,
   Project,
   ProjectCopper,
   ProjectPanel,
@@ -140,6 +142,20 @@ export const client = {
   updateCopperDefinition: async (id: number, payload: Omit<CopperDefinition, "id" | "created_at" | "updated_at">) =>
     (await api.put<CopperDefinition>(`/copper-definitions/${id}`, payload)).data,
   deleteCopperDefinition: async (definitionId: number) => api.delete(`/copper-definitions/${definitionId}`),
+
+  // Faz Etiketleri
+  listPhaseLabels: async () => (await api.get<PhaseLabel[]>("/phase-labels")).data,
+  createPhaseLabel: async (label: string, color: string) =>
+    (await api.post<PhaseLabel>("/phase-labels", { label, color })).data,
+  updatePhaseLabel: async (id: number, color: string) =>
+    (await api.put<PhaseLabel>(`/phase-labels/${id}`, { color })).data,
+  deletePhaseLabel: async (id: number) => api.delete(`/phase-labels/${id}`),
+
+  // Faz Tipleri
+  listPhaseTypes: async () => (await api.get<PhaseType[]>("/phase-types")).data,
+  createPhaseType: async (name: string, phases: string) =>
+    (await api.post<PhaseType>("/phase-types", { name, phases })).data,
+  deletePhaseType: async (id: number) => api.delete(`/phase-types/${id}`),
 
   listConnections: async (projectId: number) =>
     (await api.get<DeviceConnection[]>(`/projects/${projectId}/connections`)).data,

@@ -206,6 +206,19 @@ export interface ProjectDevice {
   device: Device;
 }
 
+export interface PhaseLabel {
+  id: number;
+  label: string;
+  color: string;
+  is_system: boolean;
+}
+
+export interface PhaseType {
+  id: number;
+  name: string;
+  phases: string; // "L1,L2,L3"
+}
+
 export interface CopperDefinition {
   id: number;
   name: string;
@@ -235,7 +248,8 @@ export interface CopperDefinition {
   busbar_orientation?: string | null;
   busbar_length_mm?: number | null;
   // Elektriksel yerleşim
-  phase_type?: string | null;
+  phase_type_id?: number | null;
+  phase_type?: PhaseType | null;
   bars_per_phase?: number | null;
   bar_gap_mm?: number | null;
   phase_center_mm?: number | null;

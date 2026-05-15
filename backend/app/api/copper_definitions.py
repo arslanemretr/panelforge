@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.dependencies import db_session
 from app.db import models
@@ -12,12 +12,16 @@ from app.schemas.copper_definition import (
 router = APIRouter(tags=["copper-definitions"])
 
 
+def _load_opts():
+    return [selectinload(models.CopperDefinition.phase_type)]
+
+
 @router.get("/copper-definitions", response_model=list[CopperDefinitionRead])
 def list_copper_definitions(
     kind: str | None = Query(default=None),
     db: Session = Depends(db_session),
 ) -> list[models.CopperDefinition]:
-    query = db.query(models.CopperDefinition)
+    query = db.query(models.CopperDefinition).options(*_load_opts())
     if kind:
         query = query.filter(models.CopperDefinition.copper_kind == kind)
     return query.order_by(models.CopperDefinition.updated_at.desc()).all()
@@ -29,12 +33,20 @@ def create_copper_definition(payload: CopperDefinitionCreate, db: Session = Depe
     db.add(definition)
     db.commit()
     db.refresh(definition)
+    db.query(models.CopperDefinition).options(*_load_opts()).filter(
+        models.CopperDefinition.id == definition.id
+    ).first()
     return definition
 
 
 @router.get("/copper-definitions/{definition_id}", response_model=CopperDefinitionRead)
 def get_copper_definition(definition_id: int, db: Session = Depends(db_session)) -> models.CopperDefinition:
-    definition = db.get(models.CopperDefinition, definition_id)
+    definition = (
+        db.query(models.CopperDefinition)
+        .options(*_load_opts())
+        .filter(models.CopperDefinition.id == definition_id)
+        .first()
+    )
     if not definition:
         raise HTTPException(status_code=404, detail="Copper definition not found")
     return definition
@@ -52,7 +64,12 @@ def update_copper_definition(
     for field, value in payload.model_dump().items():
         setattr(definition, field, value)
     db.commit()
-    db.refresh(definition)
+    definition = (
+        db.query(models.CopperDefinition)
+        .options(*_load_opts())
+        .filter(models.CopperDefinition.id == definition_id)
+        .first()
+    )
     return definition
 
 

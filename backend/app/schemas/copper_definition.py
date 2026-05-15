@@ -4,6 +4,7 @@ from decimal import Decimal
 from pydantic import BaseModel
 
 from app.schemas.common import ORMModel
+from app.schemas.phase_type import PhaseTypeRead
 
 
 class CopperDefinitionBase(BaseModel):
@@ -34,7 +35,7 @@ class CopperDefinitionBase(BaseModel):
     busbar_orientation: str | None = None
     busbar_length_mm: Decimal | None = None
     # Elektriksel yerleşim
-    phase_type: str | None = None
+    phase_type_id: int | None = None
     bars_per_phase: int | None = 1
     bar_gap_mm: Decimal | None = None
     phase_center_mm: Decimal | None = None
@@ -54,3 +55,4 @@ class CopperDefinitionRead(CopperDefinitionBase, ORMModel):
     id: int
     created_at: datetime
     updated_at: datetime
+    phase_type: PhaseTypeRead | None = None

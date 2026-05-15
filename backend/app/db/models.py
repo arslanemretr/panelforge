@@ -340,12 +340,32 @@ class CopperDefinition(Base):
     project_layout_items: Mapped[list["ProjectCopper"]] = relationship(back_populates="copper_definition")
     coating_type: Mapped[str | None] = mapped_column(Text)            # "Kaplamasız" | "Kalay Kaplı" | vb.
     # Elektriksel yerleşim alanları
-    phase_type: Mapped[str | None] = mapped_column(Text)              # "L1-L2-L3" | "N-L1-L2-L3" | "L1-L2-L3-N"
+    phase_type_id: Mapped[int | None] = mapped_column(ForeignKey("phase_types.id", ondelete="SET NULL"), nullable=True)
+    phase_type: Mapped["PhaseType | None"] = relationship(back_populates="copper_definitions")
     bars_per_phase: Mapped[int | None] = mapped_column(Integer, default=1)      # 1 fazdaki paralel bar sayısı
     bar_gap_mm: Mapped[Decimal | None] = mapped_column(Numeric)                 # aynı fazdaki barlar arası boşluk
     phase_center_mm: Mapped[Decimal | None] = mapped_column(Numeric)            # fazlar arası merkez-merkez mesafe
     layer_type: Mapped[str | None] = mapped_column(Text, default="Tek Kat")     # "Tek Kat" | "Çift Kat"
     neutral_bar_count: Mapped[int | None] = mapped_column(Integer, default=1)   # nötr bara miktarı
+
+
+class PhaseLabel(Base):
+    __tablename__ = "phase_labels"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    label: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    color: Mapped[str] = mapped_column(Text, nullable=False)
+    is_system: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+
+
+class PhaseType(Base):
+    __tablename__ = "phase_types"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    phases: Mapped[str] = mapped_column(Text, nullable=False)  # "L1,L2,L3"
+
+    copper_definitions: Mapped[list["CopperDefinition"]] = relationship(back_populates="phase_type")
 
 
 class BendType(Base):

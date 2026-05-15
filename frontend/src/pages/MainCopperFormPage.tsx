@@ -3,14 +3,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { client } from "../api/client";
-import type { CopperDefinition } from "../types";
+import type { CopperDefinition, PhaseLabel, PhaseType } from "../types";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 interface MainDraft {
   name: string;
   width_mm: number;
   thickness_mm: number;
-  phase_type: string;
+  phase_type_id: number | null;
   bars_per_phase: number;
   bar_gap_mm: number;
   phase_center_mm: number;
@@ -27,7 +27,7 @@ const EMPTY: MainDraft = {
   name: "",
   width_mm: 40,
   thickness_mm: 10,
-  phase_type: "L1-L2-L3",
+  phase_type_id: null,
   bars_per_phase: 1,
   bar_gap_mm: 5,
   phase_center_mm: 60,
@@ -41,18 +41,26 @@ const EMPTY: MainDraft = {
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
-function hasNeutral(phaseType: string): boolean {
-  return phaseType === "N-L1-L2-L3" || phaseType === "L1-L2-L3-N";
+function resolvePhases(phaseTypeId: number | null, phaseTypes: PhaseType[]): string[] {
+  if (!phaseTypeId) return ["L1", "L2", "L3"];
+  const pt = phaseTypes.find((p) => p.id === phaseTypeId);
+  if (!pt) return ["L1", "L2", "L3"];
+  return pt.phases.split(",").map((p) => p.trim()).filter(Boolean);
 }
 
-function phaseList(phaseType: string): string[] {
-  if (phaseType === "N-L1-L2-L3") return ["N", "L1", "L2", "L3"];
-  if (phaseType === "L1-L2-L3-N") return ["L1", "L2", "L3", "N"];
-  return ["L1", "L2", "L3"];
+function buildColorMap(phaseLabels: PhaseLabel[]): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const pl of phaseLabels) map[pl.label] = pl.color;
+  return map;
 }
 
-function isNIndependent(phaseType: string): boolean {
-  return phaseType === "L1-L2-L3-N";
+function hasNeutral(phases: string[]): boolean {
+  return phases.includes("N");
+}
+
+/** N bağımsız: fazlar arasında değil, sonda ayrı */
+function isNIndependent(phases: string[]): boolean {
+  return phases.includes("N") && phases[0] !== "N";
 }
 
 function defToDraft(def: CopperDefinition): MainDraft {
@@ -60,7 +68,7 @@ function defToDraft(def: CopperDefinition): MainDraft {
     name: def.name,
     width_mm: Number(def.main_width_mm ?? 40),
     thickness_mm: Number(def.main_thickness_mm ?? 10),
-    phase_type: def.phase_type ?? "L1-L2-L3",
+    phase_type_id: def.phase_type_id ?? null,
     bars_per_phase: def.bars_per_phase ?? 1,
     bar_gap_mm: Number(def.bar_gap_mm ?? 5),
     phase_center_mm: Number(def.phase_center_mm ?? def.main_phase_spacing_mm ?? 60),
@@ -74,7 +82,10 @@ function defToDraft(def: CopperDefinition): MainDraft {
   };
 }
 
-function buildPayload(draft: MainDraft): Omit<CopperDefinition, "id" | "created_at" | "updated_at"> {
+function buildPayload(
+  draft: MainDraft,
+  phases: string[],
+): Omit<CopperDefinition, "id" | "created_at" | "updated_at"> {
   return {
     name: draft.name,
     copper_kind: "main",
@@ -102,24 +113,16 @@ function buildPayload(draft: MainDraft): Omit<CopperDefinition, "id" | "created_
     busbar_z_mm: draft.busbar_z_mm,
     busbar_orientation: draft.busbar_orientation,
     busbar_length_mm: draft.busbar_length_mm,
-    phase_type: draft.phase_type,
+    phase_type_id: draft.phase_type_id,
     bars_per_phase: draft.bars_per_phase,
     bar_gap_mm: draft.bar_gap_mm,
     phase_center_mm: draft.phase_center_mm,
     layer_type: draft.layer_type,
-    neutral_bar_count: hasNeutral(draft.phase_type) ? draft.neutral_bar_count : null,
+    neutral_bar_count: hasNeutral(phases) ? draft.neutral_bar_count : null,
   };
 }
 
-// ─── SVG Önizleme (Enine Kesit — Yan Görünüş) ─────────────────────────────
-const PHASE_COLORS: Record<string, string> = {
-  L1: "#d4a017",
-  L2: "#27ae60",
-  L3: "#c0392b",
-  N: "#2980b9",
-};
-
-/** Yatay boyut oku */
+// ─── SVG Boyut Okları ──────────────────────────────────────────────────────
 function DimLineH({
   x1, x2, y, label, color = "#e74c3c",
 }: { x1: number; x2: number; y: number; label: string; color?: string }) {
@@ -138,7 +141,6 @@ function DimLineH({
   );
 }
 
-/** Dikey boyut oku */
 function DimLineV({
   x, y1, y2, label, color = "#3498db",
 }: { x: number; y1: number; y2: number; label: string; color?: string }) {
@@ -186,13 +188,18 @@ function ViewHeader({ svgW, label, accent, id }: {
 // Fiziksel eksenler: SVG-X = Z (derinlik), SVG-Y = Y (yükseklik)
 // Fazlar Z yönünde (yatay) sıralıdır, phase_center_mm merkez-merkez aralığıdır.
 // Her bar: kalınlık_mm genişliğinde (Z), genişlik_mm yüksekliğinde (Y).
-function CrossSectionView({ draft }: { draft: MainDraft }) {
-  const phases   = phaseList(draft.phase_type);
-  const nInd     = isNIndependent(draft.phase_type);
+interface SvgViewProps {
+  draft: MainDraft;
+  phases: string[];
+  phaseColors: Record<string, string>;
+}
+
+function CrossSectionView({ draft, phases, phaseColors }: SvgViewProps) {
+  const nInd     = isNIndependent(phases);
   const isDouble = draft.layer_type === "Çift Kat";
 
-  const barWmm  = Math.max(draft.width_mm, 1);      // Y yönü — dikeyde görünür yükseklik
-  const barTmm  = Math.max(draft.thickness_mm, 1);  // Z yönü — yatayda görünür kalınlık
+  const barWmm  = Math.max(draft.width_mm, 1);
+  const barTmm  = Math.max(draft.thickness_mm, 1);
   const bpc     = Math.max(draft.bars_per_phase, 1);
   const nBC     = Math.max(draft.neutral_bar_count || 1, 1);
   const gapMm   = Math.max(draft.bar_gap_mm, 0);
@@ -203,9 +210,7 @@ function CrossSectionView({ draft }: { draft: MainDraft }) {
   const nLPh    = lPhases.length;
   const getBC   = (ph: string) => (ph === "N" ? nBC : bpc);
 
-  // Faz grubunun Z genişliği (bpc bar yan yana, Z yönünde)
   const phGroupW = (bc: number) => bc * barTmm + Math.max(0, bc - 1) * gapMm;
-  // Faz grubunun Y yüksekliği (çift kat = üst üste 2 bar)
   const phGroupH = () => isDouble ? barWmm * 2 + layerGapMm : barWmm;
 
   const lGroupW = phGroupW(bpc);
@@ -219,7 +224,7 @@ function CrossSectionView({ draft }: { draft: MainDraft }) {
   const HEADER = 26;
   const LEFT   = 60;
   const RIGHT  = 14;
-  const TOP    = HEADER + 36;  // faz aralığı dim okları için boşluk
+  const TOP    = HEADER + 36;
   const MID    = 22;
   const BOT    = 30;
   const availW = SVG_W - LEFT - RIGHT;
@@ -232,7 +237,6 @@ function CrossSectionView({ draft }: { draft: MainDraft }) {
   const by0   = TOP;
   const SVG_H = TOP + barsH + MID + BOT;
 
-  // Her fazın Z başlangıç X'i (SVG-X = physical-Z)
   const pStartX: Record<string, number> = {};
   if (nInd) {
     lPhases.forEach((ph, i) => { pStartX[ph] = bx0 + i * pCenMm * sc; });
@@ -246,7 +250,7 @@ function CrossSectionView({ draft }: { draft: MainDraft }) {
       style={{ width: "100%", border: "1px solid var(--line)", borderRadius: 6, background: "#1a1f2b", display: "block" }}>
       <ViewHeader svgW={SVG_W} label="ENİNE KESİT — BARA UCUNDAN GÖRÜNÜŞ" accent="#e74c3c" id="hdr-cross" />
 
-      {/* Faz merkez aralığı dim okları (üstte yatay) */}
+      {/* Faz merkez aralığı dim okları */}
       {phases.map((ph, pi) => {
         if (pi === 0) return null;
         const prev = phases[pi - 1];
@@ -261,11 +265,11 @@ function CrossSectionView({ draft }: { draft: MainDraft }) {
       {/* Barlar */}
       {phases.map((ph) => {
         const bc    = getBC(ph);
-        const color = PHASE_COLORS[ph] ?? "#aaa";
+        const color = phaseColors[ph] ?? "#aaa";
         const startX = pStartX[ph];
         if (startX == null) return null;
-        const bTpx = barTmm * sc;  // yatay (Z yönü)
-        const bWpx = barWmm * sc;  // dikey (Y yönü)
+        const bTpx = barTmm * sc;
+        const bWpx = barWmm * sc;
         const groupCX = startX + phGroupW(bc) * sc / 2;
 
         return (
@@ -290,7 +294,7 @@ function CrossSectionView({ draft }: { draft: MainDraft }) {
         );
       })}
 
-      {/* Kalınlık dim oku (alt yatay — tek barın Z genişliği) */}
+      {/* Kalınlık dim oku */}
       {(() => {
         const ph = lPhases[0] ?? phases[0]; if (!ph) return null;
         const sx = pStartX[ph]; if (sx == null) return null;
@@ -298,7 +302,7 @@ function CrossSectionView({ draft }: { draft: MainDraft }) {
           label={`${draft.thickness_mm} mm`} color="#3498db" />;
       })()}
 
-      {/* Genişlik dim oku (sol dikey — barın Y yüksekliği) */}
+      {/* Genişlik dim oku */}
       <DimLineV x={LEFT - 14} y1={by0} y2={by0 + barWmm * sc}
         label={`${draft.width_mm} mm`} color="#9b59b6" />
 
@@ -310,114 +314,12 @@ function CrossSectionView({ draft }: { draft: MainDraft }) {
   );
 }
 
-// ─── Görünüş 2: Ön Görünüş (Z yönüne bakış) ──────────────────────────────────
-// Fiziksel eksenler: SVG-X = X (uzunluk), SVG-Y = Y (yükseklik)
-// Fazlar Z yönünde derinlikte ayrılır → hepsi aynı Y'de, perspektif ofset ile gösterilir.
-// En öndeki faz (L1) tam opak, arkadakiler sağa+yukarı kaydırılmış daha soluk görünür.
-function FrontView({ draft }: { draft: MainDraft }) {
-  const phases   = phaseList(draft.phase_type);
-  const isDouble = draft.layer_type === "Çift Kat";
-  const bpc      = Math.max(draft.bars_per_phase, 1);
-
-  const barWmm  = Math.max(draft.width_mm, 1);
-  const barLmm  = Math.max(draft.busbar_length_mm, 1);
-  const layerGapMm = 6;
-
-  // Toplam bar yüksekliği (çift kat ise 2 × genişlik + boşluk)
-  const totalBarH_mm = isDouble ? barWmm * 2 + layerGapMm : barWmm;
-
-  const SVG_W  = 520;
-  const HEADER = 26;
-  const LEFT   = 58;
-  const RIGHT  = 16;
-  const TOP    = HEADER + 14;
-  const BOT    = 34;
-  const availW = SVG_W - LEFT - RIGHT;
-
-  // Faz başına perspektif piksel ofseti (sağ+yukarı = derinliğe gidiş)
-  const nPh    = phases.length;
-  const DEPTH_DX = 14;   // px / faz — yatay
-  const DEPTH_DY = 10;   // px / faz — dikey (yukarı)
-
-  const totalOffW = (nPh - 1) * DEPTH_DX;
-  const totalOffH = (nPh - 1) * DEPTH_DY;
-
-  const sc = Math.min(
-    (availW - totalOffW) / Math.max(barLmm, 1),
-    110 / Math.max(totalBarH_mm, 1),
-    4.0,
-  );
-
-  const barsW = barLmm * sc;
-  const barsH = totalBarH_mm * sc;
-
-  const bx0 = LEFT + (availW - barsW - totalOffW) / 2;
-  const by0 = TOP + totalOffH;
-  const SVG_H = TOP + totalOffH + barsH + BOT;
-
-  return (
-    <svg viewBox={`0 0 ${SVG_W} ${Math.ceil(SVG_H)}`}
-      style={{ width: "100%", border: "1px solid var(--line)", borderRadius: 6, background: "#1a1f2b", display: "block" }}>
-      <ViewHeader svgW={SVG_W} label="ÖN GÖRÜNÜŞ — UZUNLUK × GENİŞLİK" accent="#3498db" id="hdr-front" />
-
-      {/* Arkadan öne çiz (en öndeki faz en üstte kalır) */}
-      {[...phases].reverse().map((ph) => {
-        const idx   = phases.indexOf(ph);   // 0 = öndeki faz
-        const color = PHASE_COLORS[ph] ?? "#aaa";
-        const x     = bx0 + idx * DEPTH_DX;
-        const y     = by0 - idx * DEPTH_DY;
-        const opacity = idx === 0 ? 0.90 : Math.max(0.45, 0.80 - idx * 0.12);
-
-        // bars_per_phase için ek perspektif gölgesi (Z içinde çoklu bar)
-        const extraShadows = Math.min(bpc - 1, 2);
-
-        return (
-          <g key={ph}>
-            {/* bars_per_phase gölgeleri */}
-            {Array.from({ length: extraShadows }, (_, si) => (
-              <rect key={`bsh-${si}`}
-                x={x + (si + 1) * 4} y={y - (si + 1) * 3}
-                width={barsW} height={barsH}
-                fill={color} opacity={opacity * 0.3} rx={1} />
-            ))}
-
-            {/* Ana bar yüzeyi */}
-            <rect x={x} y={y} width={barsW} height={barsH}
-              fill={color} opacity={opacity} rx={1}
-              stroke={color} strokeWidth={0.6} />
-
-            {/* Çift kat bölme çizgisi */}
-            {isDouble && (
-              <line x1={x} y1={y + barWmm * sc} x2={x + barsW} y2={y + barWmm * sc}
-                stroke={color} strokeWidth={0.6} strokeDasharray="5,3" opacity={0.55} />
-            )}
-
-            {/* Faz etiketi */}
-            <text x={x - 5} y={y + barsH / 2 + 4} textAnchor="end"
-              fontSize={11} fill={color} fontWeight="bold" fontFamily="monospace"
-              opacity={Math.max(0.6, opacity)}>{ph}</text>
-          </g>
-        );
-      })}
-
-      {/* Genişlik dim oku (sağda dikey — öndeki bara göre) */}
-      <DimLineV x={bx0 + barsW + 14} y1={by0} y2={by0 + barsH}
-        label={isDouble ? `${draft.width_mm}×2 mm` : `${draft.width_mm} mm`} color="#9b59b6" />
-
-      {/* Uzunluk dim oku (altta yatay) */}
-      <DimLineH x1={bx0} x2={bx0 + barsW} y={by0 + barsH + 18}
-        label={`${draft.busbar_length_mm} mm`} color="#3498db" />
-    </svg>
-  );
-}
-
-// ─── Görünüş 3: Üst Görünüş ──────────────────────────────────────────────────
-function TopView({ draft }: { draft: MainDraft }) {
-  const phases   = phaseList(draft.phase_type);
-  const nInd     = isNIndependent(draft.phase_type);
+// ─── Görünüş 2: Üst Görünüş ──────────────────────────────────────────────────
+function TopView({ draft, phases, phaseColors }: SvgViewProps) {
+  const nInd     = isNIndependent(phases);
   const isDouble = draft.layer_type === "Çift Kat";
 
-  const barTmm  = Math.max(draft.thickness_mm, 1);   // yukarıdan görünen kalınlık
+  const barTmm  = Math.max(draft.thickness_mm, 1);
   const barLmm  = Math.max(draft.busbar_length_mm, 1);
   const pCenMm  = Math.max(draft.phase_center_mm, 1);
   const bpc     = Math.max(draft.bars_per_phase, 1);
@@ -429,7 +331,6 @@ function TopView({ draft }: { draft: MainDraft }) {
   const lPhases = nInd ? phases.filter((p) => p !== "N") : phases;
   const nLPh    = lPhases.length;
 
-  // Bir fazın Y boyutu: bpc * barT + (bpc-1)*gap + (isDouble ? barT+layerGap : 0)
   const phGroupH = (bc: number) => bc * barTmm + Math.max(0, bc - 1) * gapMm + (isDouble ? barTmm + layerGapMm : 0);
   const lGroupH  = phGroupH(bpc);
   const nGroupH  = phGroupH(nBC);
@@ -442,7 +343,7 @@ function TopView({ draft }: { draft: MainDraft }) {
   const SVG_W  = 520;
   const HEADER = 26;
   const LEFT   = 58;
-  const RIGHT  = 50;  // faz etiketleri için
+  const RIGHT  = 50;
   const TOP    = HEADER + 14;
   const BOT    = 30;
   const availW = SVG_W - LEFT - RIGHT;
@@ -455,7 +356,6 @@ function TopView({ draft }: { draft: MainDraft }) {
   const by0    = TOP + (availH - barsH) / 2;
   const SVG_H  = TOP + availH + BOT;
 
-  // Faz merkez Y (her fazın ilk barının üst kenarı → grup ortası)
   const pTopY: Record<string, number> = {};
   if (nInd) {
     lPhases.forEach((ph, i) => { pTopY[ph] = by0 + i * pCenMm * sc; });
@@ -471,19 +371,16 @@ function TopView({ draft }: { draft: MainDraft }) {
 
       {phases.map((ph) => {
         const bc    = getBC(ph);
-        const color = PHASE_COLORS[ph] ?? "#aaa";
+        const color = phaseColors[ph] ?? "#aaa";
         const topY  = pTopY[ph];
         if (topY == null) return null;
         const bTpx  = barTmm * sc;
         const blPx  = barsW;
-
-        // Grup merkezi Y (etiket için)
         const groupH = phGroupH(bc) * sc;
         const groupCY = topY + groupH / 2;
 
         return (
           <g key={ph}>
-            {/* Faz etiketi (sağ taraf) */}
             <text x={bx0 + blPx + 8} y={groupCY + 4} fontSize={11}
               fill={color} fontWeight="bold" fontFamily="monospace">{ph}</text>
 
@@ -491,10 +388,8 @@ function TopView({ draft }: { draft: MainDraft }) {
               const barY = topY + bi * (barTmm + gapMm) * sc;
               return (
                 <g key={bi}>
-                  {/* Kat 1 */}
                   <rect x={bx0} y={barY} width={blPx} height={bTpx}
                     fill={color} opacity={0.85} rx={1} stroke={color} strokeWidth={0.5} />
-                  {/* Kat 2 (çift kat) */}
                   {isDouble && (
                     <rect x={bx0} y={barY + bTpx + layerGapMm * sc} width={blPx} height={bTpx}
                       fill={color} opacity={0.55} rx={1} stroke={color} strokeWidth={0.5} />
@@ -506,14 +401,14 @@ function TopView({ draft }: { draft: MainDraft }) {
         );
       })}
 
-      {/* Faz aralığı dim oku (solda dikey) */}
+      {/* Faz aralığı dim oku */}
       {lPhases.length >= 2 && (() => {
         const y1 = pTopY[lPhases[0]]; const y2 = pTopY[lPhases[1]];
         if (y1 == null || y2 == null) return null;
         return <DimLineV x={bx0 - 14} y1={y1} y2={y2} label={`${pCenMm} mm`} color="#e74c3c" />;
       })()}
 
-      {/* Kalınlık dim oku (solda, ilk barın kalınlığı) */}
+      {/* Kalınlık dim oku */}
       {(() => {
         const ph = lPhases[0] ?? phases[0]; if (!ph) return null;
         const topY = pTopY[ph]; if (topY == null) return null;
@@ -521,18 +416,18 @@ function TopView({ draft }: { draft: MainDraft }) {
         return <DimLineV x={bx0 - 34} y1={topY} y2={topY + bTpx} label={`${draft.thickness_mm} mm`} color="#9b59b6" />;
       })()}
 
-      {/* Uzunluk dim oku (altta yatay) */}
+      {/* Uzunluk dim oku */}
       <DimLineH x1={bx0} x2={bx0 + barsW} y={by0 + barsH + 18} label={`${draft.busbar_length_mm} mm`} color="#27ae60" />
     </svg>
   );
 }
 
-// ─── Ana önizleme bileşeni (üç görünüş alt alta) ─────────────────────────────
-function BusbarPreview({ draft }: { draft: MainDraft }) {
+// ─── Ana önizleme bileşeni ─────────────────────────────────────────────────
+function BusbarPreview({ draft, phases, phaseColors }: SvgViewProps) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-      <CrossSectionView draft={draft} />
-      <TopView draft={draft} />
+      <CrossSectionView draft={draft} phases={phases} phaseColors={phaseColors} />
+      <TopView draft={draft} phases={phases} phaseColors={phaseColors} />
     </div>
   );
 }
@@ -558,6 +453,28 @@ export function MainCopperFormPage() {
   const [draft, setDraft] = useState<MainDraft>(EMPTY);
   const [draftLoaded, setDraftLoaded] = useState(!isEditing);
 
+  // Faz tipleri ve etiketleri
+  const phaseTypesQuery = useQuery({
+    queryKey: ["phase-types"],
+    queryFn: client.listPhaseTypes,
+  });
+  const phaseLabelsQuery = useQuery({
+    queryKey: ["phase-labels"],
+    queryFn: client.listPhaseLabels,
+  });
+
+  const phaseTypes  = phaseTypesQuery.data ?? [];
+  const phaseLabels = phaseLabelsQuery.data ?? [];
+  const phaseColors = buildColorMap(phaseLabels);
+  const phases      = resolvePhases(draft.phase_type_id, phaseTypes);
+
+  // İlk yükleme — varsayılan faz tipini ata
+  useEffect(() => {
+    if (!isEditing && phaseTypes.length > 0 && draft.phase_type_id === null) {
+      setDraft((v) => ({ ...v, phase_type_id: phaseTypes[0].id }));
+    }
+  }, [phaseTypes, isEditing, draft.phase_type_id]);
+
   // Düzenleme modunda mevcut tanımı yükle
   const definitionQuery = useQuery({
     queryKey: ["copper-definition", id],
@@ -576,7 +493,7 @@ export function MainCopperFormPage() {
     queryClient.invalidateQueries({ queryKey: ["copper-definitions", "main"] });
 
   const createMutation = useMutation({
-    mutationFn: () => client.createCopperDefinition(buildPayload(draft)),
+    mutationFn: () => client.createCopperDefinition(buildPayload(draft, phases)),
     onSuccess: async () => {
       await invalidate();
       navigate("/definitions/copper/main");
@@ -585,7 +502,7 @@ export function MainCopperFormPage() {
 
   const updateMutation = useMutation({
     mutationFn: () =>
-      client.updateCopperDefinition(Number(id), buildPayload(draft)),
+      client.updateCopperDefinition(Number(id), buildPayload(draft, phases)),
     onSuccess: async () => {
       await invalidate();
       navigate("/definitions/copper/main");
@@ -607,6 +524,9 @@ export function MainCopperFormPage() {
       </div>
     );
   }
+
+  // Seçili faz tipinin etiket metni
+  const selectedPhaseTypeName = phaseTypes.find((p) => p.id === draft.phase_type_id)?.name ?? "";
 
   return (
     <div className="stack">
@@ -682,13 +602,20 @@ export function MainCopperFormPage() {
 
             <SectionLabel>Elektriksel Yerleşim</SectionLabel>
 
-            <label className="field">
+            <label className="field" style={{ gridColumn: "1 / -1" }}>
               <span>Faz Tipi</span>
-              <select className="input" value={draft.phase_type}
-                onChange={(e) => set("phase_type", e.target.value)}>
-                <option value="L1-L2-L3">L1 — L2 — L3</option>
-                <option value="N-L1-L2-L3">N — L1 — L2 — L3</option>
-                <option value="L1-L2-L3-N">L1 — L2 — L3 — N</option>
+              <select
+                className="input"
+                value={draft.phase_type_id ?? ""}
+                onChange={(e) => set("phase_type_id", e.target.value ? Number(e.target.value) : null)}
+                disabled={phaseTypesQuery.isLoading}
+              >
+                <option value="">— Seçiniz —</option>
+                {phaseTypes.map((pt) => (
+                  <option key={pt.id} value={pt.id}>
+                    {pt.name} ({pt.phases})
+                  </option>
+                ))}
               </select>
             </label>
 
@@ -710,7 +637,7 @@ export function MainCopperFormPage() {
                 onChange={(e) => set("phase_center_mm", Number(e.target.value))} />
             </label>
 
-            {hasNeutral(draft.phase_type) && (
+            {hasNeutral(phases) && (
               <label className="field">
                 <span>Nötr Bakır Miktarı (adet)</span>
                 <input className="input" type="number" min={1} max={8} value={draft.neutral_bar_count}
@@ -761,17 +688,18 @@ export function MainCopperFormPage() {
           <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted)", marginBottom: "0.75rem" }}>
             Canlı Önizleme
           </div>
-          <BusbarPreview draft={draft} />
+          <BusbarPreview draft={draft} phases={phases} phaseColors={phaseColors} />
 
           {/* Özet bilgiler */}
           <div style={{ marginTop: "1rem", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
             {[
-              ["Faz Tipi", draft.phase_type],
+              ["Faz Tipi", selectedPhaseTypeName || "—"],
+              ["Fazlar", phases.join(", ") || "—"],
               ["Kat Tipi", draft.layer_type],
               ["Faz Miktarı", `${draft.bars_per_phase} adet/faz`],
               ["Faz İçi Aralığı", `${draft.bar_gap_mm} mm`],
               ["Fazlar Arası", `${draft.phase_center_mm} mm`],
-              ...(hasNeutral(draft.phase_type) ? [["Nötr Miktarı", `${draft.neutral_bar_count} adet`]] : []),
+              ...(hasNeutral(phases) ? [["Nötr Miktarı", `${draft.neutral_bar_count} adet`]] : []),
               ["Kesit", `${draft.width_mm} × ${draft.thickness_mm} mm`],
               ["Uzunluk", `${draft.busbar_length_mm} mm`],
             ].map(([label, value]) => (
@@ -781,6 +709,20 @@ export function MainCopperFormPage() {
               </div>
             ))}
           </div>
+
+          {/* Faz renk göstergesi */}
+          {phases.length > 0 && (
+            <div style={{ marginTop: "0.75rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+              {phases.map((ph) => (
+                <div key={ph} style={{ display: "flex", alignItems: "center", gap: "0.3rem",
+                  background: "var(--surface)", borderRadius: 4, padding: "0.25rem 0.5rem" }}>
+                  <span style={{ width: 12, height: 12, borderRadius: 2,
+                    background: phaseColors[ph] ?? "#aaa", display: "inline-block" }} />
+                  <span style={{ fontSize: "0.78rem", fontWeight: 600, color: phaseColors[ph] ?? "var(--fg)" }}>{ph}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </div>

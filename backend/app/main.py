@@ -9,6 +9,8 @@ from app.api.devices import router as devices_router
 from app.api.exports import router as exports_router
 from app.api.panel_definitions import router as panel_definitions_router
 from app.api.panel_types import router as panel_types_router
+from app.api.phase_labels import router as phase_labels_router
+from app.api.phase_types import router as phase_types_router
 from app.api.panels import router as panels_router
 from app.api.project_coppers import router as project_coppers_router
 from app.api.project_devices import router as project_devices_router
@@ -38,6 +40,8 @@ app.include_router(project_coppers_router, prefix="/api")
 app.include_router(copper_router, prefix="/api")
 app.include_router(panel_definitions_router, prefix="/api")
 app.include_router(panel_types_router, prefix="/api")
+app.include_router(phase_labels_router, prefix="/api")
+app.include_router(phase_types_router, prefix="/api")
 app.include_router(copper_definitions_router, prefix="/api")
 app.include_router(bend_types_router, prefix="/api")
 app.include_router(branch_conductors_router, prefix="/api")
