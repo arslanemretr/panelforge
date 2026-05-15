@@ -58,6 +58,9 @@ interface TerminalDraft {
   terminal_depth_mm: number | null;
   fin_count: number | null;
   fin_spacing_mm: number | null;
+  bolt_pos_x_mm: number | null;  // sol kenardan ilk delik merkezi
+  bolt_pos_y_mm: number | null;  // üst yüzeyden delik satırı merkezi
+  bolt_pos_z_mm: number | null;  // ön yüzeyden delik merkezi derinliği
 }
 
 const EMPTY_DRAFT: TerminalDraft = {
@@ -75,6 +78,9 @@ const EMPTY_DRAFT: TerminalDraft = {
   terminal_depth_mm: 60,
   fin_count: null,
   fin_spacing_mm: null,
+  bolt_pos_x_mm: null,
+  bolt_pos_y_mm: null,
+  bolt_pos_z_mm: null,
 };
 
 function buildPayload(d: TerminalDraft): Omit<TerminalDefinition, "id" | "created_at" | "updated_at"> {
@@ -93,6 +99,9 @@ function buildPayload(d: TerminalDraft): Omit<TerminalDefinition, "id" | "create
     terminal_depth_mm: d.terminal_depth_mm,
     fin_count: isTarakli(d.terminal_type) ? d.fin_count : null,
     fin_spacing_mm: isTarakli(d.terminal_type) ? d.fin_spacing_mm : null,
+    bolt_pos_x_mm: d.bolt_pos_x_mm,
+    bolt_pos_y_mm: d.bolt_pos_y_mm,
+    bolt_pos_z_mm: d.bolt_pos_z_mm,
   };
 }
 
@@ -161,6 +170,9 @@ export function TerminalFormPage() {
         terminal_depth_mm: def.terminal_depth_mm ?? null,
         fin_count: def.fin_count ?? null,
         fin_spacing_mm: def.fin_spacing_mm ?? null,
+        bolt_pos_x_mm: def.bolt_pos_x_mm ?? null,
+        bolt_pos_y_mm: def.bolt_pos_y_mm ?? null,
+        bolt_pos_z_mm: def.bolt_pos_z_mm ?? null,
       });
       if (def.slot_width_mm || def.slot_length_mm) {
         setHoleMode("slot");
@@ -371,11 +383,54 @@ export function TerminalFormPage() {
             </div>
           </section>
 
-          {/* D — Fin / Tarak (Taraklı tipler için) */}
+          {/* D — Delik Konumu */}
+          <section className="card" style={{ marginBottom: "1rem" }}>
+            <h3 style={{ margin: "0 0 0.9rem", fontSize: "0.85rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              D — Delik Konumu
+            </h3>
+            <p style={{ margin: "0 0 0.75rem", fontSize: "0.78rem", color: "var(--muted)" }}>
+              Boş bırakılırsa delikler otomatik ortalanır. Belirtilirse tam konum kullanılır.
+            </p>
+            <div className="form-grid">
+              {/* X: sol kenar — tüm tipler */}
+              <NumField
+                label="Sol Kenardan (X)"
+                unit="mm"
+                value={draft.bolt_pos_x_mm}
+                onChange={(v) => set("bolt_pos_x_mm", v)}
+              />
+
+              {/* Y: üstten — Ön Terminal, Kablo Pabuçlu, Yandan Taraklı */}
+              {(draft.terminal_type === "Ön Terminal" ||
+                draft.terminal_type === "Kablo Pabuçlu" ||
+                draft.terminal_type === "Yandan Taraklı") && (
+                <NumField
+                  label="Üstten (Y)"
+                  unit="mm"
+                  value={draft.bolt_pos_y_mm}
+                  onChange={(v) => set("bolt_pos_y_mm", v)}
+                />
+              )}
+
+              {/* Z: önden derinlik — Arka Yatay ve Yandan Taraklı */}
+              {(draft.terminal_type === "Arka Yatay Taraklı" ||
+                draft.terminal_type === "Arka Yatay Terminal" ||
+                draft.terminal_type === "Yandan Taraklı") && (
+                <NumField
+                  label="Önden (Z)"
+                  unit="mm"
+                  value={draft.bolt_pos_z_mm}
+                  onChange={(v) => set("bolt_pos_z_mm", v)}
+                />
+              )}
+            </div>
+          </section>
+
+          {/* E — Fin / Tarak (Taraklı tipler için) */}
           {showFinFields && (
             <section className="card" style={{ marginBottom: "1rem" }}>
               <h3 style={{ margin: "0 0 0.9rem", fontSize: "0.85rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                D — Tarak (Fin) Geometrisi
+                E — Tarak (Fin) Geometrisi
               </h3>
               <div className="form-grid">
                 <NumField label="Fin Adedi" value={draft.fin_count}
@@ -466,6 +521,9 @@ export function TerminalFormPage() {
             slot_length_mm={draft.slot_length_mm}
             fin_count={draft.fin_count}
             fin_spacing_mm={draft.fin_spacing_mm}
+            bolt_pos_x_mm={draft.bolt_pos_x_mm}
+            bolt_pos_y_mm={draft.bolt_pos_y_mm}
+            bolt_pos_z_mm={draft.bolt_pos_z_mm}
           />
         </div>
       </div>

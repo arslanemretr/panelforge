@@ -17,6 +17,9 @@ export interface TerminalPreviewProps {
   slot_length_mm?: number | null;
   fin_count?: number | null;
   fin_spacing_mm?: number | null;
+  bolt_pos_x_mm?: number | null;  // sol kenardan ilk delik merkezi (mm)
+  bolt_pos_y_mm?: number | null;  // üst yüzeyden delik satırı merkezi (mm)
+  bolt_pos_z_mm?: number | null;  // ön yüzeyden delik derinliği (mm)
   width?: number;
   height?: number;
 }
@@ -36,6 +39,9 @@ interface Geom {
   holeDmm: number;
   finN: number;   // fin adedi
   finSpMm: number;// fin aralığı mm
+  posXmm: number | null;  // sol kenardan ilk delik (null = otomatik ortala)
+  posYmm: number | null;  // üstten delik satırı (null = otomatik)
+  posZmm: number | null;  // önden delik derinliği (null = otomatik)
 }
 
 // ─── Renkler ─────────────────────────────────────────────────────────────────
@@ -247,16 +253,25 @@ function HideLegend({ x, y }: { x: number; y: number }) {
   );
 }
 
-// Bolt X pozisyonları (merkezlenmiş, satır boyunca)
-function boltXs(bx: number, bw: number, n: number, spxSvg: number): number[] {
-  const cx0 = bx + bw / 2 - (n - 1) * spxSvg / 2;
+// Bolt X pozisyonları — posXmm varsa ilk deliği sol kenardan konumlandır, yoksa ortala
+function boltXs(bx: number, bw: number, n: number, spxSvg: number, sc: number, posXmm: number | null): number[] {
+  const cx0 = posXmm != null
+    ? bx + posXmm * sc                           // kesin konum: sol kenardan
+    : bx + bw / 2 - (n - 1) * spxSvg / 2;       // otomatik: ortalı
   return Array.from({ length: n }, (_, i) => cx0 + i * spxSvg);
 }
 
-// Bolt Y pozisyonları (merkezlenmiş, sütun boyunca)
-function boltYs(by: number, bh: number, n: number, spySvg: number): number[] {
-  const cy0 = by + bh / 2 - (n - 1) * spySvg / 2;
+// Bolt Y pozisyonları — posYmm varsa ilk deliği üstten konumlandır, yoksa ortala
+function boltYs(by: number, bh: number, n: number, spySvg: number, sc: number, posYmm: number | null): number[] {
+  const cy0 = posYmm != null
+    ? by + posYmm * sc
+    : by + bh / 2 - (n - 1) * spySvg / 2;
   return Array.from({ length: n }, (_, i) => cy0 + i * spySvg);
+}
+
+// Z pozisyonu (derinlik ekseninde) — posZmm varsa kulllan, yoksa varsayılan oran
+function posZsvg(by: number, bh: number, sc: number, posZmm: number | null, defaultRatio = 0.5): number {
+  return posZmm != null ? by + posZmm * sc : by + bh * defaultRatio;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -281,8 +296,9 @@ function FrontView({ g }: { g: Geom }) {
   const sW  = Math.max(g.sWmm * sc, hR * 1.5);
   const sL  = Math.max(g.sLmm * sc, sW * 1.6);
   const spx = Math.min(g.boltSpMm * sc, (bw - sL - 6) / Math.max(g.boltN - 1, 1));
-  const hY  = by + bh * 0.26;  // delik Y — üstten %26
-  const xs  = boltXs(bx, bw, g.boltN, spx);
+  // Delik Y: posYmm varsa kullan, yoksa üstten %26
+  const hY  = g.posYmm != null ? by + g.posYmm * sc : by + bh * 0.26;
+  const xs  = boltXs(bx, bw, g.boltN, spx, sc, g.posXmm);
 
   // Kablo pabuçlu parametreleri
   const headRx = bw * .38; const headRy = headRx * .82;
@@ -324,6 +340,14 @@ function FrontView({ g }: { g: Geom }) {
               {g.boltN >= 2 && xs.length >= 2 && (
                 <DimH x1={xs[0]} x2={xs[xs.length-1]} y={hY + (g.isSlot ? sL/sc*sc/2+6 : hR+5)}
                   label={`${g.boltSpMm} mm`} color={RED} off={10} />
+              )}
+              {/* Üstten uzaklık boyutu */}
+              {g.posYmm != null && (
+                <DimV x={bx - 6} y1={by} y2={hY} label={`${g.posYmm} mm`} color="#f39c12" off={10} />
+              )}
+              {/* Sol kenardan uzaklık boyutu (ilk delik) */}
+              {g.posXmm != null && xs.length > 0 && (
+                <DimH x1={bx} x2={xs[0]} y={hY - hR - 14} label={`${g.posXmm} mm`} color="#f39c12" off={10} />
               )}
               <HideLegend x={bx+4} y={by+bh+26} />
             </>
@@ -393,8 +417,8 @@ function BackView({ g }: { g: Geom }) {
   const sW  = Math.max(g.sWmm * sc, hR * 1.5);
   const sL  = Math.max(g.sLmm * sc, sW * 1.6);
   const spx = Math.min(g.boltSpMm * sc, (bw - sL - 6) / Math.max(g.boltN - 1, 1));
-  const hY  = by + bh * 0.26;
-  const xs  = boltXs(bx, bw, g.boltN, spx);
+  const hY  = g.posYmm != null ? by + g.posYmm * sc : by + bh * 0.26;
+  const xs  = boltXs(bx, bw, g.boltN, spx, sc, g.posXmm);
 
   return (
     <svg viewBox={`0 0 ${SW} ${Math.ceil(SVH)}`}
@@ -471,10 +495,12 @@ function SideView({ g }: { g: Geom }) {
   const sLs  = Math.max(g.sLmm * sc, sWs * 1.6);
   const spxY = Math.min(g.boltSpMm * sc, (bh - sLs - 6) / Math.max(g.boltN - 1, 1));
 
-  // Ön Terminal: delikler ön yüzde → yan görünüşte sol kenar (ön yüz)
-  const hY_front = by + bh * 0.26; // deliğin yüksekliği (ön görünüşle aynı oran)
-  // Yandan Taraklı: doğrudan delikler sütun halinde
-  const ysYT = boltYs(by, bh, g.boltN, spxY);
+  // Ön Terminal: delikler ön yüzde → Y konumu (posYmm veya %26)
+  const hY_front = g.posYmm != null ? by + g.posYmm * sc : by + bh * 0.26;
+  // Z (derinlik) konumu: Ön Terminal için posZmm → x_svg; Arka Yatay için üst/alt kenar
+  const holeXdepth = g.posZmm != null ? bx + g.posZmm * sc : bx + hR + 2;
+  // Yandan Taraklı: sütun Y pozisyonları
+  const ysYT = boltYs(by, bh, g.boltN, spxY, sc, g.posYmm);
 
   return (
     <svg viewBox={`0 0 ${SW} ${Math.ceil(SVH)}`}
@@ -489,14 +515,13 @@ function SideView({ g }: { g: Geom }) {
       <text x={bx+3} y={by-4} fontSize={7} fill="#3498db" fontFamily="system-ui" fontWeight={600}>ÖN</text>
       <text x={bx+bw-3} y={by-4} fontSize={7} fill="#e74c3c" fontFamily="system-ui" fontWeight={600} textAnchor="end">ARKA</text>
 
-      {/* ── Ön Terminal: kesit çizgisi (delik sol kenarda ön yüzden giriyor) ── */}
+      {/* ── Ön Terminal: kesit çizgisi (delik ön yüzden giriyor) ── */}
       {isOT && (
         <>
-          {/* Sol kenarda dashed delik kesiti */}
-          <RHdash cx={bx + hR + 2} cy={hY_front} r={hR} />
-          {/* Dashed yatay çizgi delik genişliği boyunca */}
-          <HideLineH x1={bx} x2={bx + Math.min(bw * 0.5, hR * 4 + 4)} y={hY_front - hR * 0.9} />
-          <HideLineH x1={bx} x2={bx + Math.min(bw * 0.5, hR * 4 + 4)} y={hY_front + hR * 0.9} />
+          {/* posZmm varsa deliğin tam derinlik konumunda, yoksa ön yüz kenarında */}
+          <RHdash cx={holeXdepth} cy={hY_front} r={hR} />
+          <HideLineH x1={bx} x2={Math.min(bx + bw * 0.6, holeXdepth + hR * 2)} y={hY_front - hR * 0.9} />
+          <HideLineH x1={bx} x2={Math.min(bx + bw * 0.6, holeXdepth + hR * 2)} y={hY_front + hR * 0.9} />
           <HideLegend x={bx+4} y={by+bh+26} />
         </>
       )}
@@ -584,15 +609,13 @@ function TopBottomView({ g }: { g: Geom }) {
   const sWt = Math.max(g.sWmm * sc, hR * 1.5);
   const sLt = Math.max(g.sLmm * sc, sWt * 1.6);
   const spx = Math.min(g.boltSpMm * sc, (bw - sLt - 6) / Math.max(g.boltN - 1, 1));
-  const xs  = boltXs(bx, bw, g.boltN, spx);
+  const xs  = boltXs(bx, bw, g.boltN, spx, sc, g.posXmm);
 
-  // Delik Y pozisyonu
-  // - Ön Terminal: ön yüz = üst kenar, delikler ön yüzde → üst kenara yakın
-  // - Arka Yatay: delikler üst/alt yüzde → ortada (direct)
-  // - Yandan Taraklı: delikler yanda → yanda dashed
-  const holeY_OT  = by + Math.min(bh * 0.22, hR * 2 + 3); // ön yüze yakın
-  const holeY_AY  = by + bh * 0.5;                          // ortada (direct)
-  const holeY_YT  = by + bh * 0.5;                          // ortada (dashed)
+  // Delik Y pozisyonu (Y ekseninde = derinlik / Z)
+  // posZmm = önden uzaklık → üst görünüşte Y koordinatı (by'den uzaklık)
+  const holeY_OT  = g.posZmm != null ? by + g.posZmm * sc : by + Math.min(bh * 0.22, hR * 2 + 3);
+  const holeY_AY  = g.posZmm != null ? by + g.posZmm * sc : by + bh * 0.5;
+  const holeY_YT  = g.posZmm != null ? by + g.posZmm * sc : by + bh * 0.5;
 
   // Etiket
   const viewLabel = g.surf === "bottom"
@@ -624,7 +647,13 @@ function TopBottomView({ g }: { g: Geom }) {
 
       {/* ── Arka Yatay Terminal: DOĞRUDAN delikler ── */}
       {isAY && (
-        <Holes xs={xs} cy={holeY_AY} g={{ ...g, sWmm: sWt/sc, sLmm: sLt/sc }} dashed={false} />
+        <>
+          <Holes xs={xs} cy={holeY_AY} g={{ ...g, sWmm: sWt/sc, sLmm: sLt/sc }} dashed={false} />
+          {/* Önden uzaklık boyutu (Z) */}
+          {g.posZmm != null && (
+            <DimV x={bx - 6} y1={by} y2={holeY_AY} label={`${g.posZmm} mm`} color="#f39c12" off={10} />
+          )}
+        </>
       )}
 
       {/* ── Arka Yatay Taraklı: DOĞRUDAN delikler + fin örüntüsü ── */}
@@ -690,6 +719,9 @@ export function TerminalPreview({
   slot_length_mm,
   fin_count,
   fin_spacing_mm,
+  bolt_pos_x_mm,
+  bolt_pos_y_mm,
+  bolt_pos_z_mm,
 }: TerminalPreviewProps) {
   const isSlot = !!(slot_width_mm || slot_length_mm);
 
@@ -716,6 +748,9 @@ export function TerminalPreview({
     holeDmm:  Math.max(hole_diameter_mm   ?? 13,  4),
     finN,
     finSpMm,
+    posXmm:   bolt_pos_x_mm ?? null,
+    posYmm:   bolt_pos_y_mm ?? null,
+    posZmm:   bolt_pos_z_mm ?? null,
   };
 
   const panelStyle: React.CSSProperties = {

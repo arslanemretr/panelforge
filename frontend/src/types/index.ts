@@ -104,6 +104,9 @@ export interface TerminalDefinition {
   terminal_depth_mm?: number | null;
   fin_count?: number | null;
   fin_spacing_mm?: number | null;
+  bolt_pos_x_mm?: number | null;   // sol kenardan ilk delik merkezi (mm)
+  bolt_pos_y_mm?: number | null;   // üst yüzeyden delik merkezi (mm)
+  bolt_pos_z_mm?: number | null;   // ön yüzeyden delik merkezi derinliği (mm)
   created_at?: string;
   updated_at?: string;
 }
