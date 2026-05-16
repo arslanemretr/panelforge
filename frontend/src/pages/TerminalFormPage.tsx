@@ -58,6 +58,7 @@ interface TerminalDraft {
   terminal_depth_mm: number | null;
   fin_count: number | null;
   fin_spacing_mm: number | null;
+  fin_thickness_mm: number | null;
   bolt_pos_x_mm: number | null;  // sol kenardan ilk delik merkezi
   bolt_pos_y_mm: number | null;  // üst yüzeyden delik satırı merkezi
   bolt_pos_z_mm: number | null;  // ön yüzeyden delik merkezi derinliği
@@ -78,6 +79,7 @@ const EMPTY_DRAFT: TerminalDraft = {
   terminal_depth_mm: 60,
   fin_count: null,
   fin_spacing_mm: null,
+  fin_thickness_mm: null,
   bolt_pos_x_mm: null,
   bolt_pos_y_mm: null,
   bolt_pos_z_mm: null,
@@ -99,6 +101,7 @@ function buildPayload(d: TerminalDraft): Omit<TerminalDefinition, "id" | "create
     terminal_depth_mm: d.terminal_depth_mm,
     fin_count: isTarakli(d.terminal_type) ? d.fin_count : null,
     fin_spacing_mm: isTarakli(d.terminal_type) ? d.fin_spacing_mm : null,
+    fin_thickness_mm: isTarakli(d.terminal_type) ? d.fin_thickness_mm : null,
     bolt_pos_x_mm: d.bolt_pos_x_mm,
     bolt_pos_y_mm: d.bolt_pos_y_mm,
     bolt_pos_z_mm: d.bolt_pos_z_mm,
@@ -170,6 +173,7 @@ export function TerminalFormPage() {
         terminal_depth_mm: def.terminal_depth_mm ?? null,
         fin_count: def.fin_count ?? null,
         fin_spacing_mm: def.fin_spacing_mm ?? null,
+        fin_thickness_mm: def.fin_thickness_mm ?? null,
         bolt_pos_x_mm: def.bolt_pos_x_mm ?? null,
         bolt_pos_y_mm: def.bolt_pos_y_mm ?? null,
         bolt_pos_z_mm: def.bolt_pos_z_mm ?? null,
@@ -439,6 +443,9 @@ export function TerminalFormPage() {
                 <NumField label="Fin Aralığı" unit="mm"
                   value={draft.fin_spacing_mm}
                   onChange={(v) => set("fin_spacing_mm", v)} />
+                <NumField label="Fin Kalınlığı" unit="mm"
+                  value={draft.fin_thickness_mm}
+                  onChange={(v) => set("fin_thickness_mm", v)} />
               </div>
             </section>
           )}
@@ -492,7 +499,7 @@ export function TerminalFormPage() {
                   ? `${draft.terminal_width_mm}×${draft.terminal_height_mm}×${draft.terminal_depth_mm ?? "?"} mm`
                   : "—"],
                 ...(showFinFields
-                  ? [["Fin", draft.fin_count ? `${draft.fin_count} adet${draft.fin_spacing_mm ? ` / ${draft.fin_spacing_mm} mm` : ""}` : "—"]]
+                  ? [["Fin", draft.fin_count ? `${draft.fin_count} adet${draft.fin_spacing_mm ? ` / ${draft.fin_spacing_mm} mm ara` : ""}${draft.fin_thickness_mm ? ` / ${draft.fin_thickness_mm} mm kalın` : ""}` : "—"]]
                   : []),
               ].map(([label, value]) => (
                 <div key={label} style={{
@@ -521,6 +528,7 @@ export function TerminalFormPage() {
             slot_length_mm={draft.slot_length_mm}
             fin_count={draft.fin_count}
             fin_spacing_mm={draft.fin_spacing_mm}
+            fin_thickness_mm={draft.fin_thickness_mm}
             bolt_pos_x_mm={draft.bolt_pos_x_mm}
             bolt_pos_y_mm={draft.bolt_pos_y_mm}
             bolt_pos_z_mm={draft.bolt_pos_z_mm}

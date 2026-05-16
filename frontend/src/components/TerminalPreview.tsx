@@ -17,6 +17,7 @@ export interface TerminalPreviewProps {
   slot_length_mm?: number | null;
   fin_count?: number | null;
   fin_spacing_mm?: number | null;
+  fin_thickness_mm?: number | null;
   bolt_pos_x_mm?: number | null;  // sol kenardan ilk delik merkezi (mm)
   bolt_pos_y_mm?: number | null;  // üst yüzeyden delik satırı merkezi (mm)
   bolt_pos_z_mm?: number | null;  // ön yüzeyden delik derinliği (mm)
@@ -37,8 +38,9 @@ interface Geom {
   sWmm: number;   // slot genişliği mm
   sLmm: number;   // slot uzunluğu mm
   holeDmm: number;
-  finN: number;   // fin adedi
-  finSpMm: number;// fin aralığı mm
+  finN: number;       // fin adedi
+  finSpMm: number;    // fin aralığı mm
+  finThickMm: number; // fin kalınlığı mm (0 = otomatik hesapla)
   posXmm: number | null;  // sol kenardan ilk delik (null = otomatik ortala)
   posYmm: number | null;  // üstten delik satırı (null = otomatik)
   posZmm: number | null;  // önden delik derinliği (null = otomatik)
@@ -458,8 +460,8 @@ function BackView({ g }: { g: Geom }) {
       {isAYT && (() => {
         const n = g.finN; const pad = bh * 0.05;
         const zone = bh - pad * 2; const sp = zone / n;
-        const fh = Math.max(sp * 0.42, 1.2);
-        // Fin merkezleri (DimVR için)
+        // Fin kalınlığı: girilmişse onu kullan, yoksa hesapla
+        const fh = g.finThickMm > 0 ? g.finThickMm * sc : Math.max(sp * 0.42, 1.2);
         const fy0 = by + pad + 0 * sp + (sp - fh) / 2 + fh / 2;
         const fy1 = by + pad + 1 * sp + (sp - fh) / 2 + fh / 2;
         return <>
@@ -468,10 +470,14 @@ function BackView({ g }: { g: Geom }) {
             return <rect key={i} x={bx + 4} y={fy} width={bw - 8} height={fh}
               fill={CUFILL} stroke={CU} strokeWidth={0.85} rx={0} />;
           })}
-          {/* Fin aralığı boyutu — sağda */}
+          {/* Fin aralığı + kalınlık boyutu — sağda */}
           {n >= 2 && (
             <DimVR x={bx + bw + 4} y1={fy0} y2={fy1}
               label={`${g.finSpMm} mm`} color="#f39c12" off={12} />
+          )}
+          {g.finThickMm > 0 && (
+            <DimVR x={bx + bw + 4} y1={fy0 - fh / 2} y2={fy0 + fh / 2}
+              label={`${g.finThickMm} mm`} color={DIM} off={52} />
           )}
         </>;
       })()}
@@ -584,25 +590,33 @@ function SideView({ g }: { g: Geom }) {
         const pad  = bh * 0.05;
         const zone = bh - pad * 2;
         const sp   = zone / n;
-        const fh   = Math.max(sp * 0.42, 1.5);
+        // Fin kalınlığı: girilmişse onu kullan, yoksa aralığın %42'si
+        const fh   = g.finThickMm > 0 ? g.finThickMm * sc : Math.max(sp * 0.42, 1.5);
 
-        // Gövde (spine): sol taraf — finler sağa uzanır
-        const bodyW     = bw * 0.28;
+        const hR_min  = Math.max(hR, 3.5);
+
+        // Delik Z konumu — posZmm veya derinliğin %50'si (üst görünüş ile tutarlı)
+        const rawHoleX = g.posZmm != null ? bx + g.posZmm * sc : bx + bw * 0.5;
+
+        // Gövde (spine): delik mutlaka içine düşmeli → dinamik genişlik
+        const rawBodyW  = bw * 0.28;
+        const bodyW     = g.posZmm != null
+          ? Math.max(rawBodyW, g.posZmm * sc + hR_min * 2.5)
+          : rawBodyW;
         const bodyX     = bx;
         const finStartX = bodyX + bodyW;
         const finEndX   = bx + bw - 2;
-        const finLength = finEndX - finStartX;
+        const finLength = Math.max(finEndX - finStartX, 4);
+
+        // holeX: delik mutlaka gövde içinde kalmalı
+        const holeX = Math.min(rawHoleX, bodyX + bodyW - hR_min * 1.2);
 
         // Fin merkezleri (boyut için)
         const fy0 = by + pad + 0 * sp + (sp - fh) / 2 + fh / 2;
         const fy1 = by + pad + 1 * sp + (sp - fh) / 2 + fh / 2;
 
-        // Delik Z konumu (yatay eksen = Z/derinlik)
-        const holeX   = g.posZmm != null ? bx + g.posZmm * sc : bodyX + bodyW * 0.5;
-        const hR_min  = Math.max(hR, 3.5);
-
-        // Delik kanalı derinliği (Y ekseninde): posYmm veya gövde yüksekliğinin %28'i
-        const holeDepthSvg = g.posYmm != null ? g.posYmm * sc : bh * 0.28;
+        // Delik kanalı Y derinliği: posYmm veya yüksekliğin %45'i
+        const holeDepthSvg = g.posYmm != null ? g.posYmm * sc : bh * 0.45;
         const holeEntryY   = g.surf === "bottom" ? by + bh : by;
         const holeCenterY  = g.surf === "bottom"
           ? by + bh - holeDepthSvg
@@ -811,6 +825,7 @@ export function TerminalPreview({
   slot_length_mm,
   fin_count,
   fin_spacing_mm,
+  fin_thickness_mm,
   bolt_pos_x_mm,
   bolt_pos_y_mm,
   bolt_pos_z_mm,
@@ -825,6 +840,7 @@ export function TerminalPreview({
   const finSpMm = fin_spacing_mm ?? (bolt_count && bolt_center_distance_mm
     ? bolt_center_distance_mm / 2
     : 20);
+  const finThickMm = Math.max(fin_thickness_mm ?? 0, 0);
 
   const g: Geom = {
     type:     terminal_type,
@@ -840,6 +856,7 @@ export function TerminalPreview({
     holeDmm:  Math.max(hole_diameter_mm   ?? 13,  4),
     finN,
     finSpMm,
+    finThickMm,
     posXmm:   bolt_pos_x_mm ?? null,
     posYmm:   bolt_pos_y_mm ?? null,
     posZmm:   bolt_pos_z_mm ?? null,
