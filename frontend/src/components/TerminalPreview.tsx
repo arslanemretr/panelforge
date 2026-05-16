@@ -121,6 +121,23 @@ function DimV({ x, y1, y2, label, color = DIM, off = 14 }:
   );
 }
 
+// Sağ tarafa boyut oku (gövde dışında, sağda)
+function DimVR({ x, y1, y2, label, color = DIM, off = 14 }:
+  { x: number; y1: number; y2: number; label: string; color?: string; off?: number }) {
+  const cy = (y1 + y2) / 2; const xr = x + off;
+  return (
+    <g stroke={color} strokeWidth={0.7} fill="none">
+      <line x1={x} y1={y1} x2={xr+3} y2={y1} />
+      <line x1={x} y1={y2} x2={xr+3} y2={y2} />
+      <line x1={xr} y1={y1} x2={xr} y2={y2} />
+      <polygon points={`${xr-2},${y1+5} ${xr},${y1} ${xr+2},${y1+5}`} fill={color} stroke="none" />
+      <polygon points={`${xr-2},${y2-5} ${xr},${y2} ${xr+2},${y2-5}`} fill={color} stroke="none" />
+      <rect x={xr+2} y={cy-6} width={42} height={12} fill={BG} stroke="none" />
+      <text x={xr+6} y={cy+4} textAnchor="start" fontSize={9} fill={color} stroke="none" fontFamily="monospace">{label}</text>
+    </g>
+  );
+}
+
 // ─── Delik sembolleri — doğrudan görünüm (tam çember) ────────────────────────
 function RH({ cx, cy, r }: { cx: number; cy: number; r: number }) {
   return (
@@ -437,18 +454,25 @@ function BackView({ g }: { g: Geom }) {
         </>
       )}
 
-      {/* Arka Yatay Taraklı: arka yüzden fin kenar hizaları görünür
-          Finler yatay bakır plakalardır — arkadan bakınca düz kenar çizgileri olarak görünür */}
+      {/* Arka Yatay Taraklı: arka yüzden fin kenar hizaları + fin aralığı boyutu */}
       {isAYT && (() => {
         const n = g.finN; const pad = bh * 0.05;
         const zone = bh - pad * 2; const sp = zone / n;
-        const fh = Math.max(sp * 0.42, 1.2); // fin kenar kalınlığı
+        const fh = Math.max(sp * 0.42, 1.2);
+        // Fin merkezleri (DimVR için)
+        const fy0 = by + pad + 0 * sp + (sp - fh) / 2 + fh / 2;
+        const fy1 = by + pad + 1 * sp + (sp - fh) / 2 + fh / 2;
         return <>
           {Array.from({ length: n }, (_, i) => {
             const fy = by + pad + i * sp + (sp - fh) / 2;
             return <rect key={i} x={bx + 4} y={fy} width={bw - 8} height={fh}
               fill={CUFILL} stroke={CU} strokeWidth={0.85} rx={0} />;
           })}
+          {/* Fin aralığı boyutu — sağda */}
+          {n >= 2 && (
+            <DimVR x={bx + bw + 4} y1={fy0} y2={fy1}
+              label={`${g.finSpMm} mm`} color="#f39c12" off={12} />
+          )}
         </>;
       })()}
 
@@ -551,45 +575,53 @@ function SideView({ g }: { g: Geom }) {
       )}
 
       {/* ── Arka Yatay Taraklı: TARAK PROFİLİ (yan kesit görünüşü) ──
-          Yan görünüşte (Derinlik Z × Yükseklik Y):
-            - Sol = ön yüz, Sağ = arka yüz
-            - Gövde: sağda (arka), finler: soldan gövdeye uzanır
-            - Delik: üst veya alt kenardan kesit (dashed) */}
+          Yan görünüş (Derinlik Z × Yükseklik Y):
+            Sol = ÖN yüz, Sağ = ARKA yüz
+            Gövde (spine): SOLDA — finler SAĞA uzanır
+            Tüm finler gövde kenarından aynı hizada başlar */}
       {isAYT && (() => {
         const n    = g.finN;
         const pad  = bh * 0.05;
         const zone = bh - pad * 2;
         const sp   = zone / n;
-        const fh   = Math.max(sp * 0.42, 1.5); // fin kalınlığı
+        const fh   = Math.max(sp * 0.42, 1.5);
 
-        // Gövde: derinliğin arka %30'u
-        const bodyW = bw * 0.30;
-        const bodyX = bx + bw - bodyW;
-        // Finler: ön yüzden gövdeye kadar
-        const finEndX = bodyX;
-        const finStartX = bx + 4;
+        // Gövde (spine): sol taraf — finler sağa uzanır
+        const bodyW    = bw * 0.28;
+        const bodyX    = bx;
+        const finStartX = bodyX + bodyW;       // finler gövde kenarından başlar
+        const finEndX  = bx + bw - 2;
         const finLength = finEndX - finStartX;
 
-        // Dashed delik konumu: posZmm veya gövde ortası
+        // Fin merkezleri (boyut için)
+        const fy0 = by + pad + 0 * sp + (sp - fh) / 2 + fh / 2;
+        const fy1 = by + pad + 1 * sp + (sp - fh) / 2 + fh / 2;
+
+        // Dashed delik: gövde içinde (posZmm veya gövde orta)
         const holeX = g.posZmm != null ? bx + g.posZmm * sc : bodyX + bodyW * 0.5;
 
         return (
           <>
-            {/* Finler: soldan (ön) gövdeye uzanan yatay plakalar */}
+            {/* Gövde: sol (ÖN) taraf */}
+            <rect x={bodyX} y={by} width={bodyW} height={bh}
+              fill={CUFILL} stroke={CU} strokeWidth={1.3} rx={1} />
+            {/* Finler: gövdeden SAĞA uzanan yatay plakalar — hepsi aynı hizadan */}
             {Array.from({ length: n }, (_, i) => {
               const fy = by + pad + i * sp + (sp - fh) / 2;
               return <rect key={i} x={finStartX} y={fy} width={finLength} height={fh}
                 fill={CUFILL} stroke={CU} strokeWidth={0.85} rx={1} />;
             })}
-            {/* Gövde: sağ taraf (arka) */}
-            <rect x={bodyX} y={by} width={bodyW} height={bh}
-              fill={CUFILL} stroke={CU} strokeWidth={1.3} rx={1} />
             {/* Dashed delik: üst veya alt yüzeyden kesit */}
-            {g.surf === "top"    && <RHdash cx={holeX} cy={by + hR + 2} r={hR} />}
-            {g.surf === "bottom" && <RHdash cx={holeX} cy={by + bh - hR - 2} r={hR} />}
-            {/* posZmm varsa boyut oku */}
+            <RHdash cx={holeX} cy={g.surf === "bottom" ? by + bh - hR - 2 : by + hR + 2} r={hR} />
+            {/* Fin aralığı boyutu — sağ kenarda */}
+            {n >= 2 && (
+              <DimVR x={finEndX + 3} y1={fy0} y2={fy1}
+                label={`${g.finSpMm} mm`} color="#f39c12" off={12} />
+            )}
+            {/* posZmm boyut oku */}
             {g.posZmm != null && (
-              <DimH x1={bx} x2={holeX} y={by + bh + 14} label={`${g.posZmm} mm`} color="#f39c12" off={10} />
+              <DimH x1={bodyX} x2={holeX} y={by + bh + 14}
+                label={`${g.posZmm} mm`} color="#f39c12" off={10} />
             )}
             <HideLegend x={bx+4} y={by+bh+26} />
           </>
@@ -696,31 +728,62 @@ function TopBottomView({ g }: { g: Geom }) {
         </>
       )}
 
-      {/* ── Arka Yatay Taraklı: DOĞRUDAN delikler + fin örüntüsü ── */}
+      {/* ── Arka Yatay Taraklı: üstten bakış — fin bantları + DOĞRUDAN delikler ──
+          Fin bantları yatay çizgiler, delikler fin alanı içinde konumlanır */}
       {isAYT && (() => {
-        // Üstten bakışta finler, yatay çizgiler olarak görünür
-        const n = g.finN; const pad = bh * 0.06;
-        const zone = bh - pad*2; const sp = zone / n; const fh = Math.max(sp*0.55, 1);
+        const n   = g.finN; const pad = bh * 0.04;
+        const zone = bh - pad * 2; const sp = zone / n;
+        const fh   = Math.max(sp * 0.50, 1.2);
+
+        // Fin merkezleri (fin aralığı boyutu için)
+        const fy0c = by + pad + 0 * sp + sp / 2;
+        const fy1c = by + pad + 1 * sp + sp / 2;
+
+        // Delik: fin alanı içinde — posZmm yoksa fin merkezlerinin ortalaması
+        const holeY = holeY_AY;
+
         return (
           <>
+            {/* Fin bantları (üstten bakışta her fin bir yatay şerit) */}
             {Array.from({ length: n }, (_, i) => {
-              const fy = by + pad + i*sp + (sp-fh)/2;
-              return <rect key={i} x={bx+4} y={fy} width={bw-8} height={fh}
-                fill={CUFILL} stroke={CU} strokeWidth={.7} rx={1} opacity={0.5} />;
+              const fy = by + pad + i * sp + (sp - fh) / 2;
+              return <rect key={i} x={bx + 4} y={fy} width={bw - 8} height={fh}
+                fill={CUFILL} stroke={CU} strokeWidth={0.7} rx={1} opacity={0.55} />;
             })}
-            <Holes xs={xs} cy={holeY_AY} g={{ ...g, sWmm: sWt/sc, sLmm: sLt/sc }} dashed={false} />
+            {/* Vida delikleri — fin alanı içinde doğrudan görünür */}
+            <Holes xs={xs} cy={holeY} g={{ ...g, sWmm: sWt/sc, sLmm: sLt/sc }} dashed={false} />
+            {/* Vida aralığı boyutu */}
             {g.boltN >= 2 && xs.length >= 2 && (
-              <DimH x1={xs[0]} x2={xs[xs.length-1]} y={holeY_AY + (g.isSlot ? sLt/2+6 : hR+5)}
+              <DimH x1={xs[0]} x2={xs[xs.length-1]}
+                y={holeY + (g.isSlot ? sLt/2+6 : hR+5)}
                 label={`${g.boltSpMm} mm`} color={RED} off={10} />
+            )}
+            {/* Fin aralığı boyutu — sağ kenarda */}
+            {n >= 2 && (
+              <DimVR x={bx + bw + 4} y1={fy0c} y2={fy1c}
+                label={`${g.finSpMm} mm`} color="#f39c12" off={12} />
+            )}
+            {/* posZmm boyutu (önden uzaklık) */}
+            {g.posZmm != null && (
+              <DimV x={bx - 6} y1={by} y2={holeY}
+                label={`${g.posZmm} mm`} color="#f39c12" off={10} />
             )}
           </>
         );
       })()}
 
-      {/* ── Arka Yatay Terminal için de boyut oku ── */}
-      {isAY && g.boltN >= 2 && xs.length >= 2 && (
-        <DimH x1={xs[0]} x2={xs[xs.length-1]} y={holeY_AY + (g.isSlot ? sLt/2+6 : hR+5)}
-          label={`${g.boltSpMm} mm`} color={RED} off={10} />
+      {/* ── Arka Yatay Terminal: doğrudan delikler + boyut oku ── */}
+      {isAY && (
+        <>
+          <Holes xs={xs} cy={holeY_AY} g={{ ...g, sWmm: sWt/sc, sLmm: sLt/sc }} dashed={false} />
+          {g.boltN >= 2 && xs.length >= 2 && (
+            <DimH x1={xs[0]} x2={xs[xs.length-1]} y={holeY_AY + (g.isSlot ? sLt/2+6 : hR+5)}
+              label={`${g.boltSpMm} mm`} color={RED} off={10} />
+          )}
+          {g.posZmm != null && (
+            <DimV x={bx - 6} y1={by} y2={holeY_AY} label={`${g.posZmm} mm`} color="#f39c12" off={10} />
+          )}
+        </>
       )}
 
       {/* ── Yandan Taraklı: dashed delikler ── */}
