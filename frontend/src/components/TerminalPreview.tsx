@@ -601,12 +601,7 @@ function SideView({ g }: { g: Geom }) {
 
         // Gövde (spine/plaka) kalınlığı — plateThickMm girilmişse kullan
         const rawBodyW  = bw * 0.28;
-        let bodyW = g.plateThickMm > 0 ? g.plateThickMm * sc : rawBodyW;
-        // Delik Z konumu — posZmm veya derinliğin %50'si (üst görünüş ile tutarlı)
-        const rawHoleX = g.posZmm != null ? bx + g.posZmm * sc : bx + bw * 0.5;
-        // Delik gövde içinde olmalı
-        bodyW = Math.max(bodyW, g.posZmm != null ? g.posZmm * sc + hR_min * 2.5 : bodyW);
-
+        const bodyW     = g.plateThickMm > 0 ? g.plateThickMm * sc : rawBodyW;
         const bodyX     = bx;
         const finStartX = bodyX + bodyW;
         // Fin uzunluğu — finLengthMm girilmişse kullan, yoksa kalan alanı doldur
@@ -616,8 +611,12 @@ function SideView({ g }: { g: Geom }) {
         const finEndX   = finStartX + finLenSvg;
         const finLength = Math.max(finLenSvg, 4);
 
-        // holeX: delik mutlaka gövde içinde kalmalı
-        const holeX = Math.min(rawHoleX, bodyX + bodyW - hR_min * 1.2);
+        // Vida delik Z konumu: posZmm = FİN BAŞINDAN uzaklık (plaka dahil değil)
+        const holeXraw = g.posZmm != null
+          ? finStartX + g.posZmm * sc          // fin başından offset
+          : (finStartX + finEndX) / 2;         // varsayılan: fin ortası
+        // Delik fin alanına kilitlenir (plate'e giremez)
+        const holeX = Math.max(finStartX + hR_min, Math.min(holeXraw, finEndX - hR_min));
 
         // Fin merkezleri (boyut için)
         const fy0 = by + pad + 0 * sp + (sp - fh) / 2 + fh / 2;
@@ -662,9 +661,9 @@ function SideView({ g }: { g: Geom }) {
               <DimH x1={finStartX} x2={finStartX + finLenSvg} y={by + bh + 14}
                 label={`${g.finLengthMm} mm`} color={CU} off={10} />
             )}
-            {/* posZmm boyut oku (önden uzaklık) — daha aşağıya */}
+            {/* posZmm boyut oku: fin BAŞINDAN delik merkezine */}
             {g.posZmm != null && (
-              <DimH x1={bodyX} x2={holeX} y={by + bh + (g.plateThickMm > 0 || g.finLengthMm > 0 ? 30 : 14)}
+              <DimH x1={finStartX} x2={holeX} y={by + bh + (g.plateThickMm > 0 || g.finLengthMm > 0 ? 30 : 14)}
                 label={`${g.posZmm} mm`} color="#f39c12" off={10} />
             )}
             <HideLegend x={bx+4} y={by+bh+(g.plateThickMm > 0 || g.finLengthMm > 0 ? 48 : 26)} />
@@ -728,10 +727,17 @@ function TopBottomView({ g }: { g: Geom }) {
   const xs  = boltXs(bx, bw, g.boltN, spx, sc, g.posXmm);
 
   // Delik Y pozisyonu (Y ekseninde = derinlik / Z)
-  // posZmm = önden uzaklık → üst görünüşte Y koordinatı (by'den uzaklık)
   const holeY_OT  = g.posZmm != null ? by + g.posZmm * sc : by + Math.min(bh * 0.22, hR * 2 + 3);
-  const holeY_AY  = g.posZmm != null ? by + g.posZmm * sc : by + bh * 0.5;
   const holeY_YT  = g.posZmm != null ? by + g.posZmm * sc : by + bh * 0.5;
+
+  // AYT: posZmm = FİN BAŞINDAN uzaklık (plaka kalınlığı sonrasından)
+  const aytPlateH  = g.plateThickMm > 0 ? g.plateThickMm * sc : bh * 0.28;
+  const aytFinEndH = g.finLengthMm  > 0 ? aytPlateH + g.finLengthMm * sc : bh;
+  const finAreaStartY = by + aytPlateH;   // fin alanı üst görünüşte başlangıcı (SVG y)
+  const finAreaEndY   = by + aytFinEndH;  // fin alanı sonu (SVG y)
+  const holeY_AY = g.posZmm != null
+    ? Math.max(finAreaStartY + hR, Math.min(finAreaStartY + g.posZmm * sc, finAreaEndY - hR))
+    : (finAreaStartY + finAreaEndY) / 2;
 
   // Etiket
   const viewLabel = g.surf === "bottom"
@@ -763,15 +769,22 @@ function TopBottomView({ g }: { g: Geom }) {
 
       {/* ── Arka Yatay Taraklı: üstten bakış ──
           Aynı uzunluktaki finler üstten TEK DÜZ YÜZEY oluşturur.
-          Gösterim: bakır yüzey rect + doğrudan vida delikleri */}
+          Plaka alanı (ön kenar) + Fin alanı (arka) ayrı gösterilir.
+          Vida delikleri yalnızca fin alanında. */}
       {isAYT && (() => {
         const holeY = holeY_AY;
         return (
           <>
-            {/* Finlerin düz üst yüzeyi — tek plaka */}
-            <rect x={bx + 3} y={by + 2} width={bw - 6} height={bh - 4}
+            {/* Plaka alanı — ön kenar şeridi */}
+            <rect x={bx + 3} y={by + 2} width={bw - 6} height={aytPlateH - 2}
               fill={CUFILL} stroke={CU} strokeWidth={1.0} rx={1} />
-            {/* Vida delikleri — doğrudan görünüm (üstten bakış = tam çember) */}
+            {/* Fin düz yüzeyi — plakadan arkaya */}
+            <rect x={bx + 3} y={finAreaStartY} width={bw - 6} height={finAreaEndY - finAreaStartY - 2}
+              fill={CUFILL} stroke={CU} strokeWidth={1.0} rx={1} opacity={0.75} />
+            {/* Plaka/fin sınır çizgisi */}
+            <line x1={bx + 3} y1={finAreaStartY} x2={bx + bw - 3} y2={finAreaStartY}
+              stroke={CU} strokeWidth={1.2} strokeDasharray="4 2" />
+            {/* Vida delikleri — fin alanında doğrudan görünüm */}
             <Holes xs={xs} cy={holeY} g={{ ...g, sWmm: sWt/sc, sLmm: sLt/sc }} dashed={false} />
             {/* Vida aralığı boyutu */}
             {g.boltN >= 2 && xs.length >= 2 && (
@@ -784,9 +797,9 @@ function TopBottomView({ g }: { g: Geom }) {
               <DimH x1={bx} x2={xs[0]} y={holeY - hR - 14}
                 label={`${g.posXmm} mm`} color="#f39c12" off={10} />
             )}
-            {/* Önden (Z) boyutu */}
+            {/* posZmm: fin BAŞINDAN deliğe uzaklık */}
             {g.posZmm != null && (
-              <DimV x={bx - 6} y1={by} y2={holeY}
+              <DimV x={bx - 6} y1={finAreaStartY} y2={holeY}
                 label={`${g.posZmm} mm`} color="#f39c12" off={10} />
             )}
           </>

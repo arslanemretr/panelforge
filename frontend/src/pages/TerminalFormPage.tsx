@@ -424,9 +424,16 @@ export function TerminalFormPage() {
                 />
               )}
 
-              {/* Z: önden derinlik — Arka Yatay ve Yandan Taraklı */}
-              {(draft.terminal_type === "Arka Yatay Taraklı" ||
-                draft.terminal_type === "Arka Yatay Terminal" ||
+              {/* Z: Arka Yatay Taraklı için FİN BAŞINDAN, diğerleri için ÖNDEN */}
+              {draft.terminal_type === "Arka Yatay Taraklı" && (
+                <NumField
+                  label="Fin Başından (Z)"
+                  unit="mm"
+                  value={draft.bolt_pos_z_mm}
+                  onChange={(v) => set("bolt_pos_z_mm", v)}
+                />
+              )}
+              {(draft.terminal_type === "Arka Yatay Terminal" ||
                 draft.terminal_type === "Yandan Taraklı") && (
                 <NumField
                   label="Önden (Z)"
