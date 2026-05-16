@@ -353,23 +353,20 @@ function FrontView({ g }: { g: Geom }) {
             </>
           )}
 
-          {/* Arka Yatay Terminal — sadece gövde, delik yok (üst/alt yüzde) */}
+          {/* Arka Yatay Terminal — cihaz arkasında, önden görünmez */}
           {isAY && (
             <text x={bx+bw/2} y={by+bh/2+4} textAnchor="middle" fontSize={7.5}
               fill={MUT} fontFamily="system-ui" fontWeight={600}>
-              {g.surf === "top" ? "↑ Delikler üst yüzeyde" : "↓ Delikler alt yüzeyde"}
+              Cihaz arkasında — ön yüzden görünmez
             </text>
           )}
 
-          {/* Arka Yatay Taraklı — yatay finler görünür */}
+          {/* Arka Yatay Taraklı — cihaz arkasında, önden görünmez */}
           {isAYT && (
-            <>
-              <HorizFins bx={bx+4} by={by+4} bw={bw-8} bh={bh-8} count={g.finN} />
-              <text x={bx+bw/2} y={by+bh+14} textAnchor="middle" fontSize={7}
-                fill={DASH} fontFamily="system-ui">
-                {g.surf === "top" ? "↑ Bağlantı delikleri üst yüzde" : "↓ Bağlantı delikleri alt yüzde"}
-              </text>
-            </>
+            <text x={bx+bw/2} y={by+bh/2+4} textAnchor="middle" fontSize={7.5}
+              fill={MUT} fontFamily="system-ui" fontWeight={600}>
+              Cihaz arkasında — ön yüzden görünmez
+            </text>
           )}
 
           {/* Yandan Taraklı — finler kenarda görünür */}
@@ -440,10 +437,20 @@ function BackView({ g }: { g: Geom }) {
         </>
       )}
 
-      {/* Arka Yatay Taraklı: finler arka yüzden de görünür */}
-      {isAYT && (
-        <HorizFins bx={bx+4} by={by+4} bw={bw-8} bh={bh-8} count={g.finN} />
-      )}
+      {/* Arka Yatay Taraklı: arka yüzden fin kenar hizaları görünür
+          Finler yatay bakır plakalardır — arkadan bakınca düz kenar çizgileri olarak görünür */}
+      {isAYT && (() => {
+        const n = g.finN; const pad = bh * 0.05;
+        const zone = bh - pad * 2; const sp = zone / n;
+        const fh = Math.max(sp * 0.42, 1.2); // fin kenar kalınlığı
+        return <>
+          {Array.from({ length: n }, (_, i) => {
+            const fy = by + pad + i * sp + (sp - fh) / 2;
+            return <rect key={i} x={bx + 4} y={fy} width={bw - 8} height={fh}
+              fill={CUFILL} stroke={CU} strokeWidth={0.85} rx={0} />;
+          })}
+        </>;
+      })()}
 
       {/* Yandan Taraklı: finler arka yüzde de görünür (kenarda) */}
       {isYT && (
@@ -508,8 +515,15 @@ function SideView({ g }: { g: Geom }) {
       <Hdr label="YAN GÖRÜNÜŞ — DERİNLİK × YÜKSEKLİK" accent="#27ae60" id="hdr-tn-side" />
       <SurfBadge surf={g.surf} />
 
-      {/* Ana gövde */}
-      <rect x={bx} y={by} width={bw} height={bh} fill={BFILL} stroke={BODY} strokeWidth={1.6} rx={2} />
+      {/* Ana gövde — tarak profili kendi gövdesini çizer, diğerleri için tam rect */}
+      {!isAYT && (
+        <rect x={bx} y={by} width={bw} height={bh} fill={BFILL} stroke={BODY} strokeWidth={1.6} rx={2} />
+      )}
+      {/* Arka Yatay Taraklı: dış çerçeve kesik çizgi (bounding box) */}
+      {isAYT && (
+        <rect x={bx} y={by} width={bw} height={bh} fill="none" stroke={BODY} strokeWidth={0.8}
+          strokeDasharray="4 3" rx={2} opacity={0.4} />
+      )}
 
       {/* Ön/Arka etiket */}
       <text x={bx+3} y={by-4} fontSize={7} fill="#3498db" fontFamily="system-ui" fontWeight={600}>ÖN</text>
@@ -536,21 +550,47 @@ function SideView({ g }: { g: Geom }) {
         </>
       )}
 
-      {/* ── Arka Yatay Taraklı: fin kesit çizgileri + dashed delik ── */}
+      {/* ── Arka Yatay Taraklı: TARAK PROFİLİ (yan kesit görünüşü) ──
+          Yan görünüşte (Derinlik Z × Yükseklik Y):
+            - Sol = ön yüz, Sağ = arka yüz
+            - Gövde: sağda (arka), finler: soldan gövdeye uzanır
+            - Delik: üst veya alt kenardan kesit (dashed) */}
       {isAYT && (() => {
-        const n = g.finN; const pad = bh * 0.05;
-        const zone = bh - pad*2; const sp = zone / n; const fh = Math.max(sp * 0.55, 1);
+        const n    = g.finN;
+        const pad  = bh * 0.05;
+        const zone = bh - pad * 2;
+        const sp   = zone / n;
+        const fh   = Math.max(sp * 0.42, 1.5); // fin kalınlığı
+
+        // Gövde: derinliğin arka %30'u
+        const bodyW = bw * 0.30;
+        const bodyX = bx + bw - bodyW;
+        // Finler: ön yüzden gövdeye kadar
+        const finEndX = bodyX;
+        const finStartX = bx + 4;
+        const finLength = finEndX - finStartX;
+
+        // Dashed delik konumu: posZmm veya gövde ortası
+        const holeX = g.posZmm != null ? bx + g.posZmm * sc : bodyX + bodyW * 0.5;
+
         return (
           <>
-            {/* Fin kesit çizgileri (yatay) */}
+            {/* Finler: soldan (ön) gövdeye uzanan yatay plakalar */}
             {Array.from({ length: n }, (_, i) => {
-              const fy = by + pad + i * sp + (sp - fh) / 2 + fh / 2;
-              return <line key={i} x1={bx+4} y1={fy} x2={bx+bw-4} y2={fy}
-                stroke={CU} strokeWidth={1.0} opacity={.75} />;
+              const fy = by + pad + i * sp + (sp - fh) / 2;
+              return <rect key={i} x={finStartX} y={fy} width={finLength} height={fh}
+                fill={CUFILL} stroke={CU} strokeWidth={0.85} rx={1} />;
             })}
-            {/* Dashed delik üst/alt kenardan */}
-            {g.surf === "top"    && <RHdash cx={bx + bw * 0.5} cy={by + hR + 2} r={hR} />}
-            {g.surf === "bottom" && <RHdash cx={bx + bw * 0.5} cy={by + bh - hR - 2} r={hR} />}
+            {/* Gövde: sağ taraf (arka) */}
+            <rect x={bodyX} y={by} width={bodyW} height={bh}
+              fill={CUFILL} stroke={CU} strokeWidth={1.3} rx={1} />
+            {/* Dashed delik: üst veya alt yüzeyden kesit */}
+            {g.surf === "top"    && <RHdash cx={holeX} cy={by + hR + 2} r={hR} />}
+            {g.surf === "bottom" && <RHdash cx={holeX} cy={by + bh - hR - 2} r={hR} />}
+            {/* posZmm varsa boyut oku */}
+            {g.posZmm != null && (
+              <DimH x1={bx} x2={holeX} y={by + bh + 14} label={`${g.posZmm} mm`} color="#f39c12" off={10} />
+            )}
             <HideLegend x={bx+4} y={by+bh+26} />
           </>
         );
