@@ -105,6 +105,8 @@ export interface TerminalDefinition {
   fin_count?: number | null;
   fin_spacing_mm?: number | null;
   fin_thickness_mm?: number | null;
+  fin_length_mm?: number | null;
+  plate_thickness_mm?: number | null;
   bolt_pos_x_mm?: number | null;   // sol kenardan ilk delik merkezi (mm)
   bolt_pos_y_mm?: number | null;   // üst yüzeyden delik merkezi (mm)
   bolt_pos_z_mm?: number | null;   // ön yüzeyden delik merkezi derinliği (mm)

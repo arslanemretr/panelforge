@@ -18,6 +18,8 @@ export interface TerminalPreviewProps {
   fin_count?: number | null;
   fin_spacing_mm?: number | null;
   fin_thickness_mm?: number | null;
+  fin_length_mm?: number | null;
+  plate_thickness_mm?: number | null;
   bolt_pos_x_mm?: number | null;  // sol kenardan ilk delik merkezi (mm)
   bolt_pos_y_mm?: number | null;  // üst yüzeyden delik satırı merkezi (mm)
   bolt_pos_z_mm?: number | null;  // ön yüzeyden delik derinliği (mm)
@@ -38,9 +40,11 @@ interface Geom {
   sWmm: number;   // slot genişliği mm
   sLmm: number;   // slot uzunluğu mm
   holeDmm: number;
-  finN: number;       // fin adedi
-  finSpMm: number;    // fin aralığı mm
-  finThickMm: number; // fin kalınlığı mm (0 = otomatik hesapla)
+  finN: number;           // fin adedi
+  finSpMm: number;        // fin aralığı mm
+  finThickMm: number;     // fin kalınlığı mm (0 = otomatik hesapla)
+  finLengthMm: number;    // fin uzunluğu mm (0 = otomatik hesapla)
+  plateThickMm: number;   // gövde plaka kalınlığı mm (0 = otomatik hesapla)
   posXmm: number | null;  // sol kenardan ilk delik (null = otomatik ortala)
   posYmm: number | null;  // üstten delik satırı (null = otomatik)
   posZmm: number | null;  // önden delik derinliği (null = otomatik)
@@ -595,18 +599,22 @@ function SideView({ g }: { g: Geom }) {
 
         const hR_min  = Math.max(hR, 3.5);
 
+        // Gövde (spine/plaka) kalınlığı — plateThickMm girilmişse kullan
+        const rawBodyW  = bw * 0.28;
+        let bodyW = g.plateThickMm > 0 ? g.plateThickMm * sc : rawBodyW;
         // Delik Z konumu — posZmm veya derinliğin %50'si (üst görünüş ile tutarlı)
         const rawHoleX = g.posZmm != null ? bx + g.posZmm * sc : bx + bw * 0.5;
+        // Delik gövde içinde olmalı
+        bodyW = Math.max(bodyW, g.posZmm != null ? g.posZmm * sc + hR_min * 2.5 : bodyW);
 
-        // Gövde (spine): delik mutlaka içine düşmeli → dinamik genişlik
-        const rawBodyW  = bw * 0.28;
-        const bodyW     = g.posZmm != null
-          ? Math.max(rawBodyW, g.posZmm * sc + hR_min * 2.5)
-          : rawBodyW;
         const bodyX     = bx;
         const finStartX = bodyX + bodyW;
-        const finEndX   = bx + bw - 2;
-        const finLength = Math.max(finEndX - finStartX, 4);
+        // Fin uzunluğu — finLengthMm girilmişse kullan, yoksa kalan alanı doldur
+        const finLenSvg = g.finLengthMm > 0
+          ? g.finLengthMm * sc
+          : Math.max(bw - bodyW - 2, 4);
+        const finEndX   = finStartX + finLenSvg;
+        const finLength = Math.max(finLenSvg, 4);
 
         // holeX: delik mutlaka gövde içinde kalmalı
         const holeX = Math.min(rawHoleX, bodyX + bodyW - hR_min * 1.2);
@@ -644,12 +652,22 @@ function SideView({ g }: { g: Geom }) {
               <DimVR x={finEndX + 3} y1={fy0} y2={fy1}
                 label={`${g.finSpMm} mm`} color="#f39c12" off={12} />
             )}
-            {/* posZmm boyut oku (önden uzaklık) */}
+            {/* Plaka kalınlığı boyutu — alta solda */}
+            {g.plateThickMm > 0 && (
+              <DimH x1={bodyX} x2={bodyX + bodyW} y={by + bh + 14}
+                label={`${g.plateThickMm} mm`} color={DIM} off={10} />
+            )}
+            {/* Fin uzunluğu boyutu — alta sağda */}
+            {g.finLengthMm > 0 && (
+              <DimH x1={finStartX} x2={finStartX + finLenSvg} y={by + bh + 14}
+                label={`${g.finLengthMm} mm`} color={CU} off={10} />
+            )}
+            {/* posZmm boyut oku (önden uzaklık) — daha aşağıya */}
             {g.posZmm != null && (
-              <DimH x1={bodyX} x2={holeX} y={by + bh + 14}
+              <DimH x1={bodyX} x2={holeX} y={by + bh + (g.plateThickMm > 0 || g.finLengthMm > 0 ? 30 : 14)}
                 label={`${g.posZmm} mm`} color="#f39c12" off={10} />
             )}
-            <HideLegend x={bx+4} y={by+bh+26} />
+            <HideLegend x={bx+4} y={by+bh+(g.plateThickMm > 0 || g.finLengthMm > 0 ? 48 : 26)} />
           </>
         );
       })()}
@@ -826,6 +844,8 @@ export function TerminalPreview({
   fin_count,
   fin_spacing_mm,
   fin_thickness_mm,
+  fin_length_mm,
+  plate_thickness_mm,
   bolt_pos_x_mm,
   bolt_pos_y_mm,
   bolt_pos_z_mm,
@@ -840,7 +860,9 @@ export function TerminalPreview({
   const finSpMm = fin_spacing_mm ?? (bolt_count && bolt_center_distance_mm
     ? bolt_center_distance_mm / 2
     : 20);
-  const finThickMm = Math.max(fin_thickness_mm ?? 0, 0);
+  const finThickMm   = Math.max(fin_thickness_mm   ?? 0, 0);
+  const finLengthMm  = Math.max(fin_length_mm      ?? 0, 0);
+  const plateThickMm = Math.max(plate_thickness_mm ?? 0, 0);
 
   const g: Geom = {
     type:     terminal_type,
@@ -857,6 +879,8 @@ export function TerminalPreview({
     finN,
     finSpMm,
     finThickMm,
+    finLengthMm,
+    plateThickMm,
     posXmm:   bolt_pos_x_mm ?? null,
     posYmm:   bolt_pos_y_mm ?? null,
     posZmm:   bolt_pos_z_mm ?? null,

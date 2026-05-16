@@ -22,6 +22,8 @@ class TerminalDefinitionBase(BaseModel):
     fin_count: int | None = None
     fin_spacing_mm: Decimal | None = None
     fin_thickness_mm: Decimal | None = None
+    fin_length_mm: Decimal | None = None
+    plate_thickness_mm: Decimal | None = None
     bolt_pos_x_mm: Decimal | None = None    # sol kenardan ilk delik merkezi
     bolt_pos_y_mm: Decimal | None = None    # üst yüzeyden delik merkezi
     bolt_pos_z_mm: Decimal | None = None    # ön yüzeyden delik merkezi derinliği
