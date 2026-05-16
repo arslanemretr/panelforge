@@ -146,9 +146,10 @@ class TerminalDefinition(Base):
     slot_width_mm: Mapped[Decimal | None] = mapped_column(Numeric)            # slot delik genişliği (mm)
     slot_length_mm: Mapped[Decimal | None] = mapped_column(Numeric)           # slot delik uzunluğu (mm)
     fin_count: Mapped[int | None] = mapped_column(Integer, nullable=True)                # fin (tarak) adedi
-    fin_spacing_mm: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)     # fin aralığı (mm)
+    fin_spacing_mm: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)     # fin aralığı, merkez-merkez (mm)
     fin_thickness_mm: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)   # fin kalınlığı (mm)
     fin_length_mm: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)      # fin uzunluğu (mm)
+    fin_offset_mm: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)      # yüzey kenarından ilk finin üst kenarına mesafe (mm)
     plate_thickness_mm: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True) # bağlı gövde plakası kalınlığı (mm)
     bolt_pos_x_mm: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)      # sol kenardan ilk delik merkezi (mm)
     bolt_pos_y_mm: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)   # üst yüzeyden delik merkezi (mm)

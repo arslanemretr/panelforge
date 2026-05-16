@@ -103,9 +103,10 @@ export interface TerminalDefinition {
   terminal_height_mm?: number | null;
   terminal_depth_mm?: number | null;
   fin_count?: number | null;
-  fin_spacing_mm?: number | null;
+  fin_spacing_mm?: number | null;      // merkez-merkez mesafe
   fin_thickness_mm?: number | null;
   fin_length_mm?: number | null;
+  fin_offset_mm?: number | null;       // yüzey kenarından ilk finin üst kenarına
   plate_thickness_mm?: number | null;
   bolt_pos_x_mm?: number | null;   // sol kenardan ilk delik merkezi (mm)
   bolt_pos_y_mm?: number | null;   // üst yüzeyden delik merkezi (mm)

@@ -19,6 +19,7 @@ export interface TerminalPreviewProps {
   fin_spacing_mm?: number | null;
   fin_thickness_mm?: number | null;
   fin_length_mm?: number | null;
+  fin_offset_mm?: number | null;
   plate_thickness_mm?: number | null;
   bolt_pos_x_mm?: number | null;  // sol kenardan ilk delik merkezi (mm)
   bolt_pos_y_mm?: number | null;  // üst yüzeyden delik satırı merkezi (mm)
@@ -40,11 +41,12 @@ interface Geom {
   sWmm: number;   // slot genişliği mm
   sLmm: number;   // slot uzunluğu mm
   holeDmm: number;
-  finN: number;           // fin adedi
-  finSpMm: number;        // fin aralığı mm
-  finThickMm: number;     // fin kalınlığı mm (0 = otomatik hesapla)
-  finLengthMm: number;    // fin uzunluğu mm (0 = otomatik hesapla)
-  plateThickMm: number;   // gövde plaka kalınlığı mm (0 = otomatik hesapla)
+  finN: number;            // fin adedi
+  finSpMm: number;         // fin aralığı mm (merkez-merkez; 0 = otomatik)
+  finThickMm: number;      // fin kalınlığı mm (0 = otomatik)
+  finLengthMm: number;     // fin uzunluğu mm (0 = otomatik)
+  finOffsetMm: number | null; // yüzey → ilk fin üst kenar (null = oto-ortala)
+  plateThickMm: number;    // gövde plaka kalınlığı mm (0 = otomatik)
   posXmm: number | null;  // sol kenardan ilk delik (null = otomatik ortala)
   posYmm: number | null;  // üstten delik satırı (null = otomatik)
   posZmm: number | null;  // önden delik derinliği (null = otomatik)
@@ -462,20 +464,25 @@ function BackView({ g }: { g: Geom }) {
 
       {/* Arka Yatay Taraklı: arka yüzden fin kenar hizaları + fin aralığı boyutu */}
       {isAYT && (() => {
-        const n = g.finN; const pad = bh * 0.05;
-        const zone = bh - pad * 2; const sp = zone / n;
-        // Fin kalınlığı: girilmişse onu kullan, yoksa hesapla
-        const fh = g.finThickMm > 0 ? g.finThickMm * sc : Math.max(sp * 0.42, 1.2);
-        const fy0 = by + pad + 0 * sp + (sp - fh) / 2 + fh / 2;
-        const fy1 = by + pad + 1 * sp + (sp - fh) / 2 + fh / 2;
+        const n = g.finN;
+        // Aynı konumlandırma mantığı (SideView ile tutarlı)
+        const autoFinThickSvg = (bh * 0.85) / n * 0.42;
+        const fh = g.finThickMm > 0 ? g.finThickMm * sc : Math.max(autoFinThickSvg, 1.2);
+        const finSpSvg = g.finSpMm > 0
+          ? g.finSpMm * sc
+          : n > 1 ? (bh - fh) / (n - 1) : bh * 0.5;
+        const finBlockSvg   = (n - 1) * finSpSvg + fh;
+        const autoOffsetSvg = Math.max((bh - finBlockSvg) / 2, 0);
+        const finOffsetSvg  = g.finOffsetMm != null ? g.finOffsetMm * sc : autoOffsetSvg;
+        const fy0 = by + finOffsetSvg + fh / 2;
+        const fy1 = n > 1 ? fy0 + finSpSvg : fy0;
         return <>
           {Array.from({ length: n }, (_, i) => {
-            const fy = by + pad + i * sp + (sp - fh) / 2;
+            const fy = by + finOffsetSvg + i * finSpSvg;
             return <rect key={i} x={bx + 4} y={fy} width={bw - 8} height={fh}
               fill={CUFILL} stroke={CU} strokeWidth={0.85} rx={0} />;
           })}
-          {/* Fin aralığı + kalınlık boyutu — sağda */}
-          {n >= 2 && (
+          {n >= 2 && g.finSpMm > 0 && (
             <DimVR x={bx + bw + 4} y1={fy0} y2={fy1}
               label={`${g.finSpMm} mm`} color="#f39c12" off={12} />
           )}
@@ -590,83 +597,103 @@ function SideView({ g }: { g: Geom }) {
             Gövde (spine): SOLDA — finler SAĞA uzanır
             Vida delikleri: üst/alt yüzeyden giren kanal → kesit çizgisi */}
       {isAYT && (() => {
-        const n    = g.finN;
-        const pad  = bh * 0.05;
-        const zone = bh - pad * 2;
-        const sp   = zone / n;
-        // Fin kalınlığı: girilmişse onu kullan, yoksa aralığın %42'si
-        const fh   = g.finThickMm > 0 ? g.finThickMm * sc : Math.max(sp * 0.42, 1.5);
+        const n = g.finN;
 
-        const hR_min  = Math.max(hR, 3.5);
-
-        // Gövde (spine/plaka) kalınlığı — plateThickMm girilmişse kullan
+        // ── Plaka ve fin boyutları ─────────────────────────────────────────────
         const rawBodyW  = bw * 0.28;
         const bodyW     = g.plateThickMm > 0 ? g.plateThickMm * sc : rawBodyW;
         const bodyX     = bx;
         const finStartX = bodyX + bodyW;
-        // Fin uzunluğu — finLengthMm girilmişse kullan, yoksa kalan alanı doldur
         const finLenSvg = g.finLengthMm > 0
           ? g.finLengthMm * sc
           : Math.max(bw - bodyW - 2, 4);
         const finEndX   = finStartX + finLenSvg;
         const finLength = Math.max(finLenSvg, 4);
 
-        // Vida delik Z konumu: posZmm = FİN BAŞINDAN uzaklık (plaka dahil değil)
+        // ── Fin kalınlığı (Y ekseni) ───────────────────────────────────────────
+        // finThickMm verilmişse kullan, yoksa otomatik: finBlock / n * 0.42
+        const autoFinThickSvg = (bh * 0.85) / n * 0.42;
+        const fh = g.finThickMm > 0 ? g.finThickMm * sc : Math.max(autoFinThickSvg, 1.5);
+
+        // ── Fin aralığı merkez-merkez (Y ekseni) ──────────────────────────────
+        // Formül doğrulama: finBlock = (n-1)*spacing + thickness ≤ height
+        const finSpSvg = g.finSpMm > 0
+          ? g.finSpMm * sc
+          : n > 1 ? (bh - fh) / (n - 1) : bh * 0.5;   // otomatik: eşit dağıt
+
+        // ── İlk fin üst kenarı (Y offset) ─────────────────────────────────────
+        // Fin bloğu: (n-1)*spacing + thickness
+        const finBlockSvg  = (n - 1) * finSpSvg + fh;
+        const autoOffsetSvg = Math.max((bh - finBlockSvg) / 2, 0);  // oto-ortala
+        const finOffsetSvg  = g.finOffsetMm != null
+          ? g.finOffsetMm * sc
+          : autoOffsetSvg;
+
+        // Fin merkez Y pozisyonları (boyut için)
+        const fy0 = by + finOffsetSvg + fh / 2;
+        const fy1 = n > 1 ? fy0 + finSpSvg : fy0;
+
+        // ── Vida delik Z konumu: posZmm = FİN BAŞINDAN ────────────────────────
+        const hR_min  = Math.max(hR, 3.5);
         const holeXraw = g.posZmm != null
-          ? finStartX + g.posZmm * sc          // fin başından offset
-          : (finStartX + finEndX) / 2;         // varsayılan: fin ortası
-        // Delik fin alanına kilitlenir (plate'e giremez)
+          ? finStartX + g.posZmm * sc
+          : (finStartX + finEndX) / 2;
         const holeX = Math.max(finStartX + hR_min, Math.min(holeXraw, finEndX - hR_min));
 
-        // Fin merkezleri (boyut için)
-        const fy0 = by + pad + 0 * sp + (sp - fh) / 2 + fh / 2;
-        const fy1 = by + pad + 1 * sp + (sp - fh) / 2 + fh / 2;
-
-        // Delik kanalı Y derinliği: posYmm veya yüksekliğin %45'i
+        // ── Vida delik kanal derinliği (Y ekseni) ─────────────────────────────
         const holeDepthSvg = g.posYmm != null ? g.posYmm * sc : bh * 0.45;
         const holeEntryY   = g.surf === "bottom" ? by + bh : by;
         const holeCenterY  = g.surf === "bottom"
           ? by + bh - holeDepthSvg
           : by + holeDepthSvg;
 
+        const hasBotDims = g.plateThickMm > 0 || g.finLengthMm > 0;
+
         return (
           <>
-            {/* Gövde: sol (ÖN) taraf */}
+            {/* Gövde / plaka: sol (ÖN) taraf */}
             <rect x={bodyX} y={by} width={bodyW} height={bh}
               fill={CUFILL} stroke={CU} strokeWidth={1.3} rx={1} />
-            {/* Finler: gövdeden SAĞA uzanan yatay plakalar — hepsi aynı hizadan */}
+
+            {/* Finler: merkez-merkez aralık + gerçek offset ile konumlandırılmış */}
             {Array.from({ length: n }, (_, i) => {
-              const fy = by + pad + i * sp + (sp - fh) / 2;
+              const fy = by + finOffsetSvg + i * finSpSvg;   // fin üst kenarı
               return <rect key={i} x={finStartX} y={fy} width={finLength} height={fh}
                 fill={CUFILL} stroke={CU} strokeWidth={0.85} rx={1} />;
             })}
-            {/* Vida delik kesiti: dikey dashed kanal çizgileri + dashed daire (kesit) */}
+
+            {/* Vida delik kesiti: dikey dashed kanal + dashed daire */}
             <line x1={holeX - hR_min} y1={holeEntryY} x2={holeX - hR_min} y2={holeCenterY}
               stroke={DASH} strokeWidth={0.85} strokeDasharray="4 3" />
             <line x1={holeX + hR_min} y1={holeEntryY} x2={holeX + hR_min} y2={holeCenterY}
               stroke={DASH} strokeWidth={0.85} strokeDasharray="4 3" />
             <RHdash cx={holeX} cy={holeCenterY} r={hR_min} />
-            {/* Fin aralığı boyutu — sağ kenarda */}
-            {n >= 2 && (
+
+            {/* Fin aralığı boyutu (m-m) — sağ kenarda */}
+            {n >= 2 && g.finSpMm > 0 && (
               <DimVR x={finEndX + 3} y1={fy0} y2={fy1}
                 label={`${g.finSpMm} mm`} color="#f39c12" off={12} />
             )}
-            {/* Plaka kalınlığı boyutu — alta solda */}
+            {/* Fin offset boyutu — sol kenarda (üst boşluk) */}
+            {g.finOffsetMm != null && finOffsetSvg > 2 && (
+              <DimV x={bodyX - 8} y1={by} y2={by + finOffsetSvg}
+                label={`${g.finOffsetMm} mm`} color={DIM} off={10} />
+            )}
+
+            {/* Alt boyut okları */}
             {g.plateThickMm > 0 && (
               <DimH x1={bodyX} x2={bodyX + bodyW} y={by + bh + 14}
                 label={`${g.plateThickMm} mm`} color={DIM} off={10} />
             )}
-            {/* Fin uzunluğu boyutu — alta sağda */}
             {g.finLengthMm > 0 && (
               <DimH x1={finStartX} x2={finStartX + finLenSvg} y={by + bh + 14}
                 label={`${g.finLengthMm} mm`} color={CU} off={10} />
             )}
-            {/* posZmm boyut oku: fin BAŞINDAN delik merkezine */}
             {g.posZmm != null && (
-              <DimH x1={finStartX} x2={holeX} y={by + bh + (g.plateThickMm > 0 || g.finLengthMm > 0 ? 30 : 14)}
+              <DimH x1={finStartX} x2={holeX} y={by + bh + (hasBotDims ? 30 : 14)}
                 label={`${g.posZmm} mm`} color="#f39c12" off={10} />
             )}
-            <HideLegend x={bx+4} y={by+bh+(g.plateThickMm > 0 || g.finLengthMm > 0 ? 48 : 26)} />
+            <HideLegend x={bx+4} y={by+bh+(hasBotDims ? 48 : 26)} />
           </>
         );
       })()}
@@ -858,6 +885,7 @@ export function TerminalPreview({
   fin_spacing_mm,
   fin_thickness_mm,
   fin_length_mm,
+  fin_offset_mm,
   plate_thickness_mm,
   bolt_pos_x_mm,
   bolt_pos_y_mm,
@@ -875,6 +903,7 @@ export function TerminalPreview({
     : 20);
   const finThickMm   = Math.max(fin_thickness_mm   ?? 0, 0);
   const finLengthMm  = Math.max(fin_length_mm      ?? 0, 0);
+  const finOffsetMm  = fin_offset_mm != null ? Math.max(fin_offset_mm, 0) : null;
   const plateThickMm = Math.max(plate_thickness_mm ?? 0, 0);
 
   const g: Geom = {
@@ -893,6 +922,7 @@ export function TerminalPreview({
     finSpMm,
     finThickMm,
     finLengthMm,
+    finOffsetMm,
     plateThickMm,
     posXmm:   bolt_pos_x_mm ?? null,
     posYmm:   bolt_pos_y_mm ?? null,

@@ -57,9 +57,10 @@ interface TerminalDraft {
   terminal_height_mm: number | null;
   terminal_depth_mm: number | null;
   fin_count: number | null;
-  fin_spacing_mm: number | null;
+  fin_spacing_mm: number | null;      // merkez-merkez mesafe
   fin_thickness_mm: number | null;
   fin_length_mm: number | null;
+  fin_offset_mm: number | null;       // yüzey kenarından ilk finin üst kenarına
   plate_thickness_mm: number | null;
   bolt_pos_x_mm: number | null;  // sol kenardan ilk delik merkezi
   bolt_pos_y_mm: number | null;  // üst yüzeyden delik satırı merkezi
@@ -83,6 +84,7 @@ const EMPTY_DRAFT: TerminalDraft = {
   fin_spacing_mm: null,
   fin_thickness_mm: null,
   fin_length_mm: null,
+  fin_offset_mm: null,
   plate_thickness_mm: null,
   bolt_pos_x_mm: null,
   bolt_pos_y_mm: null,
@@ -107,6 +109,7 @@ function buildPayload(d: TerminalDraft): Omit<TerminalDefinition, "id" | "create
     fin_spacing_mm: isTarakli(d.terminal_type) ? d.fin_spacing_mm : null,
     fin_thickness_mm: isTarakli(d.terminal_type) ? d.fin_thickness_mm : null,
     fin_length_mm: isTarakli(d.terminal_type) ? d.fin_length_mm : null,
+    fin_offset_mm: isTarakli(d.terminal_type) ? d.fin_offset_mm : null,
     plate_thickness_mm: isTarakli(d.terminal_type) ? d.plate_thickness_mm : null,
     bolt_pos_x_mm: d.bolt_pos_x_mm,
     bolt_pos_y_mm: d.bolt_pos_y_mm,
@@ -181,6 +184,7 @@ export function TerminalFormPage() {
         fin_spacing_mm: def.fin_spacing_mm ?? null,
         fin_thickness_mm: def.fin_thickness_mm ?? null,
         fin_length_mm: def.fin_length_mm ?? null,
+        fin_offset_mm: def.fin_offset_mm ?? null,
         plate_thickness_mm: def.plate_thickness_mm ?? null,
         bolt_pos_x_mm: def.bolt_pos_x_mm ?? null,
         bolt_pos_y_mm: def.bolt_pos_y_mm ?? null,
@@ -451,16 +455,63 @@ export function TerminalFormPage() {
               <h3 style={{ margin: "0 0 0.9rem", fontSize: "0.85rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                 E — Tarak (Fin) Geometrisi
               </h3>
+
+              {/* Geometrik doğrulama bilgisi */}
+              {(() => {
+                const h  = draft.terminal_height_mm;
+                const n  = draft.fin_count;
+                const th = draft.fin_thickness_mm;
+                const sp = draft.fin_spacing_mm;
+                const of = draft.fin_offset_mm;
+                if (!h || !n || !th) return null;
+
+                // Fin aralığı merkez-merkez; fin blok yüksekliği = (n-1)*sp + th
+                const finBlock  = sp != null ? (n - 1) * sp + th : th * n;
+                const remaining = h - finBlock;
+                const maxSp     = n > 1 ? (h - th) / (n - 1) : null;
+                const isOver    = sp != null && maxSp != null && sp > maxSp + 0.001;
+                const topM      = of != null ? of : remaining / 2;
+                const botM      = remaining - topM;
+                const isNeg     = remaining < -0.001;
+
+                return (
+                  <div style={{
+                    background: (isOver || isNeg) ? "rgba(239,68,68,0.07)" : "rgba(34,197,94,0.05)",
+                    border: `1px solid ${(isOver || isNeg) ? "#ef4444" : "var(--line)"}`,
+                    borderRadius: 6, padding: "0.5rem 0.75rem", marginBottom: "0.8rem",
+                    fontSize: "0.77rem", color: "var(--fg)",
+                  }}>
+                    <div style={{ display: "flex", gap: "1.2rem", flexWrap: "wrap", marginBottom: "0.25rem" }}>
+                      <span>Fin blok: <b>{finBlock.toFixed(1)} mm</b></span>
+                      <span style={{ color: isNeg ? "#ef4444" : "inherit" }}>
+                        Kalan: <b>{remaining.toFixed(1)} mm</b>{isNeg ? " ⚠ TAŞIYOR" : ""}
+                      </span>
+                      <span>Üst boşluk: <b>{topM.toFixed(1)} mm</b></span>
+                      <span>Alt boşluk: <b>{botM.toFixed(1)} mm</b></span>
+                    </div>
+                    {maxSp != null && (
+                      <div style={{ color: isOver ? "#ef4444" : "#22c55e", fontWeight: 600 }}>
+                        Maks. fin aralığı (m-m): {maxSp.toFixed(1)} mm
+                        {isOver ? ` — girilen ${sp} mm aşıyor ⚠` : " ✓"}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               <div className="form-grid">
                 <NumField label="Fin Adedi" value={draft.fin_count}
                   onChange={(v) => set("fin_count", v != null ? Math.round(v) : null)}
                   min={1} />
-                <NumField label="Fin Aralığı" unit="mm"
+                <NumField label="Fin Aralığı (m-m)" unit="mm"
                   value={draft.fin_spacing_mm}
                   onChange={(v) => set("fin_spacing_mm", v)} />
                 <NumField label="Fin Kalınlığı" unit="mm"
                   value={draft.fin_thickness_mm}
                   onChange={(v) => set("fin_thickness_mm", v)} />
+                <NumField label="İlk Fin Boşluğu (üstten)" unit="mm"
+                  value={draft.fin_offset_mm}
+                  onChange={(v) => set("fin_offset_mm", v)} />
                 <NumField label="Fin Uzunluğu" unit="mm"
                   value={draft.fin_length_mm}
                   onChange={(v) => set("fin_length_mm", v)} />
@@ -551,6 +602,7 @@ export function TerminalFormPage() {
             fin_spacing_mm={draft.fin_spacing_mm}
             fin_thickness_mm={draft.fin_thickness_mm}
             fin_length_mm={draft.fin_length_mm}
+            fin_offset_mm={draft.fin_offset_mm}
             plate_thickness_mm={draft.plate_thickness_mm}
             bolt_pos_x_mm={draft.bolt_pos_x_mm}
             bolt_pos_y_mm={draft.bolt_pos_y_mm}
