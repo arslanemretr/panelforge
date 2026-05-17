@@ -1,15 +1,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // DeviceOrthographicPreview.tsx — Cihaz 4-görünüm ortografik önizleme
-// Terminal noktaları faz renginde, aktif terminal halkalı gösterim
+// TerminalPreview ile aynı koyu tema stili
 // ─────────────────────────────────────────────────────────────────────────────
 import React from "react";
 import type { DeviceTerminal } from "../types";
 
 // ─── Renkler ─────────────────────────────────────────────────────────────────
-const BG   = "#1a1f2b";
-const BODY = "#334155";
-const DIM  = "#64748b";
-const MUT  = "#94a3b8";
+const BG    = "#1a1f2b";
+const MUT   = "#94a3b8";
+const DIM   = "#64748b";
+const DASH  = "rgba(148,163,184,0.65)";
 
 const PHASE_COL: Record<string, string> = {
   L1: "#ef4444",
@@ -18,32 +18,29 @@ const PHASE_COL: Record<string, string> = {
   N:  "#64748b",
   PE: "#22c55e",
 };
+function phaseColor(p: string) { return PHASE_COL[p] ?? "#a1b4cc"; }
 
-function phaseColor(phase: string): string {
-  return PHASE_COL[phase] ?? "#a1b4cc";
-}
-
-// ─── SVG düzen sabitleri ──────────────────────────────────────────────────────
-const SW   = 520;
+// ─── SVG düzen sabitleri ─────────────────────────────────────────────────────
+const VW   = 520;   // viewBox genişliği (sabit, width="100%" ile kapsayıcıya uyar)
 const HDR  = 26;
 const ML   = 54;
 const MR   = 16;
 const MT   = 14;
-const MB   = 38;
-const AVLW = SW - ML - MR;
+const MB   = 40;
+const AVLW = VW - ML - MR;  // 450
 
 // ─── Başlık bandı ────────────────────────────────────────────────────────────
-function Hdr({ label, accent, id }: { label: string; accent: string; id: string }) {
+function Hdr({ label, accent, uid }: { label: string; accent: string; uid: string }) {
   return (
     <g>
       <defs>
-        <linearGradient id={id} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor={accent} stopOpacity="0.20" />
+        <linearGradient id={uid} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor={accent} stopOpacity="0.22" />
           <stop offset="100%" stopColor={accent} stopOpacity="0.02" />
         </linearGradient>
       </defs>
-      <rect x={0} y={0} width={SW} height={HDR} fill={`url(#${id})`} />
-      <rect x={0} y={HDR - 1} width={SW} height={1} fill={accent} opacity={0.4} />
+      <rect x={0} y={0} width={VW} height={HDR} fill={`url(#${uid})`} />
+      <rect x={0} y={HDR - 1} width={VW} height={1} fill={accent} opacity={0.4} />
       <circle cx={14} cy={HDR / 2} r={4.5} fill={accent} opacity={0.85} />
       <text x={26} y={HDR / 2 + 4} fontSize={10.5} fill={accent}
         fontWeight="700" fontFamily="system-ui,sans-serif" letterSpacing="0.5">
@@ -81,289 +78,223 @@ function DimV({ x, y1, y2, label, color = DIM, off = 14 }:
       <line x1={xl} y1={y1} x2={xl} y2={y2} />
       <polygon points={`${xl-2},${y1+5} ${xl},${y1} ${xl+2},${y1+5}`} fill={color} stroke="none" />
       <polygon points={`${xl-2},${y2-5} ${xl},${y2} ${xl+2},${y2-5}`} fill={color} stroke="none" />
-      <rect x={xl - 44} y={cy - 6} width={44} height={12} fill={BG} stroke="none" />
-      <text x={xl - 4} y={cy + 4} textAnchor="end" fontSize={9} fill={color} stroke="none"
+      <rect x={xl-44} y={cy-6} width={44} height={12} fill={BG} stroke="none" />
+      <text x={xl-4} y={cy+4} textAnchor="end" fontSize={9} fill={color} stroke="none"
         fontFamily="monospace">{label}</text>
     </g>
   );
 }
 
-// ─── Terminal nokta sembolü ───────────────────────────────────────────────────
-interface TermDotProps {
+// ─── Terminal sembolü — faz renkli, geometrili ───────────────────────────────
+interface TermSymProps {
   cx: number;
   cy: number;
-  r: number;
-  phase: string;
-  name: string;
+  sc: number;           // ölçek faktörü
+  t: DeviceTerminal;
   active: boolean;
-  dashed?: boolean;
+  dashed?: boolean;     // gizli (başka yüzeyde)
 }
 
-function TermDot({ cx, cy, r, phase, name, active, dashed = false }: TermDotProps) {
-  const col = phaseColor(phase);
-  const labelSize = Math.max(Math.min(r * 0.8, 9), 6);
+function TermSym({ cx, cy, sc, t, active, dashed = false }: TermSymProps) {
+  const col  = phaseColor(t.phase);
+  const hd   = t.hole_diameter_mm ? Number(t.hole_diameter_mm) : null;
+  const tw   = t.terminal_width_mm  ? Number(t.terminal_width_mm)  : null;
+  const th   = t.terminal_height_mm ? Number(t.terminal_height_mm) : null;
 
-  if (dashed) {
+  // Delik yarıçapı (px)
+  const hR = hd != null
+    ? Math.min(Math.max(hd * sc / 2, 3.5), 13)
+    : tw != null
+      ? Math.min(Math.max(Math.min(tw, th ?? tw) * sc / 4, 3.5), 10)
+      : 5;
+
+  const alpha = dashed ? 0.35 : 1;
+  const dashArr = dashed ? "3 2" : undefined;
+
+  // Aktif vurgu halkası
+  const ring = active ? (
+    <circle cx={cx} cy={cy} r={hR + 5.5} fill="none"
+      stroke={col} strokeWidth={1.6} opacity={0.95} />
+  ) : null;
+
+  // Boyutlu terminal kutusu (tw × th mevcut ise)
+  if (tw != null && th != null && !dashed) {
+    const rw = Math.min(tw * sc / 2, 18);
+    const rh = Math.min(th * sc / 2, 18);
     return (
-      <g>
-        <circle cx={cx} cy={cy} r={r} fill="none"
-          stroke={col} strokeWidth={0.9} strokeDasharray="3 2" opacity={0.45} />
-        {active && (
-          <circle cx={cx} cy={cy} r={r + 3.5} fill="none"
-            stroke={col} strokeWidth={1.2} strokeDasharray="3 2" opacity={0.6} />
+      <g opacity={alpha}>
+        {ring}
+        <rect x={cx - rw} y={cy - rh} width={rw * 2} height={rh * 2}
+          fill={`${col}18`} stroke={col} strokeWidth={1.1} rx={2} />
+        {hd != null && (
+          <circle cx={cx} cy={cy} r={hR} fill={BG} stroke={col} strokeWidth={0.9}
+            strokeDasharray={dashArr} />
         )}
+        <text x={cx} y={cy - rh - 3} textAnchor="middle" fontSize={8}
+          fill={col} fontFamily="system-ui,sans-serif" fontWeight={600} opacity={0.85}>
+          {t.terminal_name}
+        </text>
       </g>
     );
   }
 
+  // Basit delik sembolü
   return (
-    <g>
-      {active && (
-        <circle cx={cx} cy={cy} r={r + 4} fill="none"
-          stroke={col} strokeWidth={1.5} opacity={0.9} />
+    <g opacity={alpha}>
+      {ring}
+      <circle cx={cx} cy={cy} r={hR} fill={dashed ? "none" : `${col}22`}
+        stroke={col} strokeWidth={1.1} strokeDasharray={dashArr} />
+      {!dashed && (
+        <circle cx={cx} cy={cy} r={hR * 0.38} fill={col} opacity={0.85} />
       )}
-      <circle cx={cx} cy={cy} r={r} fill={col} fillOpacity={0.28}
-        stroke={col} strokeWidth={1.2} />
-      <circle cx={cx} cy={cy} r={r * 0.38} fill={col} opacity={0.9} />
-      {r >= 7 && (
-        <text x={cx} y={cy - r - 3} textAnchor="middle" fontSize={labelSize}
-          fill={col} fontFamily="system-ui,sans-serif" fontWeight="600" opacity={0.9}>
-          {name}
+      {!dashed && (
+        <text x={cx} y={cy - hR - 3} textAnchor="middle" fontSize={8}
+          fill={col} fontFamily="system-ui,sans-serif" fontWeight={600} opacity={0.85}>
+          {t.terminal_name}
         </text>
       )}
     </g>
   );
 }
 
-// ─── Terminal yarıçapı ────────────────────────────────────────────────────────
-function termRadius(t: DeviceTerminal, sc: number): number {
-  if (t.hole_diameter_mm != null && t.hole_diameter_mm > 0) {
-    return Math.min(Math.max(t.hole_diameter_mm * sc / 2, 4), 14);
-  }
-  const dim = Math.min(t.terminal_width_mm ?? 18, t.terminal_height_mm ?? 18);
-  return Math.min(Math.max(dim * sc / 4, 4), 12);
-}
-
-// ─── Boyut hesabı yardımcısı ──────────────────────────────────────────────────
-function computeScale(realW: number, realH: number): { sc: number; bw: number; bh: number; bx: number; by: number } {
-  const avlH = Math.max(realH > 0 ? Math.min(AVLW * (realH / realW), 260) : 120, 60);
-  const scX = AVLW / Math.max(realW, 1);
-  const scY = avlH / Math.max(realH, 1);
-  const sc  = Math.min(scX, scY);
-  const bw  = realW * sc;
-  const bh  = realH * sc;
-  const bx  = ML + (AVLW - bw) / 2;
-  const by  = HDR + MT;
-  return { sc, bw, bh, bx, by };
-}
-
-// ─── Ön Görünüm (X × Y) ─────────────────────────────────────────────────────
-function FrontViewDev({
-  widthMm, heightMm, terminals, activeIdx
-}: {
-  widthMm: number; heightMm: number;
-  terminals: DeviceTerminal[]; activeIdx: number | null;
-}) {
-  const { sc, bw, bh, bx, by } = computeScale(widthMm, heightMm);
+// ─── Ölçek + kutu hesabı ──────────────────────────────────────────────────────
+function layout(realW: number, realH: number) {
+  const maxH = Math.min(AVLW * (realH / Math.max(realW, 1)), 260);
+  const avlH = Math.max(maxH, 60);
+  const sc   = Math.min(AVLW / Math.max(realW, 1), avlH / Math.max(realH, 1));
+  const bw   = realW * sc;
+  const bh   = realH * sc;
+  const bx   = ML + (AVLW - bw) / 2;
+  const by   = HDR + MT;
   const svgH = HDR + MT + bh + MB;
+  return { sc, bw, bh, bx, by, svgH };
+}
 
+// ─── ÖN GÖRÜNÜM (X × Y) ──────────────────────────────────────────────────────
+function FrontView({ W, H, terminals, activeIdx }:
+  { W: number; H: number; terminals: DeviceTerminal[]; activeIdx: number | null }) {
+  const { sc, bw, bh, bx, by, svgH } = layout(W, H);
   return (
-    <svg width={SW} height={svgH} viewBox={`0 0 ${SW} ${svgH}`}
+    <svg viewBox={`0 0 ${VW} ${svgH}`} width="100%"
       style={{ display: "block", background: BG }}>
-      <Hdr label="ÖN GÖRÜNÜM  (X × Y)" accent="#22d3ee" id="fg-front" />
-
-      {/* Cihaz gövdesi */}
+      <Hdr label="ÖN GÖRÜNÜM  (X × Y)" accent="#22d3ee" uid="dev-fg-front" />
       <rect x={bx} y={by} width={bw} height={bh}
         fill="rgba(51,65,85,0.55)" stroke={MUT} strokeWidth={1.2} />
-
-      {/* Köşegen çizgiler (cihaz sembolü) */}
-      <line x1={bx} y1={by} x2={bx + bw} y2={by + bh}
-        stroke={MUT} strokeWidth={0.4} opacity={0.25} />
-      <line x1={bx + bw} y1={by} x2={bx} y2={by + bh}
-        stroke={MUT} strokeWidth={0.4} opacity={0.25} />
-
-      {/* Terminaller */}
       {terminals.map((t, i) => {
         const isFront = !t.terminal_face || t.terminal_face === "front";
         const cx = bx + Math.min(Math.max(Number(t.x_mm) * sc, 0), bw);
         const cy = by + Math.min(Math.max(Number(t.y_mm) * sc, 0), bh);
-        const r  = termRadius(t, sc);
-        return (
-          <TermDot key={i} cx={cx} cy={cy} r={r}
-            phase={t.phase} name={t.terminal_name}
-            active={activeIdx === i} dashed={!isFront} />
-        );
+        return <TermSym key={i} cx={cx} cy={cy} sc={sc} t={t}
+          active={activeIdx === i} dashed={!isFront} />;
       })}
-
-      {/* Boyutlar */}
-      <DimH x1={bx} x2={bx + bw} y={by + bh + 8} label={`${widthMm} mm`} />
-      <DimV x={bx} y1={by} y2={by + bh} label={`${heightMm} mm`} />
+      <DimH x1={bx} x2={bx+bw} y={by+bh+8}  label={`${W} mm`} />
+      <DimV x={bx}  y1={by}    y2={by+bh}    label={`${H} mm`} />
     </svg>
   );
 }
 
-// ─── Arka Görünüm (X mirrorlanmış × Y) ───────────────────────────────────────
-function BackViewDev({
-  widthMm, heightMm, terminals, activeIdx
-}: {
-  widthMm: number; heightMm: number;
-  terminals: DeviceTerminal[]; activeIdx: number | null;
-}) {
-  const { sc, bw, bh, bx, by } = computeScale(widthMm, heightMm);
-  const svgH = HDR + MT + bh + MB;
-
+// ─── ARKA GÖRÜNÜM (X aynalı × Y) ─────────────────────────────────────────────
+function BackView({ W, H, terminals, activeIdx }:
+  { W: number; H: number; terminals: DeviceTerminal[]; activeIdx: number | null }) {
+  const { sc, bw, bh, bx, by, svgH } = layout(W, H);
   return (
-    <svg width={SW} height={svgH} viewBox={`0 0 ${SW} ${svgH}`}
+    <svg viewBox={`0 0 ${VW} ${svgH}`} width="100%"
       style={{ display: "block", background: BG }}>
-      <Hdr label="ARKA GÖRÜNÜM  (X mir × Y)" accent="#f59e0b" id="fg-back" />
-
+      <Hdr label="ARKA GÖRÜNÜM  (X mir × Y)" accent="#f59e0b" uid="dev-fg-back" />
       <rect x={bx} y={by} width={bw} height={bh}
         fill="rgba(51,65,85,0.55)" stroke={MUT} strokeWidth={1.2} />
-      <line x1={bx} y1={by} x2={bx + bw} y2={by + bh}
-        stroke={MUT} strokeWidth={0.4} opacity={0.25} />
-      <line x1={bx + bw} y1={by} x2={bx} y2={by + bh}
-        stroke={MUT} strokeWidth={0.4} opacity={0.25} />
-
       {terminals.map((t, i) => {
         const isBack = t.terminal_face === "back";
-        // Arka görünümde X ekseni aynalı
         const cx = bx + bw - Math.min(Math.max(Number(t.x_mm) * sc, 0), bw);
         const cy = by + Math.min(Math.max(Number(t.y_mm) * sc, 0), bh);
-        const r  = termRadius(t, sc);
-        return (
-          <TermDot key={i} cx={cx} cy={cy} r={r}
-            phase={t.phase} name={t.terminal_name}
-            active={activeIdx === i} dashed={!isBack} />
-        );
+        return <TermSym key={i} cx={cx} cy={cy} sc={sc} t={t}
+          active={activeIdx === i} dashed={!isBack} />;
       })}
-
-      <DimH x1={bx} x2={bx + bw} y={by + bh + 8} label={`${widthMm} mm`} />
-      <DimV x={bx} y1={by} y2={by + bh} label={`${heightMm} mm`} />
+      <DimH x1={bx} x2={bx+bw} y={by+bh+8} label={`${W} mm`} />
+      <DimV x={bx}  y1={by}    y2={by+bh}   label={`${H} mm`} />
     </svg>
   );
 }
 
-// ─── Sol Yan Görünüm (Z × Y) ─────────────────────────────────────────────────
-function SideViewDev({
-  depthMm, heightMm, terminals, activeIdx
-}: {
-  depthMm: number; heightMm: number;
-  terminals: DeviceTerminal[]; activeIdx: number | null;
-}) {
-  const realD = Math.max(depthMm, 1);
-  const { sc, bw, bh, bx, by } = computeScale(realD, heightMm);
-  const svgH = HDR + MT + bh + MB;
-
+// ─── YAN GÖRÜNÜM (Z × Y) ─────────────────────────────────────────────────────
+function SideView({ D, H, terminals, activeIdx }:
+  { D: number; H: number; terminals: DeviceTerminal[]; activeIdx: number | null }) {
+  const realD = Math.max(D, 1);
+  const { sc, bw, bh, bx, by, svgH } = layout(realD, H);
   return (
-    <svg width={SW} height={svgH} viewBox={`0 0 ${SW} ${svgH}`}
+    <svg viewBox={`0 0 ${VW} ${svgH}`} width="100%"
       style={{ display: "block", background: BG }}>
-      <Hdr label="YAN GÖRÜNÜM  (Z × Y)" accent="#a78bfa" id="fg-side" />
-
+      <Hdr label="YAN GÖRÜNÜM  (Z × Y)" accent="#a78bfa" uid="dev-fg-side" />
       <rect x={bx} y={by} width={bw} height={bh}
         fill="rgba(51,65,85,0.55)" stroke={MUT} strokeWidth={1.2} />
-      <line x1={bx} y1={by} x2={bx + bw} y2={by + bh}
-        stroke={MUT} strokeWidth={0.4} opacity={0.25} />
-      <line x1={bx + bw} y1={by} x2={bx} y2={by + bh}
-        stroke={MUT} strokeWidth={0.4} opacity={0.25} />
-
       {terminals.map((t, i) => {
         const isSide = t.terminal_face === "left" || t.terminal_face === "right";
         const cx = bx + Math.min(Math.max(Number(t.z_mm ?? 0) * sc, 0), bw);
         const cy = by + Math.min(Math.max(Number(t.y_mm) * sc, 0), bh);
-        const r  = termRadius(t, sc);
-        return (
-          <TermDot key={i} cx={cx} cy={cy} r={r}
-            phase={t.phase} name={t.terminal_name}
-            active={activeIdx === i} dashed={!isSide} />
-        );
+        return <TermSym key={i} cx={cx} cy={cy} sc={sc} t={t}
+          active={activeIdx === i} dashed={!isSide} />;
       })}
-
-      <DimH x1={bx} x2={bx + bw} y={by + bh + 8} label={`${depthMm} mm`} />
-      <DimV x={bx} y1={by} y2={by + bh} label={`${heightMm} mm`} />
+      <DimH x1={bx} x2={bx+bw} y={by+bh+8} label={`${D} mm`} />
+      <DimV x={bx}  y1={by}    y2={by+bh}   label={`${H} mm`} />
     </svg>
   );
 }
 
-// ─── Üst Görünüm (X × Z) ─────────────────────────────────────────────────────
-function TopViewDev({
-  widthMm, depthMm, terminals, activeIdx
-}: {
-  widthMm: number; depthMm: number;
-  terminals: DeviceTerminal[]; activeIdx: number | null;
-}) {
-  const realD = Math.max(depthMm, 1);
-  const { sc, bw, bh, bx, by } = computeScale(widthMm, realD);
-  const svgH = HDR + MT + bh + MB;
-
+// ─── ÜST GÖRÜNÜM (X × Z) ─────────────────────────────────────────────────────
+function TopView({ W, D, terminals, activeIdx }:
+  { W: number; D: number; terminals: DeviceTerminal[]; activeIdx: number | null }) {
+  const realD = Math.max(D, 1);
+  const { sc, bw, bh, bx, by, svgH } = layout(W, realD);
   return (
-    <svg width={SW} height={svgH} viewBox={`0 0 ${SW} ${svgH}`}
+    <svg viewBox={`0 0 ${VW} ${svgH}`} width="100%"
       style={{ display: "block", background: BG }}>
-      <Hdr label="ÜST GÖRÜNÜM  (X × Z)" accent="#34d399" id="fg-top" />
-
+      <Hdr label="ÜST GÖRÜNÜM  (X × Z)" accent="#34d399" uid="dev-fg-top" />
       <rect x={bx} y={by} width={bw} height={bh}
         fill="rgba(51,65,85,0.55)" stroke={MUT} strokeWidth={1.2} />
-      <line x1={bx} y1={by} x2={bx + bw} y2={by + bh}
-        stroke={MUT} strokeWidth={0.4} opacity={0.25} />
-      <line x1={bx + bw} y1={by} x2={bx} y2={by + bh}
-        stroke={MUT} strokeWidth={0.4} opacity={0.25} />
-
       {terminals.map((t, i) => {
         const isTop = t.terminal_face === "top" || t.terminal_face === "bottom";
         const cx = bx + Math.min(Math.max(Number(t.x_mm) * sc, 0), bw);
         const cy = by + Math.min(Math.max(Number(t.z_mm ?? 0) * sc, 0), bh);
-        const r  = termRadius(t, sc);
-        return (
-          <TermDot key={i} cx={cx} cy={cy} r={r}
-            phase={t.phase} name={t.terminal_name}
-            active={activeIdx === i} dashed={!isTop} />
-        );
+        return <TermSym key={i} cx={cx} cy={cy} sc={sc} t={t}
+          active={activeIdx === i} dashed={!isTop} />;
       })}
-
-      <DimH x1={bx} x2={bx + bw} y={by + bh + 8} label={`${widthMm} mm`} />
-      <DimV x={bx} y1={by} y2={by + bh} label={`${depthMm} mm`} />
+      <DimH x1={bx} x2={bx+bw} y={by+bh+8} label={`${W} mm`} />
+      <DimV x={bx}  y1={by}    y2={by+bh}   label={`${D} mm`} />
     </svg>
   );
 }
 
 // ─── Legend ───────────────────────────────────────────────────────────────────
 function Legend({ terminals, activeIdx }: { terminals: DeviceTerminal[]; activeIdx: number | null }) {
-  if (terminals.length === 0) return null;
-
+  if (!terminals.length) return null;
   return (
     <div style={{
-      background: BG,
-      border: "1px solid rgba(148,163,184,0.18)",
-      borderTop: "none",
-      padding: "0.5rem 0.75rem 0.6rem",
-      display: "flex",
-      flexWrap: "wrap",
-      gap: "0.4rem 0.75rem",
+      background: BG, borderTop: "1px solid rgba(148,163,184,0.14)",
+      padding: "0.45rem 0.7rem 0.55rem",
+      display: "flex", flexWrap: "wrap", gap: "0.35rem 0.65rem",
     }}>
       {terminals.map((t, i) => {
         const col = phaseColor(t.phase);
-        const isActive = activeIdx === i;
+        const active = activeIdx === i;
         return (
           <span key={i} style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "0.3rem",
-            fontSize: "0.72rem",
-            fontFamily: "system-ui,sans-serif",
-            color: isActive ? col : "rgba(148,163,184,0.75)",
-            fontWeight: isActive ? 700 : 400,
-            padding: "0.1rem 0.35rem",
+            display: "inline-flex", alignItems: "center", gap: "0.28rem",
+            fontSize: "0.71rem", fontFamily: "system-ui,sans-serif",
+            color: active ? col : "rgba(148,163,184,0.7)",
+            fontWeight: active ? 700 : 400,
+            padding: "0.08rem 0.32rem",
             borderRadius: 4,
-            background: isActive ? `${col}1a` : "transparent",
-            border: isActive ? `1px solid ${col}55` : "1px solid transparent",
-            transition: "all 0.15s",
+            background: active ? `${col}18` : "transparent",
+            border: `1px solid ${active ? col + "55" : "transparent"}`,
+            transition: "all 0.12s",
           }}>
             <span style={{
-              width: 8, height: 8, borderRadius: "50%",
-              background: col, opacity: isActive ? 1 : 0.5,
-              display: "inline-block",
+              width: 7, height: 7, borderRadius: "50%",
+              background: col, opacity: active ? 1 : 0.45,
+              display: "inline-block", flexShrink: 0,
             }} />
-            <span>{t.terminal_name}</span>
-            <span style={{ opacity: 0.6 }}>{t.phase}</span>
+            {t.terminal_name}
+            <span style={{ opacity: 0.6, fontSize: "0.66rem" }}>{t.phase}</span>
           </span>
         );
       })}
@@ -385,31 +316,26 @@ export function DeviceOrthographicPreview({
 }: DeviceOrthographicPreviewProps) {
   return (
     <div style={{
-      display: "flex",
-      flexDirection: "column",
-      gap: 0,
+      display: "flex", flexDirection: "column", gap: 0,
       border: "1px solid rgba(148,163,184,0.18)",
-      borderRadius: 8,
-      overflow: "hidden",
+      borderRadius: 8, overflow: "hidden",
     }}>
       {/* Başlık */}
       <div style={{
         background: "#0f1623",
-        padding: "0.5rem 0.75rem",
-        fontSize: "0.75rem",
-        fontWeight: 700,
-        color: "#94a3b8",
-        letterSpacing: "0.08em",
+        padding: "0.45rem 0.75rem",
+        fontSize: "0.72rem", fontWeight: 700,
+        color: "#94a3b8", letterSpacing: "0.08em",
         textTransform: "uppercase",
         borderBottom: "1px solid rgba(148,163,184,0.12)",
       }}>
         Cihaz Önizleme — 4 Görünüm
       </div>
 
-      <FrontViewDev widthMm={widthMm} heightMm={heightMm} terminals={terminals} activeIdx={activeIdx} />
-      <BackViewDev  widthMm={widthMm} heightMm={heightMm} terminals={terminals} activeIdx={activeIdx} />
-      <SideViewDev  depthMm={depthMm} heightMm={heightMm} terminals={terminals} activeIdx={activeIdx} />
-      <TopViewDev   widthMm={widthMm} depthMm={depthMm}   terminals={terminals} activeIdx={activeIdx} />
+      <FrontView W={widthMm}  H={heightMm} terminals={terminals} activeIdx={activeIdx} />
+      <BackView  W={widthMm}  H={heightMm} terminals={terminals} activeIdx={activeIdx} />
+      <SideView  D={depthMm}  H={heightMm} terminals={terminals} activeIdx={activeIdx} />
+      <TopView   W={widthMm}  D={depthMm}  terminals={terminals} activeIdx={activeIdx} />
 
       <Legend terminals={terminals} activeIdx={activeIdx} />
     </div>
