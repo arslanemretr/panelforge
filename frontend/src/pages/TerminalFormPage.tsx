@@ -470,21 +470,17 @@ export function TerminalFormPage() {
               Boş bırakılırsa delikler otomatik ortalanır.
             </p>
             <div className="form-grid">
-              {posAxes.x && (
-                <NumField label="Sol Kenardan (X)" unit="mm" min={0}
-                  value={draft.bolt_pos_x_mm}
-                  onChange={(v) => set("bolt_pos_x_mm", v)} />
-              )}
-              {posAxes.y && (
-                <NumField label="Üstten (Y)" unit="mm" min={0}
-                  value={draft.bolt_pos_y_mm}
-                  onChange={(v) => set("bolt_pos_y_mm", v)} />
-              )}
-              {posAxes.z && (
-                <NumField label={posAxes.zLabel} unit="mm" min={0}
-                  value={draft.bolt_pos_z_mm}
-                  onChange={(v) => set("bolt_pos_z_mm", v)} />
-              )}
+              <NumField label="Sol Kenardan (X)" unit="mm" min={0}
+                value={draft.bolt_pos_x_mm}
+                onChange={(v) => set("bolt_pos_x_mm", v)} />
+              <NumField label="Üstten (Y)" unit="mm" min={0}
+                value={draft.bolt_pos_y_mm}
+                onChange={(v) => set("bolt_pos_y_mm", v)} />
+              <NumField
+                label={draft.terminal_type === "Arka Yatay Taraklı" ? "Fin Başından (Z)" : "Önden (Z)"}
+                unit="mm" min={0}
+                value={draft.bolt_pos_z_mm}
+                onChange={(v) => set("bolt_pos_z_mm", v)} />
             </div>
           </section>
 
@@ -567,56 +563,10 @@ export function TerminalFormPage() {
           </div>
         </form>
 
-        {/* ── Sağ: Özet + Önizleme ── */}
+        {/* ── Sağ: Önizleme + Özet ── */}
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
 
-          {/* Özet kartı */}
-          <section className="card">
-            <div style={{ marginBottom: "0.6rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-              <span style={{
-                padding: "3px 10px", borderRadius: 6, fontSize: "0.78rem", fontWeight: 600,
-                background: "var(--accent-soft)", color: "var(--accent)",
-              }}>{draft.terminal_type}</span>
-              <span style={{
-                padding: "3px 10px", borderRadius: 6, fontSize: "0.78rem", fontWeight: 600,
-                background: "rgba(148,163,184,0.12)", color: "var(--muted)",
-              }}>{surfaceLabel}</span>
-              <span style={{
-                padding: "3px 10px", borderRadius: 6, fontSize: "0.78rem", fontWeight: 600,
-                background: holeMode === "slot" ? "rgba(251,191,36,0.15)" : "rgba(148,163,184,0.08)",
-                color: holeMode === "slot" ? "#b45309" : "var(--muted)",
-              }}>{holeMode === "slot" ? "Slot Delik" : "Yuvarlak Delik"}</span>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.4rem" }}>
-              {[
-                ["Vida",    draft.bolt_type ? `${draft.bolt_type} ×${draft.bolt_count ?? "?"}` : "—"],
-                ["Merkez",  draft.bolt_center_distance_mm ? `${draft.bolt_center_distance_mm} mm` : "—"],
-                ["Delik",   holeMode === "round"
-                  ? (draft.hole_diameter_mm ? `Ø${draft.hole_diameter_mm} mm` : "—")
-                  : (draft.slot_width_mm && draft.slot_length_mm ? `${draft.slot_width_mm}×${draft.slot_length_mm} mm` : "—")],
-                ["Boyut",   draft.terminal_width_mm && draft.terminal_height_mm
-                  ? `${draft.terminal_width_mm}×${draft.terminal_height_mm}×${draft.terminal_depth_mm ?? "?"} mm`
-                  : "—"],
-                ...(showFinFields ? [[
-                  "Fin",
-                  draft.fin_count
-                    ? `${draft.fin_count} adet${draft.fin_spacing_mm ? ` / ${draft.fin_spacing_mm} mm ara` : ""}${draft.fin_thickness_mm ? ` / ${draft.fin_thickness_mm} mm kalın` : ""}`
-                    : "—",
-                ]] : []),
-              ].map(([label, value]) => (
-                <div key={label} style={{
-                  background: "var(--surface-alt,rgba(0,0,0,0.03))",
-                  borderRadius: 6, padding: "0.35rem 0.6rem",
-                  border: "1px solid var(--line)",
-                }}>
-                  <div style={{ fontSize: "0.68rem", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</div>
-                  <div style={{ fontSize: "0.82rem", fontWeight: 600, fontFamily: "monospace", marginTop: "0.1rem" }}>{value}</div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* 4 görünüş */}
+          {/* 4 görünüş — üstte */}
           <TerminalPreview
             terminal_type={draft.terminal_type}
             surface={draft.surface}
@@ -638,6 +588,55 @@ export function TerminalFormPage() {
             bolt_pos_y_mm={draft.bolt_pos_y_mm}
             bolt_pos_z_mm={draft.bolt_pos_z_mm}
           />
+
+          {/* Özet kartı — görünüşlerin altında */}
+          <section className="card">
+            <div style={{ marginBottom: "0.6rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+              <span style={{
+                padding: "3px 10px", borderRadius: 6, fontSize: "0.78rem", fontWeight: 600,
+                background: "var(--accent-soft)", color: "var(--accent)",
+              }}>{draft.terminal_type}</span>
+              <span style={{
+                padding: "3px 10px", borderRadius: 6, fontSize: "0.78rem", fontWeight: 600,
+                background: "rgba(148,163,184,0.12)", color: "var(--muted)",
+              }}>{surfaceLabel}</span>
+              <span style={{
+                padding: "3px 10px", borderRadius: 6, fontSize: "0.78rem", fontWeight: 600,
+                background: holeMode === "slot" ? "rgba(251,191,36,0.15)" : "rgba(148,163,184,0.08)",
+                color: holeMode === "slot" ? "#b45309" : "var(--muted)",
+              }}>{holeMode === "slot" ? "Slot Delik" : "Yuvarlak Delik"}</span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.4rem" }}>
+              {[
+                ["Vida",   draft.bolt_type ? `${draft.bolt_type} ×${draft.bolt_count ?? "?"}` : "—"],
+                ["Merkez", draft.bolt_center_distance_mm ? `${draft.bolt_center_distance_mm} mm` : "—"],
+                ["Delik",  holeMode === "round"
+                  ? (draft.hole_diameter_mm ? `Ø${draft.hole_diameter_mm} mm` : "—")
+                  : (draft.slot_width_mm && draft.slot_length_mm ? `${draft.slot_width_mm}×${draft.slot_length_mm} mm` : "—")],
+                ["Boyut",  draft.terminal_width_mm && draft.terminal_height_mm
+                  ? `${draft.terminal_width_mm}×${draft.terminal_height_mm}×${draft.terminal_depth_mm ?? "?"} mm`
+                  : "—"],
+                ["Konum X", draft.bolt_pos_x_mm != null ? `${draft.bolt_pos_x_mm} mm` : "oto"],
+                ["Konum Y", draft.bolt_pos_y_mm != null ? `${draft.bolt_pos_y_mm} mm` : "oto"],
+                ["Konum Z", draft.bolt_pos_z_mm != null ? `${draft.bolt_pos_z_mm} mm` : "oto"],
+                ...(showFinFields ? [[
+                  "Fin",
+                  draft.fin_count
+                    ? `${draft.fin_count} adet / ${draft.fin_spacing_mm ?? "?"}mm ara / ${draft.fin_thickness_mm ?? "?"}mm kalın`
+                    : "—",
+                ]] : []),
+              ].map(([label, value]) => (
+                <div key={label} style={{
+                  background: "var(--surface-alt,rgba(0,0,0,0.03))",
+                  borderRadius: 6, padding: "0.35rem 0.6rem",
+                  border: "1px solid var(--line)",
+                }}>
+                  <div style={{ fontSize: "0.68rem", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</div>
+                  <div style={{ fontSize: "0.82rem", fontWeight: 600, fontFamily: "monospace", marginTop: "0.1rem" }}>{value}</div>
+                </div>
+              ))}
+            </div>
+          </section>
         </div>
       </div>
     </div>

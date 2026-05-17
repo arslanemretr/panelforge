@@ -451,15 +451,12 @@ function BackView({ g }: { g: Geom }) {
       {/* Ana gövde */}
       <rect x={bx} y={by} width={bw} height={bh} fill={BFILL} stroke={BODY} strokeWidth={1.6} rx={2} />
 
-      {/* Ön Terminal: arka yüzde de delikler görünür (civata geçiş) */}
+      {/* Ön Terminal: ön yüzden bağlantı — arka görünümde delik görünmez */}
       {isOT && (
-        <>
-          <Holes xs={xs} cy={hY} g={{ ...g, sWmm: sW/sc, sLmm: sL/sc }} dashed={false} />
-          {g.boltN >= 2 && xs.length >= 2 && (
-            <DimH x1={xs[0]} x2={xs[xs.length-1]} y={hY + (g.isSlot ? sL/sc*sc/2+6 : hR+5)}
-              label={`${g.boltSpMm} mm`} color={RED} off={10} />
-          )}
-        </>
+        <text x={bx+bw/2} y={by+bh/2+4} textAnchor="middle" fontSize={7.5}
+          fill={MUT} fontFamily="system-ui" fontWeight={600}>
+          Ön yüzden bağlantı — arka görünümde delik yok
+        </text>
       )}
 
       {/* Arka Yatay Taraklı: arka yüzden fin şeritleri + vida delikleri (dashed) */}
@@ -592,16 +589,48 @@ function SideView({ g }: { g: Geom }) {
       <text x={bx+3} y={by-4} fontSize={7} fill="#3498db" fontFamily="system-ui" fontWeight={600}>ÖN</text>
       <text x={bx+bw-3} y={by-4} fontSize={7} fill="#e74c3c" fontFamily="system-ui" fontWeight={600} textAnchor="end">ARKA</text>
 
-      {/* ── Ön Terminal: kesit çizgisi (delik ön yüzden giriyor) ── */}
-      {isOT && (
-        <>
-          {/* posZmm varsa deliğin tam derinlik konumunda, yoksa ön yüz kenarında */}
-          <RHdash cx={holeXdepth} cy={hY_front} r={hR} />
-          <HideLineH x1={bx} x2={Math.min(bx + bw * 0.6, holeXdepth + hR * 2)} y={hY_front - hR * 0.9} />
-          <HideLineH x1={bx} x2={Math.min(bx + bw * 0.6, holeXdepth + hR * 2)} y={hY_front + hR * 0.9} />
-          <HideLegend x={bx+4} y={by+bh+26} />
-        </>
-      )}
+      {/* ── Ön Terminal: kesit (delik ön yüzden Z yönünde giriyor) ──
+          Yan görünüş (Z×Y): ön yüz = sol kenar (bx)
+          Delik Z yönünde ilerler → iki yatay dashed çizgi + dash-dot merkez + dibi kapak
+          Boyut okları: Y konumu (posYmm), delik derinliği (posZmm), çap (holeDmm) */}
+      {isOT && (() => {
+        const holeDepthSvg = g.posZmm != null
+          ? Math.min(g.posZmm * sc, bw - 2)
+          : Math.min(bw * 0.55, bw - 2);
+        const endX = bx + holeDepthSvg;
+        const ext  = 5;
+        const hasDims = g.posYmm != null || g.posZmm != null;
+        return (
+          <g>
+            {/* Üst çap çizgisi */}
+            <line x1={bx} y1={hY_front - hR} x2={endX} y2={hY_front - hR}
+              stroke={DASH} strokeWidth={0.85} strokeDasharray="4 2" />
+            {/* Alt çap çizgisi */}
+            <line x1={bx} y1={hY_front + hR} x2={endX} y2={hY_front + hR}
+              stroke={DASH} strokeWidth={0.85} strokeDasharray="4 2" />
+            {/* Delik dibi (kapalı uç) */}
+            <line x1={endX} y1={hY_front - hR} x2={endX} y2={hY_front + hR}
+              stroke={DASH} strokeWidth={0.85} strokeDasharray="4 2" />
+            {/* Merkez çizgisi (dash-dot) */}
+            <line x1={bx - ext} y1={hY_front} x2={endX + ext} y2={hY_front}
+              stroke={DASH} strokeWidth={0.5} strokeDasharray="6 2 1 2" opacity={0.75} />
+            {/* Y konumu boyutu — sol kenarda */}
+            {g.posYmm != null && (
+              <DimV x={bx - 8} y1={by} y2={hY_front}
+                label={`${g.posYmm} mm`} color="#f39c12" off={12} />
+            )}
+            {/* Delik derinliği (Z) — alt boyut */}
+            {g.posZmm != null && (
+              <DimH x1={bx} x2={endX} y={hY_front + hR + 10}
+                label={`${g.posZmm} mm`} color="#f39c12" off={10} />
+            )}
+            {/* Çap boyutu — sağda */}
+            <DimVR x={endX + 4} y1={hY_front - hR} y2={hY_front + hR}
+              label={`Ø${g.holeDmm} mm`} color={RED} off={10} />
+            {hasDims && <line x1={bx} y1={by+bh} x2={bx} y2={by+bh} stroke="none" />}
+          </g>
+        );
+      })()}
 
       {/* ── Arka Yatay Terminal: kesit + tek dashed delik ── */}
       {isAY && (
