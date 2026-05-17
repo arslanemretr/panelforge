@@ -10,7 +10,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { client } from "../api/client";
-import { DeviceOrthographicPreview } from "../components/DeviceOrthographicPreview";
+import { DeviceTechDrawing } from "../components/DeviceTechDrawing";
 import type { Device, DeviceTerminal, TerminalDefinition } from "../types";
 
 // ── Yardımcı: boş terminal satırı ────────────────────────────────────────────
@@ -610,15 +610,30 @@ export function DeviceEditorPage() {
           </div>
         </div>
 
-        {/* ── Sağ Kolon: 4 Görünüm Önizleme ─────────────────────────────── */}
+        {/* ── Sağ Kolon: Teknik Çizim ────────────────────────────────────── */}
         <div style={{ position: "sticky", top: "1rem" }}>
-          <DeviceOrthographicPreview
-            widthMm={form.width_mm}
-            heightMm={form.height_mm}
-            depthMm={form.depth_mm}
-            terminals={terminalsForDrawing}
-            activeIdx={activeTerminalIdx}
-          />
+          <section className="card" style={{ padding: "0.75rem" }}>
+            <h3 style={{ margin: "0 0 0.6rem", fontSize: "0.9rem", color: "var(--accent)" }}>
+              Teknik Çizim — Canlı Önizleme
+              {activeTerminalIdx !== null && terminals[activeTerminalIdx] && (
+                <span style={{
+                  marginLeft: "0.5rem", fontSize: "0.72rem", fontWeight: 400,
+                  color: "#f59e0b",
+                }}>
+                  ● {terminals[activeTerminalIdx].terminal_name} vurgulanıyor
+                </span>
+              )}
+            </h3>
+            <DeviceTechDrawing
+              widthMm={form.width_mm}
+              heightMm={form.height_mm}
+              depthMm={form.depth_mm}
+              terminals={terminalsForDrawing}
+              terminalDefs={terminalDefs}
+              height={580}
+              activeTerminalIdx={activeTerminalIdx}
+            />
+          </section>
         </div>
       </div>
     </form>

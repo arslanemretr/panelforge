@@ -59,6 +59,8 @@ export interface DeviceTechDrawingProps {
   terminalDefs?: TerminalDefinition[];
   /** Bileşen display yüksekliği (px). Varsayılan 480. */
   height?: number;
+  /** Vurgulanan terminal satırı indeksi (terminals dizisine göre). */
+  activeTerminalIdx?: number | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -140,6 +142,14 @@ function HoleSymbol({ cx, cy, r, label, dimR }: {
         </text>
       )}
     </g>
+  );
+}
+
+const HL_COLOR = "#f59e0b";
+function ActiveRing({ cx, cy, r }: { cx: number; cy: number; r: number }) {
+  return (
+    <circle cx={cx} cy={cy} r={r + 5}
+      fill="none" stroke={HL_COLOR} strokeWidth={1.8} opacity={0.9} />
   );
 }
 
@@ -265,6 +275,7 @@ function TerminalSymbol({
 
 export function DeviceTechDrawing({
   widthMm, heightMm, depthMm, terminals, terminalDefs = [], height = 480,
+  activeTerminalIdx = null,
 }: DeviceTechDrawingProps) {
   const W = Math.max(widthMm  || 1, 1);
   const H = Math.max(heightMm || 1, 1);
@@ -290,19 +301,12 @@ export function DeviceTechDrawing({
 
   const gridStep = Math.max(W, H, D) > 400 ? 50 : Math.max(W, H, D) > 200 ? 25 : 10;
 
-  // Terminal filtreleri
-  const frontTerminals = terminals.filter(
-    (t) => !t.terminal_face || t.terminal_face === "front",
-  );
-  const backTerminals = terminals.filter(
-    (t) => t.terminal_face === "back",
-  );
-  const sideTerminals = terminals.filter(
-    (t) => t.terminal_face && ["right", "left"].includes(t.terminal_face),
-  );
-  const topTerminals = terminals.filter(
-    (t) => t.terminal_face && ["top", "bottom"].includes(t.terminal_face),
-  );
+  // Terminal filtreleri — orijinal indeksi koru
+  const indexed = terminals.map((t, idx) => ({ t, idx }));
+  const frontTerminals  = indexed.filter(({ t }) => !t.terminal_face || t.terminal_face === "front");
+  const backTerminals   = indexed.filter(({ t }) => t.terminal_face === "back");
+  const sideTerminals   = indexed.filter(({ t }) => t.terminal_face && ["right", "left"].includes(t.terminal_face));
+  const topTerminals    = indexed.filter(({ t }) => t.terminal_face && ["top", "bottom"].includes(t.terminal_face));
   const topHiddenTerminals = frontTerminals;
 
   const holeR = (t: TechTerminal) =>
@@ -368,7 +372,7 @@ export function DeviceTechDrawing({
 
   const viewBoxStr = `${pan.x} ${pan.y} ${svgW / zoom} ${svgH / zoom}`;
 
-  // Kullanılmayan parametre uyarısını bastır
+  // terminalDefs ileride terminal sembol zenginleştirmesi için hazırda
   void terminalDefs;
 
   return (
@@ -439,8 +443,16 @@ export function DeviceTechDrawing({
             <rect x={frontX} y={frontY} width={W} height={H}
               fill={COLORS.viewBg} stroke={COLORS.object} strokeWidth={OBJ_W} />
 
-            {frontTerminals.map((t, i) => (
-              <TerminalSymbol key={i} t={t} offsetX={frontX} offsetY={frontY} defaultR={holeR(t)} />
+            {frontTerminals.map(({ t, idx }, i) => (
+              <g key={i}>
+                {activeTerminalIdx === idx && (
+                  <ActiveRing
+                    cx={frontX + Number(t.x_mm)}
+                    cy={frontY + Number(t.y_mm)}
+                    r={holeR(t)} />
+                )}
+                <TerminalSymbol t={t} offsetX={frontX} offsetY={frontY} defaultR={holeR(t)} />
+              </g>
             ))}
 
             <ViewLabel x={frontX} y={frontY + H + 4} w={W} text="ÖN GÖRÜNÜM" />
@@ -451,21 +463,29 @@ export function DeviceTechDrawing({
             <rect x={sideX} y={sideY} width={D} height={H}
               fill={COLORS.viewBg} stroke={COLORS.object} strokeWidth={OBJ_W} />
 
-            {sideTerminals.map((t, i) => {
+            {sideTerminals.map(({ t, idx }, i) => {
               const cx = sideX + Number(t.z_mm ?? 0);
               const cy = sideY + Number(t.y_mm);
               const r  = holeR(t);
-              return <HoleSymbol key={i} cx={cx} cy={cy} r={r} label={t.terminal_name} />;
+              return (
+                <g key={i}>
+                  {activeTerminalIdx === idx && <ActiveRing cx={cx} cy={cy} r={r} />}
+                  <HoleSymbol cx={cx} cy={cy} r={r} label={t.terminal_name} />
+                </g>
+              );
             })}
 
             {/* Ön terminaller gizli çizgi */}
-            {frontTerminals.map((t, i) => {
+            {frontTerminals.map(({ t, idx }, i) => {
               const cx = sideX + Number(t.z_mm ?? D / 2);
               const cy = sideY + Number(t.y_mm);
               const r  = holeR(t);
               return (
-                <circle key={`h${i}`} cx={cx} cy={cy} r={r}
-                  fill="none" stroke={COLORS.hidden} strokeWidth={HID_W} strokeDasharray="3 2" />
+                <g key={`h${i}`}>
+                  {activeTerminalIdx === idx && <ActiveRing cx={cx} cy={cy} r={r} />}
+                  <circle cx={cx} cy={cy} r={r}
+                    fill="none" stroke={COLORS.hidden} strokeWidth={HID_W} strokeDasharray="3 2" />
+                </g>
               );
             })}
 
@@ -477,12 +497,13 @@ export function DeviceTechDrawing({
             <rect x={topX} y={topY} width={W} height={D}
               fill={COLORS.viewBg} stroke={COLORS.object} strokeWidth={OBJ_W} />
 
-            {topHiddenTerminals.map((t, i) => {
+            {topHiddenTerminals.map(({ t, idx }, i) => {
               const cx = topX + Number(t.x_mm);
               const cy = topY + Number(t.z_mm ?? D / 2);
               const r  = holeR(t);
               return (
                 <g key={i}>
+                  {activeTerminalIdx === idx && <ActiveRing cx={cx} cy={cy} r={r} />}
                   <circle cx={cx} cy={cy} r={r}
                     fill="none" stroke={COLORS.hidden} strokeWidth={HID_W} strokeDasharray="3 2" />
                   <line x1={cx - r * 1.5} y1={cy} x2={cx + r * 1.5} y2={cy}
@@ -491,11 +512,16 @@ export function DeviceTechDrawing({
               );
             })}
 
-            {topTerminals.map((t, i) => {
+            {topTerminals.map(({ t, idx }, i) => {
               const cx = topX + Number(t.x_mm);
               const cy = topY + Number(t.z_mm ?? 0);
               const r  = holeR(t);
-              return <HoleSymbol key={`top${i}`} cx={cx} cy={cy} r={r} label={t.terminal_name} />;
+              return (
+                <g key={`top${i}`}>
+                  {activeTerminalIdx === idx && <ActiveRing cx={cx} cy={cy} r={r} />}
+                  <HoleSymbol cx={cx} cy={cy} r={r} label={t.terminal_name} />
+                </g>
+              );
             })}
 
             <ViewLabel x={topX} y={topY + D + 4} w={W} text="ALT PLAN" />
@@ -508,31 +534,33 @@ export function DeviceTechDrawing({
               strokeDasharray="6 2" />
 
             {/* Arka terminal semboller — X ekseni aynalı (arka görünüşte sol/sağ ters) */}
-            {backTerminals.map((t, i) => {
+            {backTerminals.map(({ t, idx }, i) => {
               // Arka görünüşte X koordinatı aynalı: x_back = W - x_mm
-              const mirroredT: TechTerminal = {
-                ...t,
-                x_mm: W - Number(t.x_mm),
-              };
+              const mirroredT: TechTerminal = { ...t, x_mm: W - Number(t.x_mm) };
               return (
-                <TerminalSymbol
-                  key={i}
-                  t={mirroredT}
-                  offsetX={backX}
-                  offsetY={backY}
-                  defaultR={holeR(t)}
-                />
+                <g key={i}>
+                  {activeTerminalIdx === idx && (
+                    <ActiveRing
+                      cx={backX + (W - Number(t.x_mm))}
+                      cy={backY + Number(t.y_mm)}
+                      r={holeR(t)} />
+                  )}
+                  <TerminalSymbol t={mirroredT} offsetX={backX} offsetY={backY} defaultR={holeR(t)} />
+                </g>
               );
             })}
 
             {/* Ön terminaller arka görünüşte gizli çizgi */}
-            {frontTerminals.map((t, i) => {
+            {frontTerminals.map(({ t, idx }, i) => {
               const cx = backX + (W - Number(t.x_mm));
               const cy = backY + Number(t.y_mm);
               const r  = holeR(t);
               return (
-                <circle key={`bh${i}`} cx={cx} cy={cy} r={r}
-                  fill="none" stroke={COLORS.hidden} strokeWidth={HID_W} strokeDasharray="3 2" />
+                <g key={`bh${i}`}>
+                  {activeTerminalIdx === idx && <ActiveRing cx={cx} cy={cy} r={r} />}
+                  <circle cx={cx} cy={cy} r={r}
+                    fill="none" stroke={COLORS.hidden} strokeWidth={HID_W} strokeDasharray="3 2" />
+                </g>
               );
             })}
 
