@@ -146,7 +146,7 @@ function buildPayload(d: TerminalDraft): Omit<TerminalDefinition, "id" | "create
 
 // ─── Sayısal input (null destekli, negatife izin verme) ───────────────────────
 function NumField({
-  label, value, onChange, unit, min = 0, disabled,
+  label, value, onChange, unit, min = 0, disabled, hint, error,
 }: {
   label: string;
   value: number | null;
@@ -154,12 +154,28 @@ function NumField({
   unit?: string;
   min?: number;
   disabled?: boolean;
+  hint?: string;   // formül ipucu — başlık altında gri küçük yazı
+  error?: string;  // kısıt ihlali — başlık altında kırmızı küçük yazı
 }) {
   return (
     <label className="field" style={disabled ? { opacity: 0.4, pointerEvents: "none" } : undefined}>
-      <span>
-        {label}
-        {unit && <span style={{ color: "var(--muted)", fontWeight: 400 }}> ({unit})</span>}
+      <span style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
+        <span>
+          {label}
+          {unit && <span style={{ color: "var(--muted)", fontWeight: 400 }}> ({unit})</span>}
+        </span>
+        {hint && !error && (
+          <span style={{ fontSize: "0.68rem", fontWeight: 400, color: "var(--muted)",
+            fontFamily: "monospace", opacity: 0.85, lineHeight: 1.3 }}>
+            {hint}
+          </span>
+        )}
+        {error && (
+          <span style={{ fontSize: "0.68rem", fontWeight: 600, color: "#ef4444",
+            fontFamily: "monospace", lineHeight: 1.3 }}>
+            ⚠ {error}
+          </span>
+        )}
       </span>
       <input
         className="input"
@@ -169,6 +185,7 @@ function NumField({
         value={value ?? ""}
         placeholder="—"
         disabled={disabled}
+        style={error ? { borderColor: "#ef4444", boxShadow: "0 0 0 2px rgba(239,68,68,0.15)" } : undefined}
         onChange={(e) => {
           if (e.target.value === "") { onChange(null); return; }
           const v = Number(e.target.value);
@@ -300,9 +317,74 @@ export function TerminalFormPage() {
   const surfaceLabel   = validSurfaces.find(s => s.value === draft.surface)?.label ?? draft.surface;
   const showFinFields  = isTarakli(draft.terminal_type);
   const posAxes        = POSITION_AXES[draft.terminal_type] ?? { x: true, y: true, z: true, zLabel: "Önden (Z)" };
+  const isAYT          = draft.terminal_type === "Arka Yatay Taraklı";
+
+  // ── AYT kısıt hesaplamaları ────────────────────────────────────────────────
+  const W   = draft.terminal_width_mm;
+  const H   = draft.terminal_height_mm;
+  const D   = draft.terminal_depth_mm;
+  const n   = draft.fin_count ?? 1;
+  const ft  = draft.fin_thickness_mm;
+  const fs  = draft.fin_spacing_mm;
+  const fo  = draft.fin_offset_mm;
+  const fl  = draft.fin_length_mm;
+  const pt  = draft.plate_thickness_mm;
+  const hd  = draft.hole_diameter_mm;
+  const bsp = draft.bolt_center_distance_mm;
+  const bn  = draft.bolt_count ?? 1;
+  const px  = draft.bolt_pos_x_mm;
+  const pz  = draft.bolt_pos_z_mm;
+
+  // A — Derinlik: plaka + fin = D
+  const depthSum    = (pt ?? 0) + (fl ?? 0);
+  const depthHint   = `plaka_kalınlık + fin_uzunluk = D   →   ${pt ?? "?"} + ${fl ?? "?"} = ${depthSum} mm`;
+  const depthError  = isAYT && D != null && pt != null && fl != null && Math.abs(depthSum - D) > 0.001
+    ? `${pt} + ${fl} = ${depthSum} ≠ ${D} mm` : undefined;
+
+  // B — Yükseklik: finBlok ≤ H
+  const finBlock     = fs != null ? (n - 1) * fs + (ft ?? 0) : (ft ?? 0) * n;
+  const finBlockErr  = isAYT && H != null && ft != null && finBlock > H + 0.001
+    ? `finBlok ${finBlock.toFixed(1)} > H ${H} mm` : undefined;
+  const offsetErr    = isAYT && H != null && fo != null && ft != null && fs != null
+    && fo + finBlock > H + 0.001
+    ? `boşluk(${fo}) + finBlok(${finBlock.toFixed(1)}) = ${(fo + finBlock).toFixed(1)} > H(${H})` : undefined;
+  const spacingErr   = isAYT && ft != null && fs != null && fs < ft - 0.001
+    ? `fin_aralık(${fs}) < fin_kalınlık(${ft})` : undefined;
+
+  // C — Genişlik: vida konumları X içinde
+  const lastBoltX    = px != null && bsp != null ? px + (bn - 1) * bsp : null;
+  const boltRightErr = isAYT && W != null && lastBoltX != null && hd != null
+    && lastBoltX + hd / 2 > W + 0.001
+    ? `posX(${px})+(${bn}-1)×aralık(${bsp})+Ø/2(${hd/2}) = ${(lastBoltX + hd/2).toFixed(1)} > W(${W})` : undefined;
+  const boltLeftErr  = isAYT && px != null && hd != null && px < hd / 2 - 0.001
+    ? `posX(${px}) < Ø/2(${hd/2})` : undefined;
+  const bspErr       = isAYT && bn > 1 && bsp != null && hd != null && bsp < hd - 0.001
+    ? `vida_aralık(${bsp}) < Ø(${hd})` : undefined;
+
+  // D — Z: vida fin içinde
+  const boltZFrontErr = isAYT && pz != null && hd != null && pz < hd / 2 - 0.001
+    ? `posZ(${pz}) < Ø/2(${hd/2})` : undefined;
+  const boltZBackErr  = isAYT && pz != null && fl != null && hd != null
+    && pz + hd / 2 > fl + 0.001
+    ? `posZ(${pz})+Ø/2(${hd/2}) = ${(pz + hd/2).toFixed(1)} > fin_uzunluk(${fl})` : undefined;
+
+  // E — Çap ≤ fin kalınlığı
+  const hdFinErr = isAYT && hd != null && ft != null && hd > ft + 0.001
+    ? `Ø(${hd}) > fin_kalınlık(${ft})` : undefined;
+
+  // Tüm AYT hataları — submit engeli
+  const aytErrors = isAYT ? [
+    depthError, finBlockErr, offsetErr, spacingErr,
+    boltRightErr, boltLeftErr, bspErr,
+    boltZFrontErr, boltZBackErr, hdFinErr,
+  ].filter(Boolean) as string[] : [];
+  const hasAytErrors = aytErrors.length > 0;
+  const aytErrorTooltip = hasAytErrors
+    ? `Geometri hataları düzeltilmeden kaydedilemez:\n• ${aytErrors.join("\n• ")}`
+    : undefined;
 
   // C — AYT derinlik doğrulaması: fin_length + plate_thickness = terminal_depth
-  const aytDepthHint = draft.terminal_type === "Arka Yatay Taraklı" && (
+  const aytDepthHint = isAYT && (
     (draft.fin_length_mm ?? 0) + (draft.plate_thickness_mm ?? 0)
   );
 
@@ -393,10 +475,13 @@ export function TerminalFormPage() {
               </label>
 
               <NumField label="Vida Adedi" value={draft.bolt_count} min={1}
+                hint={isAYT ? "posX + (n−1)×aralık + Ø/2 ≤ W" : undefined}
                 onChange={(v) => set("bolt_count", v != null ? Math.max(1, Math.round(v)) : null)} />
 
               <NumField label="Vida Merkez Mesafesi" unit="mm" min={0}
                 value={draft.bolt_center_distance_mm}
+                hint={isAYT ? "≥ Ø;  posX + (n−1)×aralık + Ø/2 ≤ W" : undefined}
+                error={isAYT ? (bspErr ?? boltRightErr) : undefined}
                 onChange={(v) => set("bolt_center_distance_mm", v)} />
 
               {/* Delik tipi */}
@@ -421,6 +506,8 @@ export function TerminalFormPage() {
               {holeMode === "round" ? (
                 <NumField label="Delik Çapı" unit="mm" min={0}
                   value={draft.hole_diameter_mm}
+                  hint={isAYT ? "≤ fin_kalınlık;  ≤ vida_aralığı" : undefined}
+                  error={isAYT ? (hdFinErr ?? bspErr) : undefined}
                   onChange={(v) => set("hole_diameter_mm", v)} />
               ) : (
                 <>
@@ -453,12 +540,18 @@ export function TerminalFormPage() {
             <div className="form-grid">
               <NumField label="Genişlik X" unit="mm" min={0}
                 value={draft.terminal_width_mm}
+                hint={isAYT ? "posX + (n−1)×vida_aralığı + Ø/2 ≤ W" : undefined}
+                error={isAYT ? boltRightErr : undefined}
                 onChange={(v) => set("terminal_width_mm", v)} />
               <NumField label="Yükseklik Y" unit="mm" min={0}
                 value={draft.terminal_height_mm}
+                hint={isAYT ? "fin_boşluk + (n−1)×fin_aralık + fin_kalınlık ≤ H" : undefined}
+                error={isAYT ? (finBlockErr ?? offsetErr) : undefined}
                 onChange={(v) => set("terminal_height_mm", v)} />
               <NumField label="Derinlik Z" unit="mm" min={0}
                 value={draft.terminal_depth_mm}
+                hint={isAYT ? "plaka_kalınlık + fin_uzunluk = D" : undefined}
+                error={isAYT ? depthError : undefined}
                 onChange={(v) => set("terminal_depth_mm", v)} />
             </div>
           </section>
@@ -472,14 +565,18 @@ export function TerminalFormPage() {
             <div className="form-grid">
               <NumField label="Sol Kenardan (X)" unit="mm" min={0}
                 value={draft.bolt_pos_x_mm}
+                hint={isAYT ? "≥ Ø/2;  posX + (n−1)×aralık + Ø/2 ≤ W" : undefined}
+                error={isAYT ? (boltLeftErr ?? boltRightErr) : undefined}
                 onChange={(v) => set("bolt_pos_x_mm", v)} />
               <NumField label="Üstten (Y)" unit="mm" min={0}
                 value={draft.bolt_pos_y_mm}
                 onChange={(v) => set("bolt_pos_y_mm", v)} />
               <NumField
-                label={draft.terminal_type === "Arka Yatay Taraklı" ? "Fin Başından (Z)" : "Önden (Z)"}
+                label={isAYT ? "Fin Başından (Z)" : "Önden (Z)"}
                 unit="mm" min={0}
                 value={draft.bolt_pos_z_mm}
+                hint={isAYT ? "≥ Ø/2;  posZ + Ø/2 ≤ fin_uzunluk" : undefined}
+                error={isAYT ? (boltZFrontErr ?? boltZBackErr) : undefined}
                 onChange={(v) => set("bolt_pos_z_mm", v)} />
             </div>
           </section>
@@ -531,35 +628,63 @@ export function TerminalFormPage() {
 
               <div className="form-grid">
                 <NumField label="Fin Adedi" value={draft.fin_count} min={1}
+                  hint={isAYT ? "finBlok = (n−1)×fin_aralık + fin_kalınlık ≤ H" : undefined}
+                  error={isAYT ? finBlockErr : undefined}
                   onChange={(v) => set("fin_count", v != null ? Math.max(1, Math.round(v)) : null)} />
                 <NumField label="Fin Aralığı (m-m)" unit="mm" min={0}
                   value={draft.fin_spacing_mm}
+                  hint={isAYT ? "≥ fin_kalınlık;  (n−1)×aralık + kalınlık ≤ H − boşluk" : undefined}
+                  error={isAYT ? (spacingErr ?? finBlockErr) : undefined}
                   onChange={(v) => set("fin_spacing_mm", v)} />
                 <NumField label="Fin Kalınlığı" unit="mm" min={0}
                   value={draft.fin_thickness_mm}
+                  hint={isAYT ? "≤ fin_aralık;  ≤ Ø (delik çapı)" : undefined}
+                  error={isAYT ? (spacingErr ?? hdFinErr) : undefined}
                   onChange={(v) => set("fin_thickness_mm", v)} />
                 <NumField label="İlk Fin Boşluğu (üstten)" unit="mm" min={0}
                   value={draft.fin_offset_mm}
+                  hint={isAYT ? "fin_boşluk + finBlok ≤ H" : undefined}
+                  error={isAYT ? offsetErr : undefined}
                   onChange={(v) => set("fin_offset_mm", v)} />
                 <NumField label="Fin Uzunluğu" unit="mm" min={0}
                   value={draft.fin_length_mm}
+                  hint={isAYT ? "plaka + fin_uzunluk = D;  posZ + Ø/2 ≤ fin_uzunluk" : undefined}
+                  error={isAYT ? (depthError ?? boltZBackErr) : undefined}
                   onChange={(v) => set("fin_length_mm", v)} />
                 <NumField label="Plaka Kalınlığı" unit="mm" min={0}
                   value={draft.plate_thickness_mm}
+                  hint={isAYT ? "plaka_kalınlık + fin_uzunluk = D" : undefined}
+                  error={isAYT ? depthError : undefined}
                   onChange={(v) => set("plate_thickness_mm", v)} />
               </div>
             </section>
           )}
 
           {/* Kaydet */}
-          <div style={{ display: "flex", gap: "0.75rem" }}>
-            <button type="submit" className="btn-primary" disabled={isSaving}>
-              {isSaving ? "Kaydediliyor..." : isEdit ? "Güncelle" : "Kaydet"}
-            </button>
-            <button type="button" className="ghost"
-              onClick={() => navigate("/definitions/terminal-types")}>
-              İptal
-            </button>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            {hasAytErrors && (
+              <div style={{
+                fontSize: "0.75rem", color: "#ef4444", fontWeight: 600,
+                background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.25)",
+                borderRadius: 6, padding: "0.4rem 0.65rem", lineHeight: 1.5,
+              }}>
+                {aytErrors.length} geometri hatası giderilmeden kaydedilemez.
+              </div>
+            )}
+            <div style={{ display: "flex", gap: "0.75rem" }}>
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={isSaving || hasAytErrors}
+                title={aytErrorTooltip}
+              >
+                {isSaving ? "Kaydediliyor..." : isEdit ? "Güncelle" : "Kaydet"}
+              </button>
+              <button type="button" className="ghost"
+                onClick={() => navigate("/definitions/terminal-types")}>
+                İptal
+              </button>
+            </div>
           </div>
         </form>
 

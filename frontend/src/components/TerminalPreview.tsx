@@ -459,8 +459,8 @@ function BackView({ g }: { g: Geom }) {
         </text>
       )}
 
-      {/* Arka Yatay Taraklı: arka yüzden fin şeritleri + vida delikleri (dashed) */}
-      {/* Vida delikleri Y yönünde (tepeden) → arka görünüşte her fin şeridinde görünür */}
+      {/* Arka Yatay Taraklı: fin şeritleri + vida kanalları (Y yönünde tam boy dikey çizgi çifti) */}
+      {/* Vidalar tepeden (Y yönünde) delinir → arka görünüşte her vida = dikey çizgi çifti @ X konumu */}
       {isAYT && (() => {
         const n = g.finN;
         const autoFinThickSvg = (bh * 0.85) / n * 0.42;
@@ -474,25 +474,47 @@ function BackView({ g }: { g: Geom }) {
         const fy0 = by + finOffsetSvg + fh / 2;
         const fy1 = n > 1 ? fy0 + finSpSvg : fy0;
 
-        // Vida delikleri Y yönünde → arka görünüşte her finde 1 dashed daire (posXmm'de)
-        const hR_b = Math.min(g.holeDmm / 2 * sc, bw * .12, fh * .45);
+        // Vida kanalı yarıçapı (X yönünde, holeDmm'den)
+        const hR_b = Math.max(Math.min(g.holeDmm / 2 * sc, bw * 0.10, fh * 0.42), 2);
+
+        // Vida X pozisyonları: bolt_center_distance_mm = X ekseninde aralık (arka görünüşte yatay)
+        const autoSpX  = bw / (g.boltN + 1);
+        const boltSpX  = g.boltSpMm > 0 ? g.boltSpMm * sc : autoSpX;
+        const firstX   = g.posXmm != null ? bx + g.posXmm * sc : bx + autoSpX;
+        const boltXArr = Array.from({ length: g.boltN }, (_, j) =>
+          Math.max(bx + hR_b, Math.min(firstX + j * boltSpX, bx + bw - hR_b))
+        );
 
         return <>
-          {/* Fin şeritleri */}
+          {/* Fin şeritleri — tam genişlik */}
           {Array.from({ length: n }, (_, i) => {
             const fy = by + finOffsetSvg + i * finSpSvg;
-            return <rect key={i} x={bx + 4} y={fy} width={bw - 8} height={fh}
+            return <rect key={i} x={bx} y={fy} width={bw} height={fh}
               fill={CUFILL} stroke={CU} strokeWidth={0.85} rx={0} />;
           })}
-          {/* Vida delikleri: AYT'de vidalar Z yönünde aralıklı, hepsi aynı X=posXmm.
-              Arka görünüşte (W×H düzlemi) tüm vidalar aynı (X,Y)'ye yansır.
-              → Her fin şeridinde 1 adet dashed daire (tüm vidaların izdüşümü). */}
+
+          {/* Vida kanalları: her fin × her vida X → fin yüksekliğince dikey dashed çizgi çifti */}
           {Array.from({ length: n }, (_, i) => {
-            const fyCtr = by + finOffsetSvg + i * finSpSvg + fh / 2;
-            const hx    = g.posXmm != null ? bx + 4 + g.posXmm * sc : bx + bw / 2;
-            return <RHdash key={i} cx={hx} cy={fyCtr} r={Math.max(hR_b, 2)} />;
+            const finTop = by + finOffsetSvg + i * finSpSvg;
+            const finBot = finTop + fh;
+            const ext    = Math.min(2, fh * 0.25);
+            return (
+              <g key={`fin-${i}`}>
+                {boltXArr.map((bx_bolt, j) => (
+                  <g key={`bolt-${j}`}>
+                    <line x1={bx_bolt - hR_b} y1={finTop} x2={bx_bolt - hR_b} y2={finBot}
+                      stroke={DASH} strokeWidth={0.85} strokeDasharray="4 2" />
+                    <line x1={bx_bolt + hR_b} y1={finTop} x2={bx_bolt + hR_b} y2={finBot}
+                      stroke={DASH} strokeWidth={0.85} strokeDasharray="4 2" />
+                    <line x1={bx_bolt} y1={finTop - ext} x2={bx_bolt} y2={finBot + ext}
+                      stroke={DASH} strokeWidth={0.5} strokeDasharray="6 2 1 2" opacity={0.75} />
+                  </g>
+                ))}
+              </g>
+            );
           })}
-          {/* Fin aralığı boyutu */}
+
+          {/* Fin aralığı boyutu — sağ kenarda */}
           {n >= 2 && g.finSpMm > 0 && (
             <DimVR x={bx + bw + 4} y1={fy0} y2={fy1}
               label={`${g.finSpMm} mm`} color="#f39c12" off={12} />
@@ -502,12 +524,18 @@ function BackView({ g }: { g: Geom }) {
             <DimVR x={bx + bw + 4} y1={fy0 - fh / 2} y2={fy0 + fh / 2}
               label={`${g.finThickMm} mm`} color={DIM} off={52} />
           )}
-          {/* posXmm boyutu: sol kenardan vida X konumuna */}
-          {g.posXmm != null && (
-            <DimH x1={bx + 4} x2={bx + 4 + g.posXmm * sc} y={by + finOffsetSvg - 12}
+          {/* Sol kenardan ilk vida kanalına (posXmm) */}
+          {g.posXmm != null && boltXArr.length > 0 && (
+            <DimH x1={bx} x2={boltXArr[0]} y={by + finOffsetSvg - 12}
               label={`${g.posXmm} mm`} color="#f39c12" off={10} />
           )}
-          <HideLegend x={bx + 4} y={by + bh + 14} />
+          {/* Vida merkez-merkez aralığı (X yönünde) */}
+          {g.boltN >= 2 && boltXArr.length >= 2 && g.boltSpMm > 0 && (
+            <DimH x1={boltXArr[0]} x2={boltXArr[boltXArr.length - 1]}
+              y={by + finOffsetSvg - (g.posXmm != null ? 26 : 12)}
+              label={`${g.boltSpMm} mm`} color={RED} off={10} />
+          )}
+          <HideLegend x={bx} y={by + bh + 14} />
         </>;
       })()}
 
@@ -579,10 +607,10 @@ function SideView({ g }: { g: Geom }) {
       {!isAYT && (
         <rect x={bx} y={by} width={bw} height={bh} fill={BFILL} stroke={BODY} strokeWidth={1.6} rx={2} />
       )}
-      {/* Arka Yatay Taraklı: dış çerçeve kesik çizgi (bounding box) */}
+      {/* Arka Yatay Taraklı: dış çerçeve (bounding box — solid) */}
       {isAYT && (
-        <rect x={bx} y={by} width={bw} height={bh} fill="none" stroke={BODY} strokeWidth={0.8}
-          strokeDasharray="4 3" rx={2} opacity={0.4} />
+        <rect x={bx} y={by} width={bw} height={bh} fill="none" stroke={BODY} strokeWidth={1.6}
+          rx={2} />
       )}
 
       {/* Ön/Arka etiket */}
@@ -657,7 +685,7 @@ function SideView({ g }: { g: Geom }) {
         const finStartX = bodyX + bodyW;
         const finLenSvg = g.finLengthMm > 0
           ? g.finLengthMm * sc
-          : Math.max(bw - bodyW - 2, 4);
+          : Math.max(bw - bodyW, 4);
         const finEndX   = finStartX + finLenSvg;
         const finLength = Math.max(finLenSvg, 4);
 
@@ -827,7 +855,7 @@ function TopBottomView({ g }: { g: Geom }) {
 
   // AYT: posZmm = FİN BAŞINDAN uzaklık (plaka kalınlığı sonrasından)
   const aytPlateH  = g.plateThickMm > 0 ? g.plateThickMm * sc : bh * 0.28;
-  const aytFinEndH = g.finLengthMm  > 0 ? aytPlateH + g.finLengthMm * sc : bh;
+  const aytFinEndH = g.finLengthMm  > 0 ? Math.min(aytPlateH + g.finLengthMm * sc, bh) : bh;
   const finAreaStartY = by + aytPlateH;   // fin alanı üst görünüşte başlangıcı (SVG y)
   const finAreaEndY   = by + aytFinEndH;  // fin alanı sonu (SVG y)
   const holeY_AY = g.posZmm != null
@@ -859,45 +887,47 @@ function TopBottomView({ g }: { g: Geom }) {
       )}
 
       {/* ── Arka Yatay Taraklı: üstten bakış ──
-          Tüm finler aynı uzunlukta → üstten tek düz yüzey görünür.
-          Plaka alanı (ön kenar) + Fin alanı (arka) ayrı gösterilir.
-          Vida delikleri: tek X konumu (posXmm), Z yönünde boltN adet (posZmm + j*boltSpMm).
-          Tüm finlerde aynı (X,Z) konumunda vida → üstten boltN adet daire. */}
+          Vidalar X ekseninde yan yana (bolt_center_distance_mm = X aralığı).
+          Tüm vidalar aynı Z derinliğinde (tek Y satırı üstten görünür).
+          Plaka alanı (ön) + Fin alanı (arka) ayrı renkle gösterilir. */}
       {isAYT && (() => {
-        // Vida X konumu: tüm vidalar aynı X (posXmm), Y'de değişmiyor
-        const boltX  = g.posXmm != null ? bx + g.posXmm * sc : bx + bw / 2;
-        // Vida Z konumları (üst görünüşte Y ekseni = derinlik/Z)
-        const boltSpSvg = g.boltSpMm > 0 ? g.boltSpMm * sc : Math.max(hR * 3, 8);
-        const firstY    = holeY_AY;  // posZmm → fin başından Z uzaklığı
-        const holeYs    = Array.from({ length: g.boltN }, (_, j) =>
-          Math.min(firstY + j * boltSpSvg, finAreaEndY - hR)
+        // Vida X pozisyonları: arka görünüşle aynı — X ekseninde yan yana
+        const autoSpX   = bw / (g.boltN + 1);
+        const boltSpXt  = g.boltSpMm > 0 ? g.boltSpMm * sc : autoSpX;
+        const firstX    = g.posXmm != null ? bx + g.posXmm * sc : bx + autoSpX;
+        const boltXArr  = Array.from({ length: g.boltN }, (_, j) =>
+          Math.max(bx + hR, Math.min(firstX + j * boltSpXt, bx + bw - hR))
         );
+        // Vida Z pozisyonu (SVG'de Y ekseni = derinlik): tüm vidalar aynı derinlikte
+        const holeY = holeY_AY;
+
         return (
           <>
-            {/* Plaka alanı — ön kenar şeridi */}
-            <rect x={bx + 3} y={by + 2} width={bw - 6} height={aytPlateH - 2}
+            {/* Plaka alanı — ön kenar */}
+            <rect x={bx} y={by} width={bw} height={aytPlateH}
               fill={CUFILL} stroke={CU} strokeWidth={1.0} rx={1} />
             {/* Fin düz yüzeyi — plakadan arkaya */}
-            <rect x={bx + 3} y={finAreaStartY} width={bw - 6} height={finAreaEndY - finAreaStartY - 2}
+            <rect x={bx} y={finAreaStartY} width={bw} height={finAreaEndY - finAreaStartY}
               fill={CUFILL} stroke={CU} strokeWidth={1.0} rx={1} opacity={0.75} />
             {/* Plaka/fin sınır çizgisi */}
-            <line x1={bx + 3} y1={finAreaStartY} x2={bx + bw - 3} y2={finAreaStartY}
+            <line x1={bx} y1={finAreaStartY} x2={bx + bw} y2={finAreaStartY}
               stroke={CU} strokeWidth={1.2} strokeDasharray="4 2" />
-            {/* Vida delikleri: tek X, boltN adet Z konumunda (HolesV: tek cx, çoklu ys) */}
-            <HolesV cx={boltX} ys={holeYs} g={{ ...g, sWmm: sWt/sc, sLmm: sLt/sc }} dashed={false} />
-            {/* Vida Z aralığı boyutu — sağda dikey ok */}
-            {g.boltN >= 2 && holeYs.length >= 2 && g.boltSpMm > 0 && (
-              <DimVR x={bx + bw + 4} y1={holeYs[0]} y2={holeYs[holeYs.length - 1]}
+            {/* Vida delikleri: boltN adet, X ekseninde yan yana, aynı Z derinliğinde */}
+            <Holes xs={boltXArr} cy={holeY} g={{ ...g, sWmm: sWt/sc, sLmm: sLt/sc }} dashed={false} />
+            {/* Vida X aralığı boyutu (yatay) */}
+            {g.boltN >= 2 && boltXArr.length >= 2 && g.boltSpMm > 0 && (
+              <DimH x1={boltXArr[0]} x2={boltXArr[boltXArr.length - 1]}
+                y={holeY + hR + 10}
                 label={`${g.boltSpMm} mm`} color={RED} off={10} />
             )}
-            {/* Sol kenardan X boyutu */}
-            {g.posXmm != null && (
-              <DimH x1={bx} x2={boltX} y={holeYs[0] - hR - 12}
+            {/* Sol kenardan ilk vida X konumuna */}
+            {g.posXmm != null && boltXArr.length > 0 && (
+              <DimH x1={bx} x2={boltXArr[0]} y={by - 12}
                 label={`${g.posXmm} mm`} color="#f39c12" off={10} />
             )}
-            {/* posZmm: fin başından ilk vidaya Z uzaklığı */}
-            {g.posZmm != null && holeYs.length > 0 && (
-              <DimV x={bx - 6} y1={finAreaStartY} y2={holeYs[0]}
+            {/* Fin başından vida Z derinliğine */}
+            {g.posZmm != null && (
+              <DimV x={bx - 6} y1={finAreaStartY} y2={holeY}
                 label={`${g.posZmm} mm`} color="#f39c12" off={10} />
             )}
           </>
@@ -1018,3 +1048,4 @@ export function TerminalPreview({
     </div>
   );
 }
+ 
