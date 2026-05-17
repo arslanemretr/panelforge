@@ -318,8 +318,9 @@ export function TerminalFormPage() {
   const showFinFields  = isTarakli(draft.terminal_type);
   const posAxes        = POSITION_AXES[draft.terminal_type] ?? { x: true, y: true, z: true, zLabel: "Önden (Z)" };
   const isAYT          = draft.terminal_type === "Arka Yatay Taraklı";
+  const isOT           = draft.terminal_type === "Ön Terminal";
 
-  // ── AYT kısıt hesaplamaları ────────────────────────────────────────────────
+  // ── Ortak değişkenler ─────────────────────────────────────────────────────
   const W   = draft.terminal_width_mm;
   const H   = draft.terminal_height_mm;
   const D   = draft.terminal_depth_mm;
@@ -333,6 +334,7 @@ export function TerminalFormPage() {
   const bsp = draft.bolt_center_distance_mm;
   const bn  = draft.bolt_count ?? 1;
   const px  = draft.bolt_pos_x_mm;
+  const py  = draft.bolt_pos_y_mm;
   const pz  = draft.bolt_pos_z_mm;
 
   // A — Derinlik: plaka + fin = D
@@ -389,19 +391,70 @@ export function TerminalFormPage() {
   const fsZeroErr  = isAYT && n > 1 && fs != null && fs <= 0
     ? `fin_aralık > 0 olmalı (n > 1)` : undefined;
 
-  // Tüm AYT hataları — submit engeli
+  // Tüm AYT hataları
   const aytErrors = isAYT ? [
     depthError, finBlockErr, offsetErr, spacingErr,
     boltRightErr, boltLeftErr,
     bspErr, boltZFrontErr, boltZBackErr, boltZAutoErr, hdFlErr,
     ptZeroErr, flZeroErr, ftZeroErr, hdZeroErr, fsZeroErr,
   ].filter(Boolean) as string[] : [];
-  const hasAytErrors = aytErrors.length > 0;
-  const aytErrorTooltip = hasAytErrors
-    ? `Geometri hataları düzeltilmeden kaydedilemez:\n• ${aytErrors.join("\n• ")}`
+
+  // ── Ön Terminal kısıt hesaplamaları ───────────────────────────────────────
+  // A1 — Merkez mesafesi delik çapından büyük olmalı (X yönünde örtüşme)
+  const otBspErr       = isOT && bn > 1 && bsp != null && hd != null && bsp < hd - 0.001
+    ? `vida_aralık(${bsp}) < Ø(${hd}) — delikler X'te örtüşüyor` : undefined;
+  // A2 — İlk delik sol kenardan taşmamalı
+  const otBoltLeftErr  = isOT && px != null && hd != null && px < hd / 2 - 0.001
+    ? `posX(${px}) < Ø/2(${hd/2})` : undefined;
+  // A3 — Son delik sağ kenardan taşmamalı (posX girilmişse)
+  const otLastXEdge    = px != null && bsp != null ? px + (bn - 1) * bsp + (hd ?? 0) / 2 : null;
+  const otBoltRightErr = isOT && W != null && hd != null && otLastXEdge != null
+    && otLastXEdge > W + 0.001
+    ? `posX(${px})+(${bn}-1)×bsp(${bsp})+Ø/2(${(hd/2).toFixed(1)}) = ${otLastXEdge.toFixed(1)} > W(${W})` : undefined;
+  // A4 — Oto-X: toplam span ≤ W
+  const otBoltAutoXErr = isOT && px == null && W != null && hd != null && bsp != null
+    && (bn - 1) * bsp + hd > W + 0.001
+    ? `(${bn}-1)×bsp(${bsp})+Ø(${hd}) = ${((bn-1)*bsp+hd).toFixed(1)} > W(${W}) — oto konumda sığmıyor` : undefined;
+
+  // B1 — Delik üst kenardan taşmamalı
+  const otBoltTopErr   = isOT && py != null && hd != null && py < hd / 2 - 0.001
+    ? `posY(${py}) < Ø/2(${hd/2}) — delik üst kenardan taşıyor` : undefined;
+  // B2 — Delik alt kenardan taşmamalı
+  const otBoltBotErr   = isOT && H != null && py != null && hd != null
+    && py + hd / 2 > H + 0.001
+    ? `posY(${py})+Ø/2(${hd/2}) = ${(py + hd/2).toFixed(1)} > H(${H})` : undefined;
+  // B3 — Oto-Y: H ≥ Ø
+  const otBoltAutoYErr = isOT && py == null && H != null && hd != null && hd > H + 0.001
+    ? `Ø(${hd}) > H(${H}) — oto konumda sığmıyor` : undefined;
+
+  // C1 — Delik çapı pozitif
+  const otHdZeroErr    = isOT && hd != null && hd <= 0
+    ? `delik_çapı > 0 olmalı` : undefined;
+  // C2 — Çap terminal yüksekliğine sığmalı
+  const otHdHeightErr  = isOT && hd != null && H != null && hd > H + 0.001
+    ? `Ø(${hd}) > H(${H})` : undefined;
+
+  // D — Sıfır kontrolleri
+  const otWZeroErr     = isOT && W != null && W <= 0  ? `genişlik > 0 olmalı`     : undefined;
+  const otHZeroErr     = isOT && H != null && H <= 0  ? `yükseklik > 0 olmalı`    : undefined;
+  const otBspZeroErr   = isOT && bn > 1 && bsp != null && bsp <= 0
+    ? `vida_aralık > 0 olmalı (bn > 1)` : undefined;
+
+  const otErrors = isOT ? [
+    otBspErr, otBoltLeftErr, otBoltRightErr, otBoltAutoXErr,
+    otBoltTopErr, otBoltBotErr, otBoltAutoYErr,
+    otHdZeroErr, otHdHeightErr,
+    otWZeroErr, otHZeroErr, otBspZeroErr,
+  ].filter(Boolean) as string[] : [];
+
+  // ── Submit engeli ─────────────────────────────────────────────────────────
+  const formErrors    = [...aytErrors, ...otErrors];
+  const hasFormErrors = formErrors.length > 0;
+  const formErrorTooltip = hasFormErrors
+    ? `Geometri hataları düzeltilmeden kaydedilemez:\n• ${formErrors.join("\n• ")}`
     : undefined;
 
-  // C — AYT derinlik doğrulaması: fin_length + plate_thickness = terminal_depth
+  // AYT derinlik ipucu (bilgi bandı için)
   const aytDepthHint = isAYT && (
     (draft.fin_length_mm ?? 0) + (draft.plate_thickness_mm ?? 0)
   );
@@ -493,13 +546,15 @@ export function TerminalFormPage() {
               </label>
 
               <NumField label="Vida Adedi" value={draft.bolt_count} min={1}
-                hint={isAYT ? "posZ + (n−1)×aralık + Ø/2 ≤ fin_uzunluk (Z yönü)" : undefined}
+                hint={isAYT ? "posZ + (n−1)×aralık + Ø/2 ≤ fin_uzunluk (Z yönü)"
+                    : isOT  ? "posX + (n−1)×aralık + Ø/2 ≤ W (X yönü)" : undefined}
                 onChange={(v) => set("bolt_count", v != null ? Math.max(1, Math.round(v)) : null)} />
 
               <NumField label="Vida Merkez Mesafesi" unit="mm" min={0}
                 value={draft.bolt_center_distance_mm}
-                hint={isAYT ? "≥ Ø (Z yönünde);  posZ + (n−1)×aralık + Ø/2 ≤ fin_uzunluk" : undefined}
-                error={isAYT ? bspErr : undefined}
+                hint={isAYT ? "≥ Ø (Z yönünde);  posZ + (n−1)×aralık + Ø/2 ≤ fin_uzunluk"
+                    : isOT  ? "≥ Ø (X yönünde);  posX + (n−1)×aralık + Ø/2 ≤ W" : undefined}
+                error={isAYT ? bspErr : isOT ? (otBspZeroErr ?? otBspErr) : undefined}
                 onChange={(v) => set("bolt_center_distance_mm", v)} />
 
               {/* Delik tipi */}
@@ -524,8 +579,10 @@ export function TerminalFormPage() {
               {holeMode === "round" ? (
                 <NumField label="Delik Çapı" unit="mm" min={0}
                   value={draft.hole_diameter_mm}
-                  hint={isAYT ? "≤ vida_aralığı (Z);  ≤ fin_uzunluk" : undefined}
-                  error={isAYT ? (hdZeroErr ?? bspErr ?? hdFlErr) : undefined}
+                  hint={isAYT ? "≤ vida_aralığı (Z);  ≤ fin_uzunluk"
+                      : isOT  ? "≤ vida_aralığı (X);  ≤ H" : undefined}
+                  error={isAYT ? (hdZeroErr ?? bspErr ?? hdFlErr)
+                       : isOT  ? (otHdZeroErr ?? otBspErr ?? otHdHeightErr) : undefined}
                   onChange={(v) => set("hole_diameter_mm", v)} />
               ) : (
                 <>
@@ -558,13 +615,17 @@ export function TerminalFormPage() {
             <div className="form-grid">
               <NumField label="Genişlik X" unit="mm" min={0}
                 value={draft.terminal_width_mm}
-                hint={isAYT ? "posX + Ø/2 ≤ W  (tek vida X konumu; aralık Z yönündedir)" : undefined}
-                error={isAYT ? boltRightErr : undefined}
+                hint={isAYT ? "posX + Ø/2 ≤ W  (tek vida X konumu; aralık Z yönündedir)"
+                    : isOT  ? "posX + (n−1)×aralık + Ø/2 ≤ W" : undefined}
+                error={isAYT ? boltRightErr
+                     : isOT  ? (otWZeroErr ?? otBoltRightErr ?? otBoltAutoXErr) : undefined}
                 onChange={(v) => set("terminal_width_mm", v)} />
               <NumField label="Yükseklik Y" unit="mm" min={0}
                 value={draft.terminal_height_mm}
-                hint={isAYT ? "fin_boşluk + (n−1)×fin_aralık + fin_kalınlık ≤ H" : undefined}
-                error={isAYT ? (finBlockErr ?? offsetErr) : undefined}
+                hint={isAYT ? "fin_boşluk + (n−1)×fin_aralık + fin_kalınlık ≤ H"
+                    : isOT  ? "posY + Ø/2 ≤ H;  H ≥ Ø" : undefined}
+                error={isAYT ? (finBlockErr ?? offsetErr)
+                     : isOT  ? (otHZeroErr ?? otHdHeightErr ?? otBoltBotErr ?? otBoltAutoYErr) : undefined}
                 onChange={(v) => set("terminal_height_mm", v)} />
               <NumField label="Derinlik Z" unit="mm" min={0}
                 value={draft.terminal_depth_mm}
@@ -583,11 +644,15 @@ export function TerminalFormPage() {
             <div className="form-grid">
               <NumField label="Sol Kenardan (X)" unit="mm" min={0}
                 value={draft.bolt_pos_x_mm}
-                hint={isAYT ? "≥ Ø/2;  posX + Ø/2 ≤ W  (vida_aralığı Z yönünde)" : undefined}
-                error={isAYT ? (boltLeftErr ?? boltRightErr) : undefined}
+                hint={isAYT ? "≥ Ø/2;  posX + Ø/2 ≤ W  (vida_aralığı Z yönünde)"
+                    : isOT  ? "≥ Ø/2;  posX + (n−1)×aralık + Ø/2 ≤ W" : undefined}
+                error={isAYT ? (boltLeftErr ?? boltRightErr)
+                     : isOT  ? (otBoltLeftErr ?? otBoltRightErr) : undefined}
                 onChange={(v) => set("bolt_pos_x_mm", v)} />
               <NumField label="Üstten (Y)" unit="mm" min={0}
                 value={draft.bolt_pos_y_mm}
+                hint={isOT ? "≥ Ø/2;  posY + Ø/2 ≤ H" : undefined}
+                error={isOT ? (otBoltTopErr ?? otBoltBotErr) : undefined}
                 onChange={(v) => set("bolt_pos_y_mm", v)} />
               <NumField
                 label={isAYT ? "Fin Başından (Z)" : "Önden (Z)"}
@@ -680,21 +745,21 @@ export function TerminalFormPage() {
 
           {/* Kaydet */}
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            {hasAytErrors && (
+            {hasFormErrors && (
               <div style={{
                 fontSize: "0.75rem", color: "#ef4444", fontWeight: 600,
                 background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.25)",
                 borderRadius: 6, padding: "0.4rem 0.65rem", lineHeight: 1.5,
               }}>
-                {aytErrors.length} geometri hatası giderilmeden kaydedilemez.
+                {formErrors.length} geometri hatası giderilmeden kaydedilemez.
               </div>
             )}
             <div style={{ display: "flex", gap: "0.75rem" }}>
               <button
                 type="submit"
                 className="btn-primary"
-                disabled={isSaving || hasAytErrors}
-                title={aytErrorTooltip}
+                disabled={isSaving || hasFormErrors}
+                title={formErrorTooltip}
               >
                 {isSaving ? "Kaydediliyor..." : isEdit ? "Güncelle" : "Kaydet"}
               </button>
