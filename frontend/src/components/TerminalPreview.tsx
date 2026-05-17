@@ -251,24 +251,25 @@ function CuStrip({ x, y, w, h, lines = 3 }:
   );
 }
 
-// Yüzey rozeti
-const SURF_LBL: Record<string,string> = {
-  front:"ÖN YÜZ", left:"SOL YÜZ", right:"SAĞ YÜZ", top:"ÜST YÜZ", bottom:"ALT YÜZ"
-};
-function SurfBadge({ surf }: { surf: string }) {
+// ─── Eksen göstergesi — her görünüşün altında ────────────────────────────────
+function AxisBadge({ x, y, hAxis, vAxis }: { x: number; y: number; hAxis: string; vAxis: string }) {
+  const len = 20;
   return (
     <g>
-      <rect x={SW-76} y={4} width={70} height={14} rx={3}
-        fill="rgba(34,211,238,0.15)" stroke={SURF} strokeWidth={.7} />
-      <text x={SW-41} y={14} textAnchor="middle" fontSize={7}
-        fill={SURF} fontFamily="system-ui" fontWeight={700} letterSpacing={.5}>
-        {SURF_LBL[surf] ?? surf.toUpperCase()}
-      </text>
+      <circle cx={x} cy={y} r={2} fill={DIM} opacity={0.7} />
+      {/* Yatay eksen → */}
+      <line x1={x} y1={y} x2={x + len} y2={y} stroke={DIM} strokeWidth={0.9} opacity={0.7} />
+      <polygon points={`${x+len-3},${y-2} ${x+len+4},${y} ${x+len-3},${y+2}`} fill={DIM} opacity={0.7} />
+      <text x={x+len+6} y={y+3.5} fontSize={8.5} fill={DIM} fontFamily="monospace" fontWeight={700} opacity={0.85}>{hAxis}</text>
+      {/* Dikey eksen ↑ */}
+      <line x1={x} y1={y} x2={x} y2={y - len} stroke={DIM} strokeWidth={0.9} opacity={0.7} />
+      <polygon points={`${x-2},${y-len+3} ${x},${y-len-4} ${x+2},${y-len+3}`} fill={DIM} opacity={0.7} />
+      <text x={x-3} y={y-len-6} fontSize={8.5} fill={DIM} fontFamily="monospace" fontWeight={700} opacity={0.85} textAnchor="middle">{vAxis}</text>
     </g>
   );
 }
 
-// Gizli delik efsanesi
+// ─── Gizli delik efsanesi ─────────────────────────────────────────────────────
 function HideLegend({ x, y }: { x: number; y: number }) {
   return (
     <g>
@@ -337,7 +338,6 @@ function FrontView({ g }: { g: Geom }) {
     <svg viewBox={`0 0 ${SW} ${Math.ceil(SVH)}`}
       style={{ width:"100%", border:"1px solid var(--line)", borderRadius:6, background:BG, display:"block" }}>
       <Hdr label="ÖN GÖRÜNÜŞ — GENİŞLİK × YÜKSEKLİK" accent="#3498db" id="hdr-tn-front" />
-      <SurfBadge surf={g.surf} />
 
       {isKP ? (
         <>
@@ -374,7 +374,6 @@ function FrontView({ g }: { g: Geom }) {
               {g.posXmm != null && xs.length > 0 && (
                 <DimH x1={bx} x2={xs[0]} y={hY - hR - 14} label={`${g.posXmm} mm`} color="#f39c12" off={10} />
               )}
-              <HideLegend x={bx+4} y={by+bh+26} />
             </>
           )}
 
@@ -414,6 +413,8 @@ function FrontView({ g }: { g: Geom }) {
 
       <DimH x1={bx} x2={bx+bw} y={by+bh} label={`${g.wMm} mm`} color={DIM} />
       <DimV x={bx} y1={by} y2={by+bh} label={`${g.hMm} mm`} color="#9b59b6" />
+      <AxisBadge x={ML} y={Math.ceil(SVH) - 10} hAxis="X" vAxis="Y" />
+      <HideLegend x={ML + 48} y={Math.ceil(SVH) - 10} />
     </svg>
   );
 }
@@ -446,7 +447,6 @@ function BackView({ g }: { g: Geom }) {
     <svg viewBox={`0 0 ${SW} ${Math.ceil(SVH)}`}
       style={{ width:"100%", border:"1px solid var(--line)", borderRadius:6, background:BG, display:"block" }}>
       <Hdr label="ARKA GÖRÜNÜŞ — GENİŞLİK × YÜKSEKLİK" accent="#e74c3c" id="hdr-tn-back" />
-      <SurfBadge surf={g.surf} />
 
       {/* Ana gövde */}
       <rect x={bx} y={by} width={bw} height={bh} fill={BFILL} stroke={BODY} strokeWidth={1.6} rx={2} />
@@ -537,6 +537,8 @@ function BackView({ g }: { g: Geom }) {
 
       <DimH x1={bx} x2={bx+bw} y={by+bh} label={`${g.wMm} mm`} color={DIM} />
       <DimV x={bx} y1={by} y2={by+bh} label={`${g.hMm} mm`} color="#9b59b6" />
+      <AxisBadge x={ML} y={Math.ceil(SVH) - 10} hAxis="X" vAxis="Y" />
+      <HideLegend x={ML + 48} y={Math.ceil(SVH) - 10} />
     </svg>
   );
 }
@@ -575,7 +577,6 @@ function SideView({ g }: { g: Geom }) {
     <svg viewBox={`0 0 ${SW} ${Math.ceil(SVH)}`}
       style={{ width:"100%", border:"1px solid var(--line)", borderRadius:6, background:BG, display:"block" }}>
       <Hdr label="YAN GÖRÜNÜŞ — DERİNLİK × YÜKSEKLİK" accent="#27ae60" id="hdr-tn-side" />
-      <SurfBadge surf={g.surf} />
 
       {/* Ana gövde — tarak profili kendi gövdesini çizer, diğerleri için tam rect */}
       {!isAYT && (
@@ -756,6 +757,8 @@ function SideView({ g }: { g: Geom }) {
 
       <DimH x1={bx} x2={bx+bw} y={by+bh} label={`${g.dMm} mm`} color="#27ae60" />
       <DimV x={bx} y1={by} y2={by+bh} label={`${g.hMm} mm`} color="#9b59b6" />
+      <AxisBadge x={ML} y={Math.ceil(SVH) - 10} hAxis="Z" vAxis="Y" />
+      <HideLegend x={ML + 48} y={Math.ceil(SVH) - 10} />
     </svg>
   );
 }
@@ -811,7 +814,6 @@ function TopBottomView({ g }: { g: Geom }) {
     <svg viewBox={`0 0 ${SW} ${Math.ceil(SVH)}`}
       style={{ width:"100%", border:"1px solid var(--line)", borderRadius:6, background:BG, display:"block" }}>
       <Hdr label={viewLabel} accent="#f39c12" id="hdr-tn-top" />
-      <SurfBadge surf={g.surf} />
 
       {/* Ana gövde */}
       <rect x={bx} y={by} width={bw} height={bh} fill={BFILL} stroke={BODY} strokeWidth={1.6} rx={2} />
@@ -824,10 +826,7 @@ function TopBottomView({ g }: { g: Geom }) {
 
       {/* ── Ön Terminal: dashed delikler (ön yüzden giriyor, üstten gizli) ── */}
       {isOT && (
-        <>
-          <Holes xs={xs} cy={holeY_OT} g={{ ...g, sWmm: sWt/sc, sLmm: sLt/sc }} dashed />
-          <HideLegend x={bx+4} y={by+bh+24} />
-        </>
+        <Holes xs={xs} cy={holeY_OT} g={{ ...g, sWmm: sWt/sc, sLmm: sLt/sc }} dashed />
       )}
 
       {/* ── Arka Yatay Taraklı: üstten bakış ──
@@ -892,10 +891,7 @@ function TopBottomView({ g }: { g: Geom }) {
 
       {/* ── Yandan Taraklı: dashed delikler ── */}
       {isYT && (
-        <>
-          <Holes xs={xs} cy={holeY_YT} g={{ ...g, sWmm: sWt/sc, sLmm: sLt/sc }} dashed />
-          <HideLegend x={bx+4} y={by+bh+24} />
-        </>
+        <Holes xs={xs} cy={holeY_YT} g={{ ...g, sWmm: sWt/sc, sLmm: sLt/sc }} dashed />
       )}
 
       {/* Kablo Pabuçlu: üstten oval kafa */}
@@ -906,6 +902,8 @@ function TopBottomView({ g }: { g: Geom }) {
 
       <DimH x1={bx} x2={bx+bw} y={by+bh} label={`${g.wMm} mm`} color={DIM} />
       <DimV x={bx} y1={by} y2={by+bh} label={`${g.dMm} mm`} color="#f39c12" />
+      <AxisBadge x={ML} y={Math.ceil(SVH) - 10} hAxis="X" vAxis="Z" />
+      <HideLegend x={ML + 48} y={Math.ceil(SVH) - 10} />
     </svg>
   );
 }
@@ -949,9 +947,12 @@ export function TerminalPreview({
   const finOffsetMm  = fin_offset_mm != null ? Math.max(fin_offset_mm, 0) : null;
   const plateThickMm = Math.max(plate_thickness_mm ?? 0, 0);
 
+  // "top_bottom" çizimi etkilemez — önizleme için "top" olarak göster
+  const surfForPreview = surface === "top_bottom" ? "top" : (surface || "front");
+
   const g: Geom = {
     type:     terminal_type,
-    surf:     surface,
+    surf:     surfForPreview,
     wMm:      Math.max(terminal_width_mm  ?? 100, 5),
     hMm:      Math.max(terminal_height_mm ?? 120, 5),
     dMm:      Math.max(terminal_depth_mm  ?? 60,  5),

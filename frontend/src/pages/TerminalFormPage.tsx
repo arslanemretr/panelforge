@@ -6,7 +6,7 @@ import { client } from "../api/client";
 import { TerminalPreview } from "../components/TerminalPreview";
 import type { TerminalDefinition } from "../types";
 
-// ─── Sabitler ─────────────────────────────────────────────────────────────────
+// ─── Terminal tipleri ─────────────────────────────────────────────────────────
 export const TERMINAL_TYPES = [
   "Ön Terminal",
   "Arka Yatay Taraklı",
@@ -15,27 +15,53 @@ export const TERMINAL_TYPES = [
   "Kablo Pabuçlu",
 ];
 
-const ALL_SURFACES = [
-  { value: "front",  label: "Ön" },
-  { value: "left",   label: "Sol" },
-  { value: "right",  label: "Sağ" },
-  { value: "top",    label: "Üst" },
-  { value: "bottom", label: "Alt" },
+// ─── Vida tipleri → otomatik delik çapı ──────────────────────────────────────
+const BOLT_SIZES: { value: string; label: string; holeDmm: number }[] = [
+  { value: "M6",  label: "M6",  holeDmm: 7  },
+  { value: "M8",  label: "M8",  holeDmm: 9  },
+  { value: "M10", label: "M10", holeDmm: 11 },
+  { value: "M12", label: "M12", holeDmm: 13 },
+  { value: "M14", label: "M14", holeDmm: 15 },
+  { value: "M16", label: "M16", holeDmm: 18 },
+  { value: "M20", label: "M20", holeDmm: 22 },
+  { value: "M24", label: "M24", holeDmm: 26 },
 ];
 
-// Her terminal tipinde geçerli yüzey seçenekleri
-const SURFACE_OPTIONS_BY_TYPE: Record<string, string[]> = {
-  "Ön Terminal":         ["front"],
-  "Arka Yatay Taraklı":  ["top", "bottom"],
-  "Arka Yatay Terminal": ["top", "bottom"],
-  "Yandan Taraklı":      ["left", "right"],
-  "Kablo Pabuçlu":       ["front"],
+// ─── Basma yüzeyi seçenekleri ─────────────────────────────────────────────────
+// Her terminal tipinde hangi yüzey seçenekleri sunulacak
+// Çizimle ilişkisi yok — tali bakır basma yüzeyi bilgisi
+const SURFACE_OPTIONS_BY_TYPE: Record<string, { value: string; label: string }[]> = {
+  "Ön Terminal":         [{ value: "front",      label: "Sadece Ön" }],
+  "Arka Yatay Taraklı":  [
+    { value: "top_bottom", label: "Üst ve Alt" },
+    { value: "top",        label: "Sadece Üst"  },
+    { value: "bottom",     label: "Sadece Alt"  },
+  ],
+  "Arka Yatay Terminal": [
+    { value: "top_bottom", label: "Üst ve Alt" },
+    { value: "top",        label: "Sadece Üst"  },
+    { value: "bottom",     label: "Sadece Alt"  },
+  ],
+  "Yandan Taraklı":      [
+    { value: "left",  label: "Sol Yüzey" },
+    { value: "right", label: "Sağ Yüzey" },
+  ],
+  "Kablo Pabuçlu":       [{ value: "front", label: "Sadece Ön" }],
 };
 
 function defaultSurface(terminalType: string): string {
-  const opts = SURFACE_OPTIONS_BY_TYPE[terminalType] ?? ["front"];
-  return opts[0];
+  const opts = SURFACE_OPTIONS_BY_TYPE[terminalType] ?? [{ value: "front", label: "Ön" }];
+  return opts[0].value;
 }
+
+// ─── Delik konumu: hangi eksenler aktif ───────────────────────────────────────
+const POSITION_AXES: Record<string, { x: boolean; y: boolean; z: boolean; zLabel: string }> = {
+  "Ön Terminal":         { x: true,  y: true,  z: false, zLabel: "Önden (Z)"         },
+  "Arka Yatay Taraklı":  { x: true,  y: false, z: true,  zLabel: "Fin Başından (Z)"  },
+  "Arka Yatay Terminal": { x: true,  y: false, z: true,  zLabel: "Önden (Z)"         },
+  "Yandan Taraklı":      { x: true,  y: false, z: true,  zLabel: "Önden (Z)"         },
+  "Kablo Pabuçlu":       { x: true,  y: true,  z: false, zLabel: "Önden (Z)"         },
+};
 
 // Taraklı tipler — fin alanları göster
 function isTarakli(terminalType: string): boolean {
@@ -57,14 +83,14 @@ interface TerminalDraft {
   terminal_height_mm: number | null;
   terminal_depth_mm: number | null;
   fin_count: number | null;
-  fin_spacing_mm: number | null;      // merkez-merkez mesafe
+  fin_spacing_mm: number | null;
   fin_thickness_mm: number | null;
   fin_length_mm: number | null;
-  fin_offset_mm: number | null;       // yüzey kenarından ilk finin üst kenarına
+  fin_offset_mm: number | null;
   plate_thickness_mm: number | null;
-  bolt_pos_x_mm: number | null;  // sol kenardan ilk delik merkezi
-  bolt_pos_y_mm: number | null;  // üst yüzeyden delik satırı merkezi
-  bolt_pos_z_mm: number | null;  // ön yüzeyden delik merkezi derinliği
+  bolt_pos_x_mm: number | null;
+  bolt_pos_y_mm: number | null;
+  bolt_pos_z_mm: number | null;
 }
 
 const EMPTY_DRAFT: TerminalDraft = {
@@ -80,12 +106,13 @@ const EMPTY_DRAFT: TerminalDraft = {
   terminal_width_mm: 100,
   terminal_height_mm: 120,
   terminal_depth_mm: 60,
-  fin_count: null,
-  fin_spacing_mm: null,
-  fin_thickness_mm: null,
-  fin_length_mm: null,
-  fin_offset_mm: null,
-  plate_thickness_mm: null,
+  // Fin varsayılanları (E bölümü)
+  fin_count: 2,
+  fin_spacing_mm: 20,
+  fin_thickness_mm: 10,
+  fin_length_mm: 20,
+  fin_offset_mm: 30,
+  plate_thickness_mm: 10,
   bolt_pos_x_mm: null,
   bolt_pos_y_mm: null,
   bolt_pos_z_mm: null,
@@ -105,30 +132,31 @@ function buildPayload(d: TerminalDraft): Omit<TerminalDefinition, "id" | "create
     terminal_width_mm: d.terminal_width_mm,
     terminal_height_mm: d.terminal_height_mm,
     terminal_depth_mm: d.terminal_depth_mm,
-    fin_count: isTarakli(d.terminal_type) ? d.fin_count : null,
-    fin_spacing_mm: isTarakli(d.terminal_type) ? d.fin_spacing_mm : null,
-    fin_thickness_mm: isTarakli(d.terminal_type) ? d.fin_thickness_mm : null,
-    fin_length_mm: isTarakli(d.terminal_type) ? d.fin_length_mm : null,
-    fin_offset_mm: isTarakli(d.terminal_type) ? d.fin_offset_mm : null,
-    plate_thickness_mm: isTarakli(d.terminal_type) ? d.plate_thickness_mm : null,
+    fin_count:         isTarakli(d.terminal_type) ? d.fin_count        : null,
+    fin_spacing_mm:    isTarakli(d.terminal_type) ? d.fin_spacing_mm   : null,
+    fin_thickness_mm:  isTarakli(d.terminal_type) ? d.fin_thickness_mm : null,
+    fin_length_mm:     isTarakli(d.terminal_type) ? d.fin_length_mm    : null,
+    fin_offset_mm:     isTarakli(d.terminal_type) ? d.fin_offset_mm    : null,
+    plate_thickness_mm:isTarakli(d.terminal_type) ? d.plate_thickness_mm : null,
     bolt_pos_x_mm: d.bolt_pos_x_mm,
     bolt_pos_y_mm: d.bolt_pos_y_mm,
     bolt_pos_z_mm: d.bolt_pos_z_mm,
   };
 }
 
-// ─── Sayısal input (null destekli) ────────────────────────────────────────────
+// ─── Sayısal input (null destekli, negatife izin verme) ───────────────────────
 function NumField({
-  label, value, onChange, unit, min,
+  label, value, onChange, unit, min = 0, disabled,
 }: {
   label: string;
   value: number | null;
   onChange: (v: number | null) => void;
   unit?: string;
   min?: number;
+  disabled?: boolean;
 }) {
   return (
-    <label className="field">
+    <label className="field" style={disabled ? { opacity: 0.4, pointerEvents: "none" } : undefined}>
       <span>
         {label}
         {unit && <span style={{ color: "var(--muted)", fontWeight: 400 }}> ({unit})</span>}
@@ -140,7 +168,12 @@ function NumField({
         min={min}
         value={value ?? ""}
         placeholder="—"
-        onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
+        disabled={disabled}
+        onChange={(e) => {
+          if (e.target.value === "") { onChange(null); return; }
+          const v = Number(e.target.value);
+          onChange(v < min ? min : v);
+        }}
       />
     </label>
   );
@@ -157,7 +190,6 @@ export function TerminalFormPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [holeMode, setHoleMode] = useState<"round" | "slot">("round");
 
-  // Düzenleme modunda tek kayıt çek (GET /{id})
   const detailQuery = useQuery({
     queryKey: ["terminal-definition", id],
     queryFn: () => client.getTerminalDefinition(Number(id)),
@@ -180,19 +212,17 @@ export function TerminalFormPage() {
         terminal_width_mm: def.terminal_width_mm ?? null,
         terminal_height_mm: def.terminal_height_mm ?? null,
         terminal_depth_mm: def.terminal_depth_mm ?? null,
-        fin_count: def.fin_count ?? null,
-        fin_spacing_mm: def.fin_spacing_mm ?? null,
-        fin_thickness_mm: def.fin_thickness_mm ?? null,
-        fin_length_mm: def.fin_length_mm ?? null,
-        fin_offset_mm: def.fin_offset_mm ?? null,
-        plate_thickness_mm: def.plate_thickness_mm ?? null,
+        fin_count:          def.fin_count          ?? 2,
+        fin_spacing_mm:     def.fin_spacing_mm     ?? 20,
+        fin_thickness_mm:   def.fin_thickness_mm   ?? 10,
+        fin_length_mm:      def.fin_length_mm      ?? 20,
+        fin_offset_mm:      def.fin_offset_mm      ?? 30,
+        plate_thickness_mm: def.plate_thickness_mm ?? 10,
         bolt_pos_x_mm: def.bolt_pos_x_mm ?? null,
         bolt_pos_y_mm: def.bolt_pos_y_mm ?? null,
         bolt_pos_z_mm: def.bolt_pos_z_mm ?? null,
       });
-      if (def.slot_width_mm || def.slot_length_mm) {
-        setHoleMode("slot");
-      }
+      if (def.slot_width_mm || def.slot_length_mm) setHoleMode("slot");
     }
   }, [isEdit, detailQuery.data]);
 
@@ -200,22 +230,34 @@ export function TerminalFormPage() {
     setDraft((d) => ({ ...d, [key]: value }));
   }
 
-  // Terminal tipi değişince yüzeyi sıfırla
+  // Terminal tipi değişince yüzey sıfırla
   function changeType(newType: string) {
-    const validSurfaces = SURFACE_OPTIONS_BY_TYPE[newType] ?? ["front"];
-    const currentValid = validSurfaces.includes(draft.surface);
+    const validSurfaces = SURFACE_OPTIONS_BY_TYPE[newType] ?? [{ value: "front", label: "Ön" }];
+    const currentValid  = validSurfaces.some(s => s.value === draft.surface);
     setDraft((d) => ({
       ...d,
       terminal_type: newType,
-      surface: currentValid ? d.surface : validSurfaces[0],
+      surface: currentValid ? d.surface : validSurfaces[0].value,
     }));
   }
 
-  // Delik modu değiştiğinde karşı alanları temizle
+  // Vida tipi değişince delik çapını otomatik doldur
+  function changeBoltType(boltValue: string) {
+    const size = BOLT_SIZES.find(b => b.value === boltValue);
+    setDraft((d) => ({
+      ...d,
+      bolt_type: boltValue,
+      hole_diameter_mm: (size && holeMode === "round") ? size.holeDmm : d.hole_diameter_mm,
+    }));
+  }
+
   function changeHoleMode(mode: "round" | "slot") {
     setHoleMode(mode);
     if (mode === "round") {
-      setDraft((d) => ({ ...d, slot_width_mm: null, slot_length_mm: null }));
+      // Seçili vida tipine göre çapı otomatik doldur
+      const size = BOLT_SIZES.find(b => b.value === draft.bolt_type);
+      setDraft((d) => ({ ...d, slot_width_mm: null, slot_length_mm: null,
+        hole_diameter_mm: size ? size.holeDmm : d.hole_diameter_mm }));
     } else {
       setDraft((d) => ({ ...d, hole_diameter_mm: null }));
     }
@@ -254,15 +296,19 @@ export function TerminalFormPage() {
     );
   }
 
-  const validSurfaces = ALL_SURFACES.filter(
-    (s) => (SURFACE_OPTIONS_BY_TYPE[draft.terminal_type] ?? ["front"]).includes(s.value)
+  const validSurfaces  = SURFACE_OPTIONS_BY_TYPE[draft.terminal_type] ?? [{ value: "front", label: "Ön" }];
+  const surfaceLabel   = validSurfaces.find(s => s.value === draft.surface)?.label ?? draft.surface;
+  const showFinFields  = isTarakli(draft.terminal_type);
+  const posAxes        = POSITION_AXES[draft.terminal_type] ?? { x: true, y: true, z: true, zLabel: "Önden (Z)" };
+
+  // C — AYT derinlik doğrulaması: fin_length + plate_thickness = terminal_depth
+  const aytDepthHint = draft.terminal_type === "Arka Yatay Taraklı" && (
+    (draft.fin_length_mm ?? 0) + (draft.plate_thickness_mm ?? 0)
   );
-  const surfaceLabel = ALL_SURFACES.find(s => s.value === draft.surface)?.label ?? draft.surface;
-  const showFinFields = isTarakli(draft.terminal_type);
 
   return (
     <div className="stack">
-      {/* ── Başlık ── */}
+      {/* Başlık */}
       <section className="card page-heading">
         <div>
           <span className="eyebrow">Terminal Tipleri</span>
@@ -276,7 +322,6 @@ export function TerminalFormPage() {
 
       {saveError && <div className="alert alert-warning">{saveError}</div>}
 
-      {/* ── 2 Panel Layout ── */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", alignItems: "start" }}>
 
         {/* ── Sol: Form ── */}
@@ -284,22 +329,16 @@ export function TerminalFormPage() {
 
           {/* A — Temel Bilgiler */}
           <section className="card" style={{ marginBottom: "1rem" }}>
-            <h3 style={{ margin: "0 0 0.9rem", fontSize: "0.85rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              A — Temel Bilgiler
-            </h3>
+            <h3 style={sectionTitle}>A — Temel Bilgiler</h3>
             <div className="form-grid">
               <label className="field" style={{ gridColumn: "1 / -1" }}>
                 <span>Terminal Adı</span>
-                <input
-                  className="input"
-                  required
-                  value={draft.name}
+                <input className="input" required value={draft.name}
                   onChange={(e) => set("name", e.target.value)}
-                  placeholder="ör. ABB Emax2 Ön Terminal M12"
-                />
+                  placeholder="ör. ABB Emax2 Ön Terminal M12" />
               </label>
 
-              <label className="field">
+              <label className="field" style={{ gridColumn: "1 / -1" }}>
                 <span>Terminal Tipi</span>
                 <select className="input" value={draft.terminal_type}
                   onChange={(e) => changeType(e.target.value)}>
@@ -307,73 +346,88 @@ export function TerminalFormPage() {
                 </select>
               </label>
 
-              <label className="field">
-                <span>Basma Yüzeyi</span>
-                <select className="input" value={draft.surface}
-                  onChange={(e) => set("surface", e.target.value)}>
-                  {validSurfaces.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                </select>
-              </label>
+              {/* Basma Yüzeyi — radio butonlar */}
+              <div style={{ gridColumn: "1 / -1" }}>
+                <span style={{ display: "block", fontSize: "0.8rem", fontWeight: 600,
+                  color: "var(--fg)", marginBottom: "0.4rem" }}>
+                  Basma Yüzeyi
+                  <span style={{ fontSize: "0.72rem", fontWeight: 400, color: "var(--muted)", marginLeft: "0.5rem" }}>
+                    (tali bakır baskı yüzeyi — çizimi etkilemez)
+                  </span>
+                </span>
+                <div style={{ display: "flex", gap: "0.45rem", flexWrap: "wrap" }}>
+                  {validSurfaces.map((s) => (
+                    <label key={s.value} style={{
+                      display: "flex", alignItems: "center", gap: "0.3rem",
+                      padding: "0.28rem 0.85rem", borderRadius: 6, cursor: "pointer",
+                      border: `1px solid ${draft.surface === s.value ? "var(--accent)" : "var(--line)"}`,
+                      background: draft.surface === s.value ? "var(--accent-soft)" : "var(--surface)",
+                      color: draft.surface === s.value ? "var(--accent)" : "var(--fg)",
+                      fontSize: "0.82rem", fontWeight: draft.surface === s.value ? 600 : 400,
+                      transition: "all 0.15s",
+                    }}>
+                      <input type="radio" name="surface" value={s.value}
+                        checked={draft.surface === s.value}
+                        onChange={() => set("surface", s.value)}
+                        style={{ display: "none" }} />
+                      {s.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
             </div>
           </section>
 
           {/* B — Vida & Delik */}
           <section className="card" style={{ marginBottom: "1rem" }}>
-            <h3 style={{ margin: "0 0 0.9rem", fontSize: "0.85rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              B — Vida & Delik
-            </h3>
+            <h3 style={sectionTitle}>B — Vida &amp; Delik</h3>
             <div className="form-grid">
+              {/* Vida tipi — select ile otomatik çap */}
               <label className="field">
                 <span>Vida Tipi</span>
-                <input className="input" value={draft.bolt_type}
-                  onChange={(e) => set("bolt_type", e.target.value)}
-                  placeholder="M10, M12..." />
+                <select className="input" value={draft.bolt_type}
+                  onChange={(e) => changeBoltType(e.target.value)}>
+                  {BOLT_SIZES.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
+                  <option value="">Diğer / Manuel</option>
+                </select>
               </label>
 
-              <NumField label="Vida Adedi" value={draft.bolt_count}
-                onChange={(v) => set("bolt_count", v != null ? Math.round(v) : null)}
-                min={1} />
+              <NumField label="Vida Adedi" value={draft.bolt_count} min={1}
+                onChange={(v) => set("bolt_count", v != null ? Math.max(1, Math.round(v)) : null)} />
 
-              <NumField label="Vida Merkez Mesafesi" unit="mm"
+              <NumField label="Vida Merkez Mesafesi" unit="mm" min={0}
                 value={draft.bolt_center_distance_mm}
                 onChange={(v) => set("bolt_center_distance_mm", v)} />
 
-              {/* Delik tipi seçimi */}
-              <label className="field" style={{ gridColumn: "1 / -1" }}>
-                <span>Delik Tipi</span>
-                <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.25rem" }}>
+              {/* Delik tipi */}
+              <div style={{ gridColumn: "1 / -1" }}>
+                <span style={{ display: "block", fontSize: "0.8rem", fontWeight: 600,
+                  color: "var(--fg)", marginBottom: "0.4rem" }}>Delik Tipi</span>
+                <div style={{ display: "flex", gap: "0.45rem" }}>
                   {(["round", "slot"] as const).map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => changeHoleMode(m)}
-                      style={{
-                        padding: "0.3rem 0.9rem",
-                        borderRadius: 6,
-                        border: "1px solid var(--line)",
-                        background: holeMode === m ? "var(--accent)" : "var(--surface)",
-                        color: holeMode === m ? "#fff" : "var(--fg)",
-                        fontSize: "0.82rem",
-                        cursor: "pointer",
-                        fontWeight: holeMode === m ? 600 : 400,
-                      }}
-                    >
+                    <button key={m} type="button" onClick={() => changeHoleMode(m)} style={{
+                      padding: "0.28rem 0.85rem", borderRadius: 6, fontSize: "0.82rem",
+                      border: `1px solid ${holeMode === m ? "var(--accent)" : "var(--line)"}`,
+                      background: holeMode === m ? "var(--accent-soft)" : "var(--surface)",
+                      color: holeMode === m ? "var(--accent)" : "var(--fg)",
+                      fontWeight: holeMode === m ? 600 : 400, cursor: "pointer",
+                    }}>
                       {m === "round" ? "Yuvarlak Delik" : "Slot Delik"}
                     </button>
                   ))}
                 </div>
-              </label>
+              </div>
 
               {holeMode === "round" ? (
-                <NumField label="Delik Çapı" unit="mm"
+                <NumField label="Delik Çapı" unit="mm" min={0}
                   value={draft.hole_diameter_mm}
                   onChange={(v) => set("hole_diameter_mm", v)} />
               ) : (
                 <>
-                  <NumField label="Slot Genişliği" unit="mm"
+                  <NumField label="Slot Genişliği" unit="mm" min={0}
                     value={draft.slot_width_mm}
                     onChange={(v) => set("slot_width_mm", v)} />
-                  <NumField label="Slot Uzunluğu" unit="mm"
+                  <NumField label="Slot Uzunluğu" unit="mm" min={0}
                     value={draft.slot_length_mm}
                     onChange={(v) => set("slot_length_mm", v)} />
                 </>
@@ -383,17 +437,27 @@ export function TerminalFormPage() {
 
           {/* C — Fiziksel Boyutlar */}
           <section className="card" style={{ marginBottom: "1rem" }}>
-            <h3 style={{ margin: "0 0 0.9rem", fontSize: "0.85rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              C — Fiziksel Boyutlar
-            </h3>
+            <h3 style={sectionTitle}>C — Fiziksel Boyutlar</h3>
+            {draft.terminal_type === "Arka Yatay Taraklı" && (
+              <p style={{ margin: "0 0 0.7rem", fontSize: "0.77rem", color: "var(--muted)",
+                background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.2)",
+                borderRadius: 6, padding: "0.4rem 0.65rem" }}>
+                Derinlik Z = Plaka Kalınlığı + Fin Uzunluğu
+                {aytDepthHint !== false && aytDepthHint > 0 && (
+                  <strong style={{ marginLeft: "0.5rem" }}>
+                    ({draft.plate_thickness_mm ?? 0} + {draft.fin_length_mm ?? 0} = {aytDepthHint} mm)
+                  </strong>
+                )}
+              </p>
+            )}
             <div className="form-grid">
-              <NumField label="Genişlik X" unit="mm"
+              <NumField label="Genişlik X" unit="mm" min={0}
                 value={draft.terminal_width_mm}
                 onChange={(v) => set("terminal_width_mm", v)} />
-              <NumField label="Yükseklik Y" unit="mm"
+              <NumField label="Yükseklik Y" unit="mm" min={0}
                 value={draft.terminal_height_mm}
                 onChange={(v) => set("terminal_height_mm", v)} />
-              <NumField label="Derinlik Z" unit="mm"
+              <NumField label="Derinlik Z" unit="mm" min={0}
                 value={draft.terminal_depth_mm}
                 onChange={(v) => set("terminal_depth_mm", v)} />
             </div>
@@ -401,62 +465,35 @@ export function TerminalFormPage() {
 
           {/* D — Delik Konumu */}
           <section className="card" style={{ marginBottom: "1rem" }}>
-            <h3 style={{ margin: "0 0 0.9rem", fontSize: "0.85rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              D — Delik Konumu
-            </h3>
+            <h3 style={sectionTitle}>D — Delik Konumu</h3>
             <p style={{ margin: "0 0 0.75rem", fontSize: "0.78rem", color: "var(--muted)" }}>
-              Boş bırakılırsa delikler otomatik ortalanır. Belirtilirse tam konum kullanılır.
+              Boş bırakılırsa delikler otomatik ortalanır.
             </p>
             <div className="form-grid">
-              {/* X: sol kenar — tüm tipler */}
-              <NumField
-                label="Sol Kenardan (X)"
-                unit="mm"
-                value={draft.bolt_pos_x_mm}
-                onChange={(v) => set("bolt_pos_x_mm", v)}
-              />
-
-              {/* Y: üstten — Ön Terminal, Kablo Pabuçlu, Yandan Taraklı */}
-              {(draft.terminal_type === "Ön Terminal" ||
-                draft.terminal_type === "Kablo Pabuçlu" ||
-                draft.terminal_type === "Yandan Taraklı") && (
-                <NumField
-                  label="Üstten (Y)"
-                  unit="mm"
+              {posAxes.x && (
+                <NumField label="Sol Kenardan (X)" unit="mm" min={0}
+                  value={draft.bolt_pos_x_mm}
+                  onChange={(v) => set("bolt_pos_x_mm", v)} />
+              )}
+              {posAxes.y && (
+                <NumField label="Üstten (Y)" unit="mm" min={0}
                   value={draft.bolt_pos_y_mm}
-                  onChange={(v) => set("bolt_pos_y_mm", v)}
-                />
+                  onChange={(v) => set("bolt_pos_y_mm", v)} />
               )}
-
-              {/* Z: Arka Yatay Taraklı için FİN BAŞINDAN, diğerleri için ÖNDEN */}
-              {draft.terminal_type === "Arka Yatay Taraklı" && (
-                <NumField
-                  label="Fin Başından (Z)"
-                  unit="mm"
+              {posAxes.z && (
+                <NumField label={posAxes.zLabel} unit="mm" min={0}
                   value={draft.bolt_pos_z_mm}
-                  onChange={(v) => set("bolt_pos_z_mm", v)}
-                />
-              )}
-              {(draft.terminal_type === "Arka Yatay Terminal" ||
-                draft.terminal_type === "Yandan Taraklı") && (
-                <NumField
-                  label="Önden (Z)"
-                  unit="mm"
-                  value={draft.bolt_pos_z_mm}
-                  onChange={(v) => set("bolt_pos_z_mm", v)}
-                />
+                  onChange={(v) => set("bolt_pos_z_mm", v)} />
               )}
             </div>
           </section>
 
-          {/* E — Fin / Tarak (Taraklı tipler için) */}
+          {/* E — Fin / Tarak Geometrisi */}
           {showFinFields && (
             <section className="card" style={{ marginBottom: "1rem" }}>
-              <h3 style={{ margin: "0 0 0.9rem", fontSize: "0.85rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                E — Tarak (Fin) Geometrisi
-              </h3>
+              <h3 style={sectionTitle}>E — Tarak (Fin) Geometrisi</h3>
 
-              {/* Geometrik doğrulama bilgisi */}
+              {/* Geometrik doğrulama */}
               {(() => {
                 const h  = draft.terminal_height_mm;
                 const n  = draft.fin_count;
@@ -464,8 +501,6 @@ export function TerminalFormPage() {
                 const sp = draft.fin_spacing_mm;
                 const of = draft.fin_offset_mm;
                 if (!h || !n || !th) return null;
-
-                // Fin aralığı merkez-merkez; fin blok yüksekliği = (n-1)*sp + th
                 const finBlock  = sp != null ? (n - 1) * sp + th : th * n;
                 const remaining = h - finBlock;
                 const maxSp     = n > 1 ? (h - th) / (n - 1) : null;
@@ -473,15 +508,14 @@ export function TerminalFormPage() {
                 const topM      = of != null ? of : remaining / 2;
                 const botM      = remaining - topM;
                 const isNeg     = remaining < -0.001;
-
                 return (
                   <div style={{
                     background: (isOver || isNeg) ? "rgba(239,68,68,0.07)" : "rgba(34,197,94,0.05)",
                     border: `1px solid ${(isOver || isNeg) ? "#ef4444" : "var(--line)"}`,
                     borderRadius: 6, padding: "0.5rem 0.75rem", marginBottom: "0.8rem",
-                    fontSize: "0.77rem", color: "var(--fg)",
+                    fontSize: "0.77rem",
                   }}>
-                    <div style={{ display: "flex", gap: "1.2rem", flexWrap: "wrap", marginBottom: "0.25rem" }}>
+                    <div style={{ display: "flex", gap: "1.2rem", flexWrap: "wrap", marginBottom: "0.2rem" }}>
                       <span>Fin blok: <b>{finBlock.toFixed(1)} mm</b></span>
                       <span style={{ color: isNeg ? "#ef4444" : "inherit" }}>
                         Kalan: <b>{remaining.toFixed(1)} mm</b>{isNeg ? " ⚠ TAŞIYOR" : ""}
@@ -500,22 +534,21 @@ export function TerminalFormPage() {
               })()}
 
               <div className="form-grid">
-                <NumField label="Fin Adedi" value={draft.fin_count}
-                  onChange={(v) => set("fin_count", v != null ? Math.round(v) : null)}
-                  min={1} />
-                <NumField label="Fin Aralığı (m-m)" unit="mm"
+                <NumField label="Fin Adedi" value={draft.fin_count} min={1}
+                  onChange={(v) => set("fin_count", v != null ? Math.max(1, Math.round(v)) : null)} />
+                <NumField label="Fin Aralığı (m-m)" unit="mm" min={0}
                   value={draft.fin_spacing_mm}
                   onChange={(v) => set("fin_spacing_mm", v)} />
-                <NumField label="Fin Kalınlığı" unit="mm"
+                <NumField label="Fin Kalınlığı" unit="mm" min={0}
                   value={draft.fin_thickness_mm}
                   onChange={(v) => set("fin_thickness_mm", v)} />
-                <NumField label="İlk Fin Boşluğu (üstten)" unit="mm"
+                <NumField label="İlk Fin Boşluğu (üstten)" unit="mm" min={0}
                   value={draft.fin_offset_mm}
                   onChange={(v) => set("fin_offset_mm", v)} />
-                <NumField label="Fin Uzunluğu" unit="mm"
+                <NumField label="Fin Uzunluğu" unit="mm" min={0}
                   value={draft.fin_length_mm}
                   onChange={(v) => set("fin_length_mm", v)} />
-                <NumField label="Plaka Kalınlığı" unit="mm"
+                <NumField label="Plaka Kalınlığı" unit="mm" min={0}
                   value={draft.plate_thickness_mm}
                   onChange={(v) => set("plate_thickness_mm", v)} />
               </div>
@@ -534,48 +567,45 @@ export function TerminalFormPage() {
           </div>
         </form>
 
-        {/* ── Sağ: Önizleme ── */}
+        {/* ── Sağ: Özet + Önizleme ── */}
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
 
-          {/* Bilgi kartı — rozetler + özet */}
+          {/* Özet kartı */}
           <section className="card">
             <div style={{ marginBottom: "0.6rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
               <span style={{
                 padding: "3px 10px", borderRadius: 6, fontSize: "0.78rem", fontWeight: 600,
                 background: "var(--accent-soft)", color: "var(--accent)",
-              }}>
-                {draft.terminal_type}
-              </span>
+              }}>{draft.terminal_type}</span>
               <span style={{
                 padding: "3px 10px", borderRadius: 6, fontSize: "0.78rem", fontWeight: 600,
                 background: "rgba(148,163,184,0.12)", color: "var(--muted)",
-              }}>
-                {surfaceLabel} Yüzey
-              </span>
+              }}>{surfaceLabel}</span>
               <span style={{
                 padding: "3px 10px", borderRadius: 6, fontSize: "0.78rem", fontWeight: 600,
                 background: holeMode === "slot" ? "rgba(251,191,36,0.15)" : "rgba(148,163,184,0.08)",
                 color: holeMode === "slot" ? "#b45309" : "var(--muted)",
-              }}>
-                {holeMode === "slot" ? "Slot Delik" : "Yuvarlak Delik"}
-              </span>
+              }}>{holeMode === "slot" ? "Slot Delik" : "Yuvarlak Delik"}</span>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.4rem" }}>
               {[
-                ["Vida", draft.bolt_type ? `${draft.bolt_type} ×${draft.bolt_count ?? "?"}` : "—"],
-                ["Merkez", draft.bolt_center_distance_mm ? `${draft.bolt_center_distance_mm} mm` : "—"],
-                ["Delik", holeMode === "round"
+                ["Vida",    draft.bolt_type ? `${draft.bolt_type} ×${draft.bolt_count ?? "?"}` : "—"],
+                ["Merkez",  draft.bolt_center_distance_mm ? `${draft.bolt_center_distance_mm} mm` : "—"],
+                ["Delik",   holeMode === "round"
                   ? (draft.hole_diameter_mm ? `Ø${draft.hole_diameter_mm} mm` : "—")
                   : (draft.slot_width_mm && draft.slot_length_mm ? `${draft.slot_width_mm}×${draft.slot_length_mm} mm` : "—")],
-                ["Boyut", draft.terminal_width_mm && draft.terminal_height_mm
+                ["Boyut",   draft.terminal_width_mm && draft.terminal_height_mm
                   ? `${draft.terminal_width_mm}×${draft.terminal_height_mm}×${draft.terminal_depth_mm ?? "?"} mm`
                   : "—"],
-                ...(showFinFields
-                  ? [["Fin", draft.fin_count ? `${draft.fin_count} adet${draft.fin_spacing_mm ? ` / ${draft.fin_spacing_mm} mm ara` : ""}${draft.fin_thickness_mm ? ` / ${draft.fin_thickness_mm} mm kalın` : ""}` : "—"]]
-                  : []),
+                ...(showFinFields ? [[
+                  "Fin",
+                  draft.fin_count
+                    ? `${draft.fin_count} adet${draft.fin_spacing_mm ? ` / ${draft.fin_spacing_mm} mm ara` : ""}${draft.fin_thickness_mm ? ` / ${draft.fin_thickness_mm} mm kalın` : ""}`
+                    : "—",
+                ]] : []),
               ].map(([label, value]) => (
                 <div key={label} style={{
-                  background: "var(--surface-alt, rgba(0,0,0,0.03))",
+                  background: "var(--surface-alt,rgba(0,0,0,0.03))",
                   borderRadius: 6, padding: "0.35rem 0.6rem",
                   border: "1px solid var(--line)",
                 }}>
@@ -613,3 +643,13 @@ export function TerminalFormPage() {
     </div>
   );
 }
+
+// Bölüm başlığı stili
+const sectionTitle: React.CSSProperties = {
+  margin: "0 0 0.9rem",
+  fontSize: "0.85rem",
+  fontWeight: 700,
+  color: "var(--muted)",
+  textTransform: "uppercase",
+  letterSpacing: "0.05em",
+};
