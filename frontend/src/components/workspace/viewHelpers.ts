@@ -146,21 +146,20 @@ export function buildCabinetLayouts(
   const layouts: CabinetLayout[] = [];
 
   for (const pp of sorted) {
-    const def = pp.panel_definition;
     const qty = Math.max(1, pp.quantity ?? 1);
-    const cW = Number(def.width_mm);
-    const cH = Number(def.height_mm);
-    // depth_mm yoksa mounting_plate_height_mm veya 300mm fallback
-    const cD = Number(def.depth_mm ?? 300);
-    const lm = Number(def.left_margin_mm ?? 0);
-    const rm = Number(def.right_margin_mm ?? 0);
-    const tm = Number(def.top_margin_mm ?? 0);
-    const bm = Number(def.bottom_margin_mm ?? 0);
+    // Proje özgü geometri kullan (kütüphane tanımından kopyalanmış, düzenlenmiş olabilir)
+    const cW = Number(pp.width_mm);
+    const cH = Number(pp.height_mm);
+    const cD = Number(pp.depth_mm ?? 300);
+    const lm = Number(pp.left_margin_mm ?? 0);
+    const rm = Number(pp.right_margin_mm ?? 0);
+    const tm = Number(pp.top_margin_mm ?? 0);
+    const bm = Number(pp.bottom_margin_mm ?? 0);
 
     for (let q = 0; q < qty; q++) {
       const label = qty > 1
-        ? `${pp.label ?? def.name} (${q + 1}/${qty})`
-        : (pp.label ?? def.name);
+        ? `${pp.label ?? pp.panel_definition.name} (${q + 1}/${qty})`
+        : (pp.label ?? pp.panel_definition.name);
 
       layouts.push({
         id: pp.id,

@@ -52,6 +52,23 @@ export interface ProjectPanel {
   label?: string | null;
   seq: number;
   quantity: number;
+  // Project-specific geometry (copied from library, editable per-project)
+  width_mm: number;
+  height_mm: number;
+  depth_mm?: number | null;
+  mounting_plate_width_mm?: number | null;
+  mounting_plate_height_mm?: number | null;
+  left_margin_mm: number;
+  right_margin_mm: number;
+  top_margin_mm: number;
+  bottom_margin_mm: number;
+  busbar_orientation?: string | null;
+  phase_system?: string | null;
+  busbar_rail_offset_mm?: number | null;
+  busbar_end_setback_mm?: number | null;
+  origin_x_mm: number;
+  origin_y_mm: number;
+  origin_z_mm: number;
   panel_definition: PanelDefinition;
 }
 

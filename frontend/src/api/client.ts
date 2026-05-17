@@ -59,6 +59,10 @@ export const client = {
     (await api.patch<ProjectPanel>(`/projects/${projectId}/panel-layout/${panelId}`, { label })).data,
   reorderProjectPanel: async (projectId: number, panelId: number, direction: "up" | "down") =>
     (await api.put<ProjectPanel[]>(`/projects/${projectId}/panel-layout/${panelId}/reorder`, { direction })).data,
+  updateProjectPanel: async (projectId: number, panelId: number, payload: Partial<Omit<ProjectPanel, "id" | "project_id" | "panel_definition">>) =>
+    (await api.put<ProjectPanel>(`/projects/${projectId}/panel-layout/${panelId}`, payload)).data,
+  resetProjectPanelFromLibrary: async (projectId: number, panelId: number) =>
+    (await api.post<ProjectPanel>(`/projects/${projectId}/panel-layout/${panelId}/reset`, {})).data,
 
   listProjectCoppers: async (projectId: number) =>
     (await api.get<ProjectCopper[]>(`/projects/${projectId}/copper-layout`)).data,

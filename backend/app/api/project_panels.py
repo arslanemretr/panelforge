@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.api.dependencies import db_session
 from app.db import models
 from app.schemas.panel import PanelUpsert
-from app.schemas.project_panel import ProjectPanelCreate, ProjectPanelRead
+from app.schemas.project_panel import ProjectPanelCreate, ProjectPanelRead, ProjectPanelUpdate
 
 router = APIRouter(tags=["project-panels"])
 
@@ -21,9 +21,9 @@ def _load_options():
 
 
 def _sync_aggregate_panel(db: Session, project_id: int) -> None:
+    """Aggregate Panel'i ProjectPanel'lerin proje özgü geometrilerinden hesaplar."""
     items = (
         db.query(models.ProjectPanel)
-        .options(selectinload(models.ProjectPanel.panel_definition))
         .filter(models.ProjectPanel.project_id == project_id)
         .order_by(models.ProjectPanel.seq.asc(), models.ProjectPanel.id.asc())
         .all()
@@ -36,21 +36,21 @@ def _sync_aggregate_panel(db: Session, project_id: int) -> None:
             db.commit()
         return
 
-    first = items[0].panel_definition
+    first = items[0]
     total_width = sum(
-        (item.panel_definition.width_mm * item.quantity for item in items), Decimal("0")
+        (item.width_mm * item.quantity for item in items), Decimal("0")
     )
     max_height = max(
-        (item.panel_definition.height_mm for item in items), default=Decimal("0")
+        (item.height_mm for item in items), default=Decimal("0")
     )
     max_depth = max(
-        (item.panel_definition.depth_mm or Decimal("0") for item in items), default=Decimal("0")
+        (item.depth_mm or Decimal("0") for item in items), default=Decimal("0")
     )
     total_mounting_width = sum(
-        ((item.panel_definition.mounting_plate_width_mm or Decimal("0")) * item.quantity for item in items), Decimal("0")
+        ((item.mounting_plate_width_mm or Decimal("0")) * item.quantity for item in items), Decimal("0")
     )
     max_mounting_height = max(
-        (item.panel_definition.mounting_plate_height_mm or Decimal("0") for item in items), default=Decimal("0")
+        (item.mounting_plate_height_mm or Decimal("0") for item in items), default=Decimal("0")
     )
 
     payload = PanelUpsert(
@@ -114,8 +114,99 @@ def create_project_panel(
         label=payload.label or definition.name,
         seq=next_seq + 1,
         quantity=max(1, payload.quantity),
+        # Geometry copied from library definition (project-specific copy)
+        width_mm=definition.width_mm,
+        height_mm=definition.height_mm,
+        depth_mm=definition.depth_mm,
+        mounting_plate_width_mm=definition.mounting_plate_width_mm,
+        mounting_plate_height_mm=definition.mounting_plate_height_mm,
+        left_margin_mm=definition.left_margin_mm,
+        right_margin_mm=definition.right_margin_mm,
+        top_margin_mm=definition.top_margin_mm,
+        bottom_margin_mm=definition.bottom_margin_mm,
+        busbar_orientation=definition.busbar_orientation,
+        phase_system=definition.phase_system,
+        busbar_rail_offset_mm=definition.busbar_rail_offset_mm,
+        busbar_end_setback_mm=definition.busbar_end_setback_mm,
+        origin_x_mm=definition.origin_x_mm,
+        origin_y_mm=definition.origin_y_mm,
+        origin_z_mm=definition.origin_z_mm,
     )
     db.add(item)
+    db.commit()
+    _sync_aggregate_panel(db, project_id)
+    return (
+        db.query(models.ProjectPanel)
+        .options(_load_options())
+        .filter(models.ProjectPanel.id == item.id)
+        .one()
+    )
+
+
+@router.put("/projects/{project_id}/panel-layout/{project_panel_id}", response_model=ProjectPanelRead)
+def update_project_panel(
+    project_id: int,
+    project_panel_id: int,
+    payload: ProjectPanelUpdate,
+    db: Session = Depends(db_session),
+) -> models.ProjectPanel:
+    """Proje özgü kabin geometrisini ve etiketini günceller. Kütüphaneyi etkilemez."""
+    item = (
+        db.query(models.ProjectPanel)
+        .options(_load_options())
+        .filter(models.ProjectPanel.project_id == project_id, models.ProjectPanel.id == project_panel_id)
+        .one_or_none()
+    )
+    if item is None:
+        raise HTTPException(status_code=404, detail="Project panel not found")
+
+    for field, val in payload.model_dump(exclude_unset=True).items():
+        setattr(item, field, val)
+
+    db.commit()
+    _sync_aggregate_panel(db, project_id)
+    return (
+        db.query(models.ProjectPanel)
+        .options(_load_options())
+        .filter(models.ProjectPanel.id == item.id)
+        .one()
+    )
+
+
+@router.post("/projects/{project_id}/panel-layout/{project_panel_id}/reset", response_model=ProjectPanelRead)
+def reset_project_panel_from_library(
+    project_id: int,
+    project_panel_id: int,
+    db: Session = Depends(db_session),
+) -> models.ProjectPanel:
+    """Proje özgü geometriyi kütüphane tanımından sıfırlar."""
+    item = (
+        db.query(models.ProjectPanel)
+        .options(_load_options())
+        .filter(models.ProjectPanel.project_id == project_id, models.ProjectPanel.id == project_panel_id)
+        .one_or_none()
+    )
+    if item is None:
+        raise HTTPException(status_code=404, detail="Project panel not found")
+
+    definition = item.panel_definition
+    item.width_mm = definition.width_mm
+    item.height_mm = definition.height_mm
+    item.depth_mm = definition.depth_mm
+    item.mounting_plate_width_mm = definition.mounting_plate_width_mm
+    item.mounting_plate_height_mm = definition.mounting_plate_height_mm
+    item.left_margin_mm = definition.left_margin_mm
+    item.right_margin_mm = definition.right_margin_mm
+    item.top_margin_mm = definition.top_margin_mm
+    item.bottom_margin_mm = definition.bottom_margin_mm
+    item.busbar_orientation = definition.busbar_orientation
+    item.phase_system = definition.phase_system
+    item.busbar_rail_offset_mm = definition.busbar_rail_offset_mm
+    item.busbar_end_setback_mm = definition.busbar_end_setback_mm
+    item.origin_x_mm = definition.origin_x_mm
+    item.origin_y_mm = definition.origin_y_mm
+    item.origin_z_mm = definition.origin_z_mm
+
     db.commit()
     _sync_aggregate_panel(db, project_id)
     return (
@@ -143,7 +234,6 @@ def reorder_project_panel(
 ) -> list[models.ProjectPanel]:
     items = (
         db.query(models.ProjectPanel)
-        .options(selectinload(models.ProjectPanel.panel_definition))
         .filter(models.ProjectPanel.project_id == project_id)
         .order_by(models.ProjectPanel.seq.asc(), models.ProjectPanel.id.asc())
         .all()

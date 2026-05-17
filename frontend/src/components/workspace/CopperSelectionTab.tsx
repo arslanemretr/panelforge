@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { client } from "../../api/client";
 import type { CopperDefinition, CopperSettings } from "../../types";
-import { TechnicalDrawingView } from "./TechnicalDrawingView";
+import { CopperOrthographicPreview } from "./CopperOrthographicPreview";
 
 interface CopperSelectionTabProps {
   projectId: number;
@@ -68,11 +68,6 @@ export function CopperSelectionTab({ projectId }: CopperSelectionTabProps) {
     queryFn: () => client.listProjectPanels(projectId),
   });
 
-  const projectDevicesQuery = useQuery({
-    queryKey: ["project-devices", projectId],
-    queryFn: () => client.listProjectDevices(projectId),
-  });
-
   useEffect(() => {
     if (settingsQuery.data) {
       setDraft(settingsQuery.data);
@@ -107,114 +102,138 @@ export function CopperSelectionTab({ projectId }: CopperSelectionTabProps) {
   }
 
   return (
-    <div className="stack">
-      <section className="table-card">
-        <div className="section-header">
-          <h3 style={{ margin: 0 }}>Ana Bakir Secimi</h3>
-          <span className="helper-text" style={{ fontSize: "0.82rem" }}>
-            Secilen ana bakir kutuphanesi tum alanlari doldurur. Projeye ozel konum, yon, faz araligi ve uzunluk burada override edilebilir.
-          </span>
-        </div>
+    <div style={{ display: "grid", gridTemplateColumns: "3fr 2fr", gap: "1.5rem", alignItems: "start" }}>
 
-        <div className="form-grid" style={{ marginTop: "1rem" }}>
-          <label className="field" style={{ gridColumn: "1 / -1" }}>
-            <span>Ana Bakir Tanimi</span>
-            <select
-              className="input"
-              value={draft.main_copper_definition_id ?? ""}
-              onChange={(event) => handleDefinitionChange(Number(event.target.value))}
-            >
-              <option value="">- Secin -</option>
-              {definitions.map((definition) => (
-                <option key={definition.id} value={definition.id}>
-                  {definition.name} - {definition.main_width_mm ?? "?"} x {definition.main_thickness_mm ?? "?"} mm
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="field">
-            <span>Genislik (mm)</span>
-            <input className="input" type="number" value={toNumber(draft.main_width_mm)} onChange={(e) => updateField("main_width_mm", Number(e.target.value))} />
-          </label>
-          <label className="field">
-            <span>Kalinlik (mm)</span>
-            <input className="input" type="number" value={toNumber(draft.main_thickness_mm)} onChange={(e) => updateField("main_thickness_mm", Number(e.target.value))} />
-          </label>
-          <label className="field">
-            <span>Malzeme</span>
-            <select className="input" value={draft.main_material ?? "Cu"} onChange={(e) => updateField("main_material", e.target.value)}>
-              <option value="Cu">Cu</option>
-              <option value="Al">Al</option>
-            </select>
-          </label>
-          <label className="field">
-            <span>Faz Araligi (mm)</span>
-            <input className="input" type="number" value={toNumber(draft.main_phase_spacing_mm)} onChange={(e) => updateField("main_phase_spacing_mm", Number(e.target.value))} />
-          </label>
-
-          <label className="field">
-            <span>X (mm)</span>
-            <input className="input" type="number" value={toNumber(draft.busbar_x_mm)} onChange={(e) => updateField("busbar_x_mm", Number(e.target.value))} />
-          </label>
-          <label className="field">
-            <span>Y (mm)</span>
-            <input className="input" type="number" value={toNumber(draft.busbar_y_mm)} onChange={(e) => updateField("busbar_y_mm", Number(e.target.value))} />
-          </label>
-          <label className="field">
-            <span>Z (mm)</span>
-            <input className="input" type="number" value={toNumber(draft.busbar_z_mm)} onChange={(e) => updateField("busbar_z_mm", Number(e.target.value))} />
-          </label>
-          <label className="field">
-            <span>Yon</span>
-            <select className="input" value={draft.busbar_orientation ?? "horizontal"} onChange={(e) => updateField("busbar_orientation", e.target.value)}>
-              <option value="horizontal">Yatay</option>
-              <option value="vertical">Dikey</option>
-            </select>
-          </label>
-
-          <label className="field">
-            <span>Uzunluk (mm)</span>
-            <input className="input" type="number" value={toNumber(draft.busbar_length_mm)} onChange={(e) => updateField("busbar_length_mm", Number(e.target.value))} />
-          </label>
-          <label className="field">
-            <span>Faz Sayisi</span>
-            <input className="input" type="number" min={1} max={5} value={toNumber(draft.busbar_phase_count)} onChange={(e) => updateField("busbar_phase_count", Number(e.target.value))} />
-          </label>
-          <label className="field">
-            <span>Faz Basina Bar</span>
-            <input className="input" type="number" min={1} value={toNumber(draft.bars_per_phase)} onChange={(e) => updateField("bars_per_phase", Number(e.target.value))} />
-          </label>
-          <label className="field">
-            <span>Ayni Faz Bar Boslugu (mm)</span>
-            <input className="input" type="number" min={0} value={toNumber(draft.bar_gap_mm)} onChange={(e) => updateField("bar_gap_mm", Number(e.target.value))} />
-          </label>
-        </div>
-
-        <div className="form-actions" style={{ marginTop: "1rem" }}>
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={!draft.main_width_mm || !draft.main_thickness_mm || saveMutation.isPending}
-            onClick={() => saveMutation.mutate({ ...EMPTY_SETTINGS, ...draft })}
-          >
-            {saveMutation.isPending ? "Kaydediliyor..." : "Ana Bakiri Kaydet"}
-          </button>
-          {selectedDefinition && (
-            <span style={{ color: "var(--muted)", fontSize: "0.85rem", alignSelf: "center" }}>
-              Secili tanim: <strong style={{ color: "var(--text)" }}>{selectedDefinition.name}</strong>
+      {/* ──────────────── SOL KOLON — Form ──────────────── */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <section className="table-card">
+          <div className="section-header">
+            <h3 style={{ margin: 0 }}>Ana Bakır Seçimi</h3>
+            <span className="helper-text" style={{ fontSize: "0.82rem" }}>
+              Seçilen tanım tüm alanları doldurur; proje özgü konum, yön ve uzunluk burada düzenlenebilir.
             </span>
-          )}
-        </div>
-      </section>
+          </div>
 
-      <TechnicalDrawingView
-        panel={panelQuery.data}
-        projectPanels={projectPanelsQuery.data ?? []}
-        devices={projectDevicesQuery.data ?? []}
-        copperSettings={draft}
-        title="Ana Bakir Teknik Gorunumu"
-      />
+          <div className="form-grid" style={{ marginTop: "1rem" }}>
+            {/* Kütüphane tanımı */}
+            <label className="field" style={{ gridColumn: "1 / -1" }}>
+              <span>Ana Bakır Tanımı</span>
+              <select
+                className="input"
+                value={draft.main_copper_definition_id ?? ""}
+                onChange={(event) => handleDefinitionChange(Number(event.target.value))}
+              >
+                <option value="">— Seçin —</option>
+                {definitions.map((definition) => (
+                  <option key={definition.id} value={definition.id}>
+                    {definition.name} — {definition.main_width_mm ?? "?"} × {definition.main_thickness_mm ?? "?"} mm
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {/* Kesit */}
+            <label className="field">
+              <span>Genişlik (mm)</span>
+              <input className="input" type="number" value={toNumber(draft.main_width_mm)}
+                onChange={(e) => updateField("main_width_mm", Number(e.target.value))} />
+            </label>
+            <label className="field">
+              <span>Kalınlık (mm)</span>
+              <input className="input" type="number" value={toNumber(draft.main_thickness_mm)}
+                onChange={(e) => updateField("main_thickness_mm", Number(e.target.value))} />
+            </label>
+            <label className="field">
+              <span>Malzeme</span>
+              <select className="input" value={draft.main_material ?? "Cu"}
+                onChange={(e) => updateField("main_material", e.target.value)}>
+                <option value="Cu">Cu</option>
+                <option value="Al">Al</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>Faz Aralığı (mm)</span>
+              <input className="input" type="number" value={toNumber(draft.main_phase_spacing_mm)}
+                onChange={(e) => updateField("main_phase_spacing_mm", Number(e.target.value))} />
+            </label>
+
+            {/* Konum */}
+            <label className="field">
+              <span>X — Başlangıç (mm)</span>
+              <input className="input" type="number" value={toNumber(draft.busbar_x_mm)}
+                onChange={(e) => updateField("busbar_x_mm", Number(e.target.value))} />
+            </label>
+            <label className="field">
+              <span>Y — Alttan mesafe (mm)</span>
+              <input className="input" type="number" value={toNumber(draft.busbar_y_mm)}
+                onChange={(e) => updateField("busbar_y_mm", Number(e.target.value))} />
+            </label>
+            <label className="field">
+              <span>Z — Ön yüzeyden (mm)</span>
+              <input className="input" type="number" value={toNumber(draft.busbar_z_mm)}
+                onChange={(e) => updateField("busbar_z_mm", Number(e.target.value))} />
+            </label>
+            <label className="field">
+              <span>Yön</span>
+              <select className="input" value={draft.busbar_orientation ?? "horizontal"}
+                onChange={(e) => updateField("busbar_orientation", e.target.value)}>
+                <option value="horizontal">Yatay</option>
+                <option value="vertical">Dikey</option>
+              </select>
+            </label>
+
+            {/* Boyut + faz */}
+            <label className="field">
+              <span>Uzunluk (mm)</span>
+              <input className="input" type="number" value={toNumber(draft.busbar_length_mm)}
+                onChange={(e) => updateField("busbar_length_mm", Number(e.target.value))} />
+            </label>
+            <label className="field">
+              <span>Faz Sayısı</span>
+              <input className="input" type="number" min={1} max={5} value={toNumber(draft.busbar_phase_count)}
+                onChange={(e) => updateField("busbar_phase_count", Number(e.target.value))} />
+            </label>
+            <label className="field">
+              <span>Faz Başına Bar</span>
+              <input className="input" type="number" min={1} value={toNumber(draft.bars_per_phase)}
+                onChange={(e) => updateField("bars_per_phase", Number(e.target.value))} />
+            </label>
+            <label className="field">
+              <span>Aynı Faz Bar Boşluğu (mm)</span>
+              <input className="input" type="number" min={0} value={toNumber(draft.bar_gap_mm)}
+                onChange={(e) => updateField("bar_gap_mm", Number(e.target.value))} />
+            </label>
+          </div>
+
+          <div className="form-actions" style={{ marginTop: "1rem" }}>
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={!draft.main_width_mm || !draft.main_thickness_mm || saveMutation.isPending}
+              onClick={() => saveMutation.mutate({ ...EMPTY_SETTINGS, ...draft })}
+            >
+              {saveMutation.isPending ? "Kaydediliyor…" : "Ana Bakırı Kaydet"}
+            </button>
+            {selectedDefinition && (
+              <span style={{ color: "var(--muted)", fontSize: "0.85rem", alignSelf: "center" }}>
+                Seçili tanım: <strong style={{ color: "var(--text)" }}>{selectedDefinition.name}</strong>
+              </span>
+            )}
+            {saveMutation.isSuccess && (
+              <span style={{ color: "#22c55e", fontSize: "0.82rem", alignSelf: "center" }}>✓ Kaydedildi</span>
+            )}
+          </div>
+        </section>
+      </div>
+
+      {/* ──────────────── SAĞ KOLON — Ortografik Önizleme ──────────────── */}
+      <div style={{ position: "sticky", top: "1rem" }}>
+        <CopperOrthographicPreview
+          panel={panelQuery.data}
+          projectPanels={projectPanelsQuery.data ?? []}
+          copperSettings={draft}
+        />
+      </div>
     </div>
   );
 }
