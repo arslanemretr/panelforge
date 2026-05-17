@@ -10,7 +10,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { client } from "../api/client";
-import { DeviceTechDrawing } from "../components/DeviceTechDrawing";
+import { DeviceOrthographicPreview } from "../components/DeviceOrthographicPreview";
 import type { Device, DeviceTerminal, TerminalDefinition } from "../types";
 
 // ── Yardımcı: boş terminal satırı ────────────────────────────────────────────
@@ -115,6 +115,7 @@ export function DeviceEditorPage() {
     emptyTerminal("L2", "L2", 90),
     emptyTerminal("L3", "L3", 150),
   ]);
+  const [activeTerminalIdx, setActiveTerminalIdx] = useState<number | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   // Düzenleme/kopyalama modunda mevcut veriyi yükle
@@ -270,7 +271,7 @@ export function DeviceEditorPage() {
     : "Yeni Cihaz Tanımla";
 
   return (
-    <form className="stack" onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
       {/* ── Başlık ──────────────────────────────────────────────────────────── */}
       <section className="card page-heading">
         <div>
@@ -293,306 +294,332 @@ export function DeviceEditorPage() {
 
       {saveError && <div className="alert alert-warning">{saveError}</div>}
 
-      {/* ── Şalter Bilgileri ─────────────────────────────────────────────────── */}
-      <section className="card">
-        <h3 style={{ margin: "0 0 1rem", fontSize: "0.95rem", color: "var(--accent)" }}>
-          Şalter Bilgileri
-        </h3>
-        <div className="form-grid">
-          <label>
-            <span>Marka</span>
-            <input
-              required
-              value={form.brand}
-              onChange={(e) => updateField("brand", e.target.value)}
-              placeholder="ABB, Schneider…"
-            />
-          </label>
-          <label>
-            <span>Model</span>
-            <input
-              required
-              value={form.model}
-              onChange={(e) => updateField("model", e.target.value)}
-              placeholder="Emax, Compact…"
-            />
-          </label>
-          <label>
-            <span>Cihaz Tipi</span>
-            <input
-              required
-              value={form.device_type}
-              onChange={(e) => updateField("device_type", e.target.value)}
-              placeholder="Ana Şalter, Kompak Şalter…"
-            />
-          </label>
-          <label>
-            <span>Kasa Tipi</span>
-            <select
-              value={form.enclosure_type}
-              onChange={(e) => updateField("enclosure_type", e.target.value)}
-            >
-              <option value="">— Seçin —</option>
-              {ENCLOSURE_TYPES.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>Referans Nokta</span>
-            <select
-              value={form.reference_origin}
-              onChange={(e) => updateField("reference_origin", e.target.value)}
-            >
-              {REFERENCE_ORIGINS.map((o) => (
-                <option key={o} value={o}>{o}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>Kutup</span>
-            <input
-              type="number"
-              min={1}
-              max={5}
-              value={form.poles}
-              onChange={(e) => updateField("poles", Number(e.target.value))}
-            />
-          </label>
-          <label>
-            <span>Anma Akımı (A)</span>
-            <input
-              type="number"
-              min={0}
-              value={form.current_a}
-              onChange={(e) => updateField("current_a", Number(e.target.value))}
-            />
-          </label>
-          <label>
-            <span>Genişlik X (mm)</span>
-            <input
-              type="number"
-              min={1}
-              required
-              value={form.width_mm}
-              onChange={(e) => updateField("width_mm", Number(e.target.value))}
-            />
-          </label>
-          <label>
-            <span>Yükseklik Y (mm)</span>
-            <input
-              type="number"
-              min={1}
-              required
-              value={form.height_mm}
-              onChange={(e) => updateField("height_mm", Number(e.target.value))}
-            />
-          </label>
-          <label>
-            <span>Derinlik Z (mm)</span>
-            <input
-              type="number"
-              min={0}
-              value={form.depth_mm}
-              onChange={(e) => updateField("depth_mm", Number(e.target.value))}
-            />
-          </label>
-        </div>
-      </section>
+      {/* ── 2 Kolonlu Ana Düzen ─────────────────────────────────────────────── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem", alignItems: "start" }}>
 
-      {/* ── Terminal Tablosu ─────────────────────────────────────────────────── */}
-      <section className="card">
-        <div className="section-header">
-          <h3 style={{ margin: 0, fontSize: "0.95rem", color: "var(--accent)" }}>
-            Terminal Bilgileri
-            <span style={{ marginLeft: "0.6rem", fontSize: "0.75rem", fontWeight: 400, color: "var(--muted)" }}>
-              {terminals.length} terminal
-            </span>
-          </h3>
-          <button type="button" className="ghost" onClick={addTerminal}>
-            + Terminal Ekle
-          </button>
-        </div>
+        {/* ── Sol Kolon: Formlar ──────────────────────────────────────────── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
 
-        <div style={{ overflowX: "auto", marginTop: "0.5rem" }}>
-          <table style={{ minWidth: 860, borderCollapse: "collapse", fontSize: "0.82rem" }}>
-            <thead>
-              <tr>
-                <th colSpan={3} style={thGroupStyle("rgba(255,138,61,0.18)")}>Referans</th>
-                <th colSpan={3} style={thGroupStyle("rgba(96,165,250,0.18)")}>Koordinat (mm)</th>
-                <th colSpan={3} style={thGroupStyle("rgba(161,188,220,0.1)")}>Bağlantı</th>
-                <th style={{ padding: "0.4rem 0.5rem" }}></th>
-              </tr>
-              <tr style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-                <Th>Referans</Th>
-                <Th>Faz</Th>
-                <Th>Terminal Tipi</Th>
-                <Th>X</Th>
-                <Th>Y</Th>
-                <Th>Z</Th>
-                <Th>Yüzey</Th>
-                <Th>Rol</Th>
-                <Th>Grup</Th>
-                <th style={{ padding: "0.4rem 0.5rem" }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {terminals.map((t, idx) => {
-                const selectedDef = t.terminal_definition_id
-                  ? terminalDefs.find((d) => d.id === t.terminal_definition_id)
-                  : null;
-                return (
-                  <tr
-                    key={idx}
-                    style={{
-                      borderBottom: "1px solid var(--line)",
-                      background: idx % 2 === 0 ? "transparent" : "rgba(161,188,220,0.03)",
-                    }}
-                  >
-                    {/* Referans adı */}
-                    <Td>
-                      <input
-                        style={cellInput}
-                        value={t.terminal_name}
-                        onChange={(e) => updateTerminal(idx, "terminal_name", e.target.value)}
-                        placeholder="L1.1"
-                      />
-                    </Td>
-                    {/* Faz */}
-                    <Td>
-                      <select
-                        style={cellInput}
-                        value={t.phase}
-                        onChange={(e) => updateTerminal(idx, "phase", e.target.value)}
-                      >
-                        {PHASES.map((p) => <option key={p} value={p}>{p}</option>)}
-                      </select>
-                    </Td>
-                    {/* Terminal Tipi dropdown */}
-                    <Td>
-                      <select
-                        style={{ ...cellInput, minWidth: 160 }}
-                        value={t.terminal_definition_id ?? ""}
-                        onChange={(e) =>
-                          updateTerminal(
-                            idx,
-                            "terminal_definition_id",
-                            e.target.value === "" ? null : Number(e.target.value),
-                          )
-                        }
-                        title={selectedDef ? termDefSummary(selectedDef) : ""}
-                      >
-                        <option value="">— Seçin —</option>
-                        {terminalDefs.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.name}
-                          </option>
-                        ))}
-                      </select>
-                    </Td>
-                    {/* Koordinatlar */}
-                    <Td>
-                      <NumInput value={t.x_mm} onChange={(v) => updateTerminal(idx, "x_mm", v)} />
-                    </Td>
-                    <Td>
-                      <NumInput value={t.y_mm} onChange={(v) => updateTerminal(idx, "y_mm", v)} />
-                    </Td>
-                    <Td>
-                      <NumInput value={t.z_mm ?? 0} onChange={(v) => updateTerminal(idx, "z_mm", v)} />
-                    </Td>
-                    {/* Yüzey */}
-                    <Td>
-                      <select
-                        style={cellInput}
-                        value={t.terminal_face ?? ""}
-                        onChange={(e) => updateTerminal(idx, "terminal_face", e.target.value || null)}
-                      >
-                        {FACES.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
-                      </select>
-                    </Td>
-                    {/* Rol */}
-                    <Td>
-                      <select
-                        style={cellInput}
-                        value={t.terminal_role ?? ""}
-                        onChange={(e) => updateTerminal(idx, "terminal_role", e.target.value || null)}
-                      >
-                        <option value="">—</option>
-                        <option value="input">Giriş</option>
-                        <option value="output">Çıkış</option>
-                      </select>
-                    </Td>
-                    {/* Grup */}
-                    <Td>
-                      <select
-                        style={cellInput}
-                        value={t.terminal_group ?? ""}
-                        onChange={(e) => updateTerminal(idx, "terminal_group", e.target.value || null)}
-                      >
-                        <option value="">—</option>
-                        <option value="line">Hat</option>
-                        <option value="load">Yük</option>
-                        <option value="bus">Bara</option>
-                        <option value="branch">Tali</option>
-                      </select>
-                    </Td>
-                    {/* Sil */}
-                    <Td>
-                      <button
-                        type="button"
-                        className="ghost danger"
-                        style={{ padding: "0.2rem 0.5rem", fontSize: "0.8rem" }}
-                        onClick={() => removeTerminal(idx)}
-                        title="Terminali sil"
-                      >
-                        ✕
-                      </button>
-                    </Td>
+          {/* Şalter Bilgileri */}
+          <section className="card">
+            <h3 style={{ margin: "0 0 1rem", fontSize: "0.95rem", color: "var(--accent)" }}>
+              Şalter Bilgileri
+            </h3>
+            <div className="form-grid">
+              <label>
+                <span>Marka</span>
+                <input
+                  required
+                  value={form.brand}
+                  onChange={(e) => updateField("brand", e.target.value)}
+                  placeholder="ABB, Schneider…"
+                />
+              </label>
+              <label>
+                <span>Model</span>
+                <input
+                  required
+                  value={form.model}
+                  onChange={(e) => updateField("model", e.target.value)}
+                  placeholder="Emax, Compact…"
+                />
+              </label>
+              <label>
+                <span>Cihaz Tipi</span>
+                <input
+                  required
+                  value={form.device_type}
+                  onChange={(e) => updateField("device_type", e.target.value)}
+                  placeholder="Ana Şalter, Kompak Şalter…"
+                />
+              </label>
+              <label>
+                <span>Kasa Tipi</span>
+                <select
+                  value={form.enclosure_type}
+                  onChange={(e) => updateField("enclosure_type", e.target.value)}
+                >
+                  <option value="">— Seçin —</option>
+                  {ENCLOSURE_TYPES.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Referans Nokta</span>
+                <select
+                  value={form.reference_origin}
+                  onChange={(e) => updateField("reference_origin", e.target.value)}
+                >
+                  {REFERENCE_ORIGINS.map((o) => (
+                    <option key={o} value={o}>{o}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Kutup</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={5}
+                  value={form.poles}
+                  onChange={(e) => updateField("poles", Number(e.target.value))}
+                />
+              </label>
+              <label>
+                <span>Anma Akımı (A)</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={form.current_a}
+                  onChange={(e) => updateField("current_a", Number(e.target.value))}
+                />
+              </label>
+              <label>
+                <span>Genişlik X (mm)</span>
+                <input
+                  type="number"
+                  min={1}
+                  required
+                  value={form.width_mm}
+                  onChange={(e) => updateField("width_mm", Number(e.target.value))}
+                />
+              </label>
+              <label>
+                <span>Yükseklik Y (mm)</span>
+                <input
+                  type="number"
+                  min={1}
+                  required
+                  value={form.height_mm}
+                  onChange={(e) => updateField("height_mm", Number(e.target.value))}
+                />
+              </label>
+              <label>
+                <span>Derinlik Z (mm)</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={form.depth_mm}
+                  onChange={(e) => updateField("depth_mm", Number(e.target.value))}
+                />
+              </label>
+            </div>
+          </section>
+
+          {/* Terminal Tablosu */}
+          <section className="card">
+            <div className="section-header">
+              <h3 style={{ margin: 0, fontSize: "0.95rem", color: "var(--accent)" }}>
+                Terminal Bilgileri
+                <span style={{ marginLeft: "0.6rem", fontSize: "0.75rem", fontWeight: 400, color: "var(--muted)" }}>
+                  {terminals.length} terminal
+                  {activeTerminalIdx !== null && (
+                    <span style={{ marginLeft: "0.4rem", color: "var(--accent)" }}>
+                      — {terminals[activeTerminalIdx]?.terminal_name} seçili
+                    </span>
+                  )}
+                </span>
+              </h3>
+              <button type="button" className="ghost" onClick={addTerminal}>
+                + Terminal Ekle
+              </button>
+            </div>
+
+            <div style={{ overflowX: "auto", marginTop: "0.5rem" }}>
+              <table style={{ minWidth: 700, borderCollapse: "collapse", fontSize: "0.82rem" }}>
+                <thead>
+                  <tr>
+                    <th colSpan={3} style={thGroupStyle("rgba(255,138,61,0.18)")}>Referans</th>
+                    <th colSpan={3} style={thGroupStyle("rgba(96,165,250,0.18)")}>Koordinat (mm)</th>
+                    <th colSpan={3} style={thGroupStyle("rgba(161,188,220,0.1)")}>Bağlantı</th>
+                    <th style={{ padding: "0.4rem 0.5rem" }}></th>
                   </tr>
-                );
-              })}
-              {terminals.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={10}
-                    style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}
-                  >
-                    Terminal yok — "Terminal Ekle" butonuna tıklayın
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                  <tr style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                    <Th>Referans</Th>
+                    <Th>Faz</Th>
+                    <Th>Terminal Tipi</Th>
+                    <Th>X</Th>
+                    <Th>Y</Th>
+                    <Th>Z</Th>
+                    <Th>Yüzey</Th>
+                    <Th>Rol</Th>
+                    <Th>Grup</Th>
+                    <th style={{ padding: "0.4rem 0.5rem" }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {terminals.map((t, idx) => {
+                    const selectedDef = t.terminal_definition_id
+                      ? terminalDefs.find((d) => d.id === t.terminal_definition_id)
+                      : null;
+                    const isActive = activeTerminalIdx === idx;
+                    return (
+                      <tr
+                        key={idx}
+                        onClick={() => setActiveTerminalIdx(isActive ? null : idx)}
+                        style={{
+                          borderBottom: "1px solid var(--line)",
+                          background: isActive
+                            ? "rgba(34,211,238,0.07)"
+                            : idx % 2 === 0 ? "transparent" : "rgba(161,188,220,0.03)",
+                          cursor: "pointer",
+                          outline: isActive ? "1px solid rgba(34,211,238,0.35)" : "none",
+                          outlineOffset: -1,
+                          transition: "background 0.12s",
+                        }}
+                      >
+                        {/* Referans adı */}
+                        <Td>
+                          <input
+                            style={cellInput}
+                            value={t.terminal_name}
+                            onChange={(e) => updateTerminal(idx, "terminal_name", e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            placeholder="L1.1"
+                          />
+                        </Td>
+                        {/* Faz */}
+                        <Td>
+                          <select
+                            style={cellInput}
+                            value={t.phase}
+                            onChange={(e) => updateTerminal(idx, "phase", e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {PHASES.map((p) => <option key={p} value={p}>{p}</option>)}
+                          </select>
+                        </Td>
+                        {/* Terminal Tipi dropdown */}
+                        <Td>
+                          <select
+                            style={{ ...cellInput, minWidth: 140 }}
+                            value={t.terminal_definition_id ?? ""}
+                            onChange={(e) =>
+                              updateTerminal(
+                                idx,
+                                "terminal_definition_id",
+                                e.target.value === "" ? null : Number(e.target.value),
+                              )
+                            }
+                            onClick={(e) => e.stopPropagation()}
+                            title={selectedDef ? termDefSummary(selectedDef) : ""}
+                          >
+                            <option value="">— Seçin —</option>
+                            {terminalDefs.map((d) => (
+                              <option key={d.id} value={d.id}>
+                                {d.name}
+                              </option>
+                            ))}
+                          </select>
+                        </Td>
+                        {/* Koordinatlar */}
+                        <Td>
+                          <NumInput value={t.x_mm} onChange={(v) => updateTerminal(idx, "x_mm", v)}
+                            onClick={(e: React.MouseEvent) => e.stopPropagation()} />
+                        </Td>
+                        <Td>
+                          <NumInput value={t.y_mm} onChange={(v) => updateTerminal(idx, "y_mm", v)}
+                            onClick={(e: React.MouseEvent) => e.stopPropagation()} />
+                        </Td>
+                        <Td>
+                          <NumInput value={t.z_mm ?? 0} onChange={(v) => updateTerminal(idx, "z_mm", v)}
+                            onClick={(e: React.MouseEvent) => e.stopPropagation()} />
+                        </Td>
+                        {/* Yüzey */}
+                        <Td>
+                          <select
+                            style={cellInput}
+                            value={t.terminal_face ?? ""}
+                            onChange={(e) => updateTerminal(idx, "terminal_face", e.target.value || null)}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {FACES.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+                          </select>
+                        </Td>
+                        {/* Rol */}
+                        <Td>
+                          <select
+                            style={cellInput}
+                            value={t.terminal_role ?? ""}
+                            onChange={(e) => updateTerminal(idx, "terminal_role", e.target.value || null)}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <option value="">—</option>
+                            <option value="input">Giriş</option>
+                            <option value="output">Çıkış</option>
+                          </select>
+                        </Td>
+                        {/* Grup */}
+                        <Td>
+                          <select
+                            style={cellInput}
+                            value={t.terminal_group ?? ""}
+                            onChange={(e) => updateTerminal(idx, "terminal_group", e.target.value || null)}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <option value="">—</option>
+                            <option value="line">Hat</option>
+                            <option value="load">Yük</option>
+                            <option value="bus">Bara</option>
+                            <option value="branch">Tali</option>
+                          </select>
+                        </Td>
+                        {/* Sil */}
+                        <Td>
+                          <button
+                            type="button"
+                            className="ghost danger"
+                            style={{ padding: "0.2rem 0.5rem", fontSize: "0.8rem" }}
+                            onClick={(e) => { e.stopPropagation(); removeTerminal(idx); }}
+                            title="Terminali sil"
+                          >
+                            ✕
+                          </button>
+                        </Td>
+                      </tr>
+                    );
+                  })}
+                  {terminals.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={10}
+                        style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}
+                      >
+                        Terminal yok — "Terminal Ekle" butonuna tıklayın
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {/* Alt Kaydet Butonları */}
+          <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => navigate("/definitions/devices")}
+            >
+              ← Geri
+            </button>
+            <button type="submit" disabled={isPending}>
+              {isPending ? "Kaydediliyor…" : isEdit ? "Değişiklikleri Kaydet" : "Cihaz Ekle"}
+            </button>
+          </div>
         </div>
-      </section>
 
-      {/* ── Teknik Çizim ─────────────────────────────────────────────────────── */}
-      <section className="card">
-        <h3 style={{ margin: "0 0 1rem", fontSize: "0.95rem", color: "var(--accent)" }}>
-          Teknik Çizim — Canlı Önizleme
-        </h3>
-        <DeviceTechDrawing
-          widthMm={form.width_mm}
-          heightMm={form.height_mm}
-          depthMm={form.depth_mm}
-          terminals={terminalsForDrawing}
-          terminalDefs={terminalDefs}
-          height={960}
-        />
-      </section>
-
-      {/* ── Alt Kaydet Butonu ────────────────────────────────────────────────── */}
-      <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
-        <button
-          type="button"
-          className="ghost"
-          onClick={() => navigate("/definitions/devices")}
-        >
-          ← Geri
-        </button>
-        <button type="submit" disabled={isPending}>
-          {isPending ? "Kaydediliyor…" : isEdit ? "Değişiklikleri Kaydet" : "Cihaz Ekle"}
-        </button>
+        {/* ── Sağ Kolon: 4 Görünüm Önizleme ─────────────────────────────── */}
+        <div style={{ position: "sticky", top: "1rem" }}>
+          <DeviceOrthographicPreview
+            widthMm={form.width_mm}
+            heightMm={form.height_mm}
+            depthMm={form.depth_mm}
+            terminals={terminalsForDrawing}
+            activeIdx={activeTerminalIdx}
+          />
+        </div>
       </div>
     </form>
   );
@@ -622,11 +649,13 @@ function Td({ children }: { children: React.ReactNode }) {
 function NumInput({
   value,
   onChange,
+  onClick,
   placeholder = "0",
   step = "any",
 }: {
   value: number;
   onChange: (v: number) => void;
+  onClick?: (e: React.MouseEvent) => void;
   placeholder?: string;
   step?: string | number;
 }) {
@@ -638,6 +667,7 @@ function NumInput({
       value={value}
       placeholder={placeholder}
       onChange={(e) => onChange(Number(e.target.value))}
+      onClick={onClick}
     />
   );
 }
