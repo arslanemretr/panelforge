@@ -70,6 +70,13 @@ export const client = {
     projectId: number,
     payload: { copper_definition_id: number; length_mm: number; quantity: number },
   ) => (await api.post<ProjectCopper>(`/projects/${projectId}/copper-layout`, payload)).data,
+  updateProjectCopper: async (
+    projectId: number,
+    copperId: number,
+    payload: Partial<Omit<ProjectCopper, "id" | "project_id" | "seq" | "copper_definition" | "phase_type">>,
+  ) => (await api.put<ProjectCopper>(`/projects/${projectId}/copper-layout/${copperId}`, payload)).data,
+  resetProjectCopperFromLibrary: async (projectId: number, copperId: number) =>
+    (await api.post<ProjectCopper>(`/projects/${projectId}/copper-layout/${copperId}/reset`, {})).data,
   deleteProjectCopper: async (projectId: number, copperId: number) =>
     api.delete(`/projects/${projectId}/copper-layout/${copperId}`),
 

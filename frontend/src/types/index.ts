@@ -324,6 +324,21 @@ export interface ProjectCopper {
   quantity: number;
   seq: number;
   copper_definition: CopperDefinition;
+
+  // Proje özgü geometri (kütüphaneden kopyalanır, düzenlenebilir)
+  main_width_mm?: number | null;
+  main_thickness_mm?: number | null;
+  busbar_x_mm?: number | null;
+  busbar_y_mm?: number | null;
+  busbar_z_mm?: number | null;
+  busbar_orientation?: string | null;
+  phase_type_id?: number | null;
+  phase_type?: PhaseType | null;
+  bars_per_phase?: number | null;
+  bar_gap_mm?: number | null;
+  phase_center_mm?: number | null;
+  layer_type?: string | null;
+  neutral_bar_count?: number | null;
 }
 
 export interface CopperSettings {

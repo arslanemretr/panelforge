@@ -14,7 +14,7 @@
  *   Z → derinlik, ön yüzeyden arka yüzeye (0 = ön)
  */
 
-import type { CopperSettings, Panel, ProjectDevice, ProjectPanel } from "../../types";
+import type { CopperSettings, Panel, ProjectCopper, ProjectDevice, ProjectPanel } from "../../types";
 
 // ── Bar koordinat satırı ──────────────────────────────────────────────────────
 
@@ -28,6 +28,9 @@ export interface BarRow {
   yCenter: number;   // mm, bar Y merkezi (alttan)
   zCenter: number;   // mm, bar Z merkezi (ön yüzeyden)
   length: number;    // mm
+  width_mm: number;  // mm, bar genişliği (Y ekseninde)
+  thickness_mm: number; // mm, bar kalınlığı (Z ekseninde)
+  copperIndex?: number; // hangi ProjectCopper'a ait (çoklu bakır için)
 }
 
 /**
@@ -61,16 +64,65 @@ export function computeBarTable(cs: CopperSettings): BarRow[] {
       const zCenter = baseZ + barT / 2 + globalIndex * barStep;
 
       rows.push({
-        key:     `${PHASE_LABELS[pi]}-B${bi + 1}`,
-        phase:   PHASE_LABELS[pi],
-        barNo:   bi + 1,
+        key:          `${PHASE_LABELS[pi]}-B${bi + 1}`,
+        phase:        PHASE_LABELS[pi],
+        barNo:        bi + 1,
         xStart,
-        yCenter: Math.round(yCenter * 10) / 10,
-        zCenter: Math.round(zCenter * 10) / 10,
+        yCenter:      Math.round(yCenter * 10) / 10,
+        zCenter:      Math.round(zCenter * 10) / 10,
         length,
+        width_mm:     barW,
+        thickness_mm: barT,
       });
     }
   }
+
+  return rows;
+}
+
+/**
+ * ProjectCopper kaydından BarRow listesi hesaplar.
+ * Proje özgü alanlar öncelikli; eksikse kütüphane tanımından alır.
+ * copperIndex: hangi ProjectCopper'a ait (birden fazla bakır olduğunda)
+ */
+export function projectCopperToBarRows(pc: ProjectCopper, copperIndex = 0): BarRow[] {
+  const def = pc.copper_definition;
+
+  // Faz sayısını phase_type'dan çıkar — "L1,L2,L3" veya "L1,L2,L3,N" gibi
+  const phaseStr = pc.phase_type?.phases ?? def.phase_type?.phases ?? "L1,L2,L3";
+  const phases = phaseStr.split(",").map((p) => p.trim()).filter(Boolean);
+
+  const barsPerPhase = Number(pc.bars_per_phase ?? def.bars_per_phase ?? 1);
+
+  const cs: CopperSettings = {
+    main_material: def.main_material ?? "Cu",
+    branch_material: def.branch_material ?? "Cu",
+    use_slot_holes: def.use_slot_holes ?? false,
+    busbar_orientation: (pc.busbar_orientation ?? def.busbar_orientation ?? "horizontal") as string,
+    busbar_plane: "XY",
+    phase_stack_axis: "Y",
+
+    main_width_mm: Number(pc.main_width_mm ?? def.main_width_mm ?? 40),
+    main_thickness_mm: Number(pc.main_thickness_mm ?? def.main_thickness_mm ?? 5),
+    main_phase_spacing_mm: Number(pc.phase_center_mm ?? def.phase_center_mm ?? def.main_phase_spacing_mm ?? 60),
+    busbar_x_mm: Number(pc.busbar_x_mm ?? def.busbar_x_mm ?? 0),
+    busbar_y_mm: Number(pc.busbar_y_mm ?? def.busbar_y_mm ?? 0),
+    busbar_z_mm: Number(pc.busbar_z_mm ?? def.busbar_z_mm ?? 0),
+    busbar_length_mm: Number(pc.length_mm ?? 0),
+    busbar_phase_count: phases.length,
+    bars_per_phase: barsPerPhase,
+    bar_gap_mm: Number(pc.bar_gap_mm ?? def.bar_gap_mm ?? 0),
+  };
+
+  const rows = computeBarTable(cs);
+
+  // Faz etiketlerini gerçek faz isimlerine göre güncelle
+  rows.forEach((row, i) => {
+    const pi = Math.floor(i / barsPerPhase);
+    row.phase = phases[pi] ?? row.phase;
+    row.key = `${row.phase}-B${row.barNo}`;
+    row.copperIndex = copperIndex;
+  });
 
   return rows;
 }

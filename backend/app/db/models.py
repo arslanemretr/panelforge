@@ -124,8 +124,23 @@ class ProjectCopper(Base):
     quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     seq: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
+    # Proje özgü bakır geometrisi (kütüphaneden kopyalanır, proje içinde düzenlenebilir)
+    main_width_mm: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
+    main_thickness_mm: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
+    busbar_x_mm: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
+    busbar_y_mm: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
+    busbar_z_mm: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
+    busbar_orientation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    phase_type_id: Mapped[int | None] = mapped_column(ForeignKey("phase_types.id", ondelete="SET NULL"), nullable=True)
+    bars_per_phase: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    bar_gap_mm: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
+    phase_center_mm: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
+    layer_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    neutral_bar_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
     project: Mapped["Project"] = relationship(back_populates="copper_layout_items")
     copper_definition: Mapped["CopperDefinition"] = relationship(back_populates="project_layout_items")
+    phase_type: Mapped["PhaseType | None"] = relationship(foreign_keys=[phase_type_id])
 
 
 class Panel(Base):
