@@ -368,15 +368,15 @@ export function TerminalFormPage() {
     && pz + hd / 2 > fl + 0.001
     ? `posZ(${pz})+Ø/2(${hd/2}) = ${(pz + hd/2).toFixed(1)} > fin_uzunluk(${fl})` : undefined;
 
-  // E — Çap ≤ fin kalınlığı
-  const hdFinErr = isAYT && hd != null && ft != null && hd > ft + 0.001
-    ? `Ø(${hd}) > fin_kalınlık(${ft})` : undefined;
+  // NOT: Ø ≤ fin_kalınlık kısıtı geçersiz.
+  // Bolt Y yönünde finin tamamını geçtiğinden (tepeden tabana) fin_thickness hole'u sınırlamaz.
+  // Hole'u sınırlayan: X boşluğu (boltLeftErr/boltRightErr) ve Z boşluğu (boltZFrontErr/boltZBackErr).
 
   // Tüm AYT hataları — submit engeli
   const aytErrors = isAYT ? [
     depthError, finBlockErr, offsetErr, spacingErr,
     boltRightErr, boltLeftErr, bspErr,
-    boltZFrontErr, boltZBackErr, hdFinErr,
+    boltZFrontErr, boltZBackErr,
   ].filter(Boolean) as string[] : [];
   const hasAytErrors = aytErrors.length > 0;
   const aytErrorTooltip = hasAytErrors
@@ -506,8 +506,8 @@ export function TerminalFormPage() {
               {holeMode === "round" ? (
                 <NumField label="Delik Çapı" unit="mm" min={0}
                   value={draft.hole_diameter_mm}
-                  hint={isAYT ? "≤ fin_kalınlık;  ≤ vida_aralığı" : undefined}
-                  error={isAYT ? (hdFinErr ?? bspErr) : undefined}
+                  hint={isAYT ? "≤ vida_aralığı  (delikler örtüşmesin)" : undefined}
+                  error={isAYT ? bspErr : undefined}
                   onChange={(v) => set("hole_diameter_mm", v)} />
               ) : (
                 <>
@@ -638,8 +638,8 @@ export function TerminalFormPage() {
                   onChange={(v) => set("fin_spacing_mm", v)} />
                 <NumField label="Fin Kalınlığı" unit="mm" min={0}
                   value={draft.fin_thickness_mm}
-                  hint={isAYT ? "≤ fin_aralık;  ≤ Ø (delik çapı)" : undefined}
-                  error={isAYT ? (spacingErr ?? hdFinErr) : undefined}
+                  hint={isAYT ? "≤ fin_aralık  (finler örtüşmesin)" : undefined}
+                  error={isAYT ? spacingErr : undefined}
                   onChange={(v) => set("fin_thickness_mm", v)} />
                 <NumField label="İlk Fin Boşluğu (üstten)" unit="mm" min={0}
                   value={draft.fin_offset_mm}
