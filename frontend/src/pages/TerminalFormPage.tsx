@@ -351,32 +351,50 @@ export function TerminalFormPage() {
   const spacingErr   = isAYT && ft != null && fs != null && fs < ft - 0.001
     ? `fin_aralık(${fs}) < fin_kalınlık(${ft})` : undefined;
 
-  // C — Genişlik: vida konumları X içinde
-  const lastBoltX    = px != null && bsp != null ? px + (bn - 1) * bsp : null;
-  const boltRightErr = isAYT && W != null && lastBoltX != null && hd != null
-    && lastBoltX + hd / 2 > W + 0.001
-    ? `posX(${px})+(${bn}-1)×aralık(${bsp})+Ø/2(${hd/2}) = ${(lastBoltX + hd/2).toFixed(1)} > W(${W})` : undefined;
+  // C — Genişlik: sadece tek vida X konumu (bsp Z yönünde, X'i etkilemez)
+  const boltRightErr = isAYT && W != null && px != null && hd != null
+    && px + hd / 2 > W + 0.001
+    ? `posX(${px}) + Ø/2(${hd/2}) = ${(px + hd/2).toFixed(1)} > W(${W})` : undefined;
   const boltLeftErr  = isAYT && px != null && hd != null && px < hd / 2 - 0.001
     ? `posX(${px}) < Ø/2(${hd/2})` : undefined;
-  const bspErr       = isAYT && bn > 1 && bsp != null && hd != null && bsp < hd - 0.001
-    ? `vida_aralık(${bsp}) < Ø(${hd})` : undefined;
 
-  // D — Z: vida fin içinde
+  // D — Z: vida delikleri fin uzunluğu içinde (Z yönünde sıralı)
+  // bsp = Z yönünde vida merkez-merkez aralığı
+  const bspErr        = isAYT && bn > 1 && bsp != null && hd != null && bsp < hd - 0.001
+    ? `vida_aralık(${bsp}) < Ø(${hd}) — delikler Z'de örtüşüyor` : undefined;
   const boltZFrontErr = isAYT && pz != null && hd != null && pz < hd / 2 - 0.001
-    ? `posZ(${pz}) < Ø/2(${hd/2})` : undefined;
-  const boltZBackErr  = isAYT && pz != null && fl != null && hd != null
-    && pz + hd / 2 > fl + 0.001
-    ? `posZ(${pz})+Ø/2(${hd/2}) = ${(pz + hd/2).toFixed(1)} > fin_uzunluk(${fl})` : undefined;
+    ? `posZ(${pz}) < Ø/2(${hd/2}) — ilk delik fin ön kenarına taşıyor` : undefined;
+  // Son vida sağ kenarı: posZ + (boltN-1)*bsp + Ø/2 ≤ fin_length
+  const lastBoltZEdge = pz != null && bsp != null ? pz + (bn - 1) * bsp + (hd ?? 0) / 2 : null;
+  const boltZBackErr  = isAYT && fl != null && hd != null && lastBoltZEdge != null
+    && lastBoltZEdge > fl + 0.001
+    ? `posZ(${pz})+(${bn}-1)×bsp(${bsp})+Ø/2(${(hd/2).toFixed(1)}) = ${lastBoltZEdge.toFixed(1)} > fin_uzunluk(${fl})` : undefined;
+  // Oto-Z (posZ=null): toplam span ≤ fin_length
+  const boltZAutoErr  = isAYT && pz == null && fl != null && hd != null && bsp != null
+    && (bn - 1) * bsp + hd > fl + 0.001
+    ? `(${bn}-1)×bsp(${bsp})+Ø(${hd}) = ${((bn-1)*bsp+hd).toFixed(1)} > fin_uzunluk(${fl}) — oto konumda sığmıyor` : undefined;
+  // Ø ≤ fin_length: delik çapı her halükarda fin uzunluğundan küçük olmalı
+  const hdFlErr       = isAYT && hd != null && fl != null && hd > fl + 0.001
+    ? `Ø(${hd}) > fin_uzunluk(${fl})` : undefined;
 
-  // NOT: Ø ≤ fin_kalınlık kısıtı geçersiz.
-  // Bolt Y yönünde finin tamamını geçtiğinden (tepeden tabana) fin_thickness hole'u sınırlamaz.
-  // Hole'u sınırlayan: X boşluğu (boltLeftErr/boltRightErr) ve Z boşluğu (boltZFrontErr/boltZBackErr).
+  // G — Sıfır değer kontrolleri
+  const ptZeroErr  = isAYT && pt != null && pt <= 0
+    ? `plaka_kalınlık > 0 olmalı` : undefined;
+  const flZeroErr  = isAYT && fl != null && fl <= 0
+    ? `fin_uzunluk > 0 olmalı` : undefined;
+  const ftZeroErr  = isAYT && ft != null && ft <= 0
+    ? `fin_kalınlık > 0 olmalı` : undefined;
+  const hdZeroErr  = isAYT && hd != null && hd <= 0
+    ? `delik_çapı > 0 olmalı` : undefined;
+  const fsZeroErr  = isAYT && n > 1 && fs != null && fs <= 0
+    ? `fin_aralık > 0 olmalı (n > 1)` : undefined;
 
   // Tüm AYT hataları — submit engeli
   const aytErrors = isAYT ? [
     depthError, finBlockErr, offsetErr, spacingErr,
-    boltRightErr, boltLeftErr, bspErr,
-    boltZFrontErr, boltZBackErr,
+    boltRightErr, boltLeftErr,
+    bspErr, boltZFrontErr, boltZBackErr, boltZAutoErr, hdFlErr,
+    ptZeroErr, flZeroErr, ftZeroErr, hdZeroErr, fsZeroErr,
   ].filter(Boolean) as string[] : [];
   const hasAytErrors = aytErrors.length > 0;
   const aytErrorTooltip = hasAytErrors
@@ -475,13 +493,13 @@ export function TerminalFormPage() {
               </label>
 
               <NumField label="Vida Adedi" value={draft.bolt_count} min={1}
-                hint={isAYT ? "posX + (n−1)×aralık + Ø/2 ≤ W" : undefined}
+                hint={isAYT ? "posZ + (n−1)×aralık + Ø/2 ≤ fin_uzunluk (Z yönü)" : undefined}
                 onChange={(v) => set("bolt_count", v != null ? Math.max(1, Math.round(v)) : null)} />
 
               <NumField label="Vida Merkez Mesafesi" unit="mm" min={0}
                 value={draft.bolt_center_distance_mm}
-                hint={isAYT ? "≥ Ø;  posX + (n−1)×aralık + Ø/2 ≤ W" : undefined}
-                error={isAYT ? (bspErr ?? boltRightErr) : undefined}
+                hint={isAYT ? "≥ Ø (Z yönünde);  posZ + (n−1)×aralık + Ø/2 ≤ fin_uzunluk" : undefined}
+                error={isAYT ? bspErr : undefined}
                 onChange={(v) => set("bolt_center_distance_mm", v)} />
 
               {/* Delik tipi */}
@@ -506,8 +524,8 @@ export function TerminalFormPage() {
               {holeMode === "round" ? (
                 <NumField label="Delik Çapı" unit="mm" min={0}
                   value={draft.hole_diameter_mm}
-                  hint={isAYT ? "≤ vida_aralığı  (delikler örtüşmesin)" : undefined}
-                  error={isAYT ? bspErr : undefined}
+                  hint={isAYT ? "≤ vida_aralığı (Z);  ≤ fin_uzunluk" : undefined}
+                  error={isAYT ? (hdZeroErr ?? bspErr ?? hdFlErr) : undefined}
                   onChange={(v) => set("hole_diameter_mm", v)} />
               ) : (
                 <>
@@ -540,7 +558,7 @@ export function TerminalFormPage() {
             <div className="form-grid">
               <NumField label="Genişlik X" unit="mm" min={0}
                 value={draft.terminal_width_mm}
-                hint={isAYT ? "posX + (n−1)×vida_aralığı + Ø/2 ≤ W" : undefined}
+                hint={isAYT ? "posX + Ø/2 ≤ W  (tek vida X konumu; aralık Z yönündedir)" : undefined}
                 error={isAYT ? boltRightErr : undefined}
                 onChange={(v) => set("terminal_width_mm", v)} />
               <NumField label="Yükseklik Y" unit="mm" min={0}
@@ -565,7 +583,7 @@ export function TerminalFormPage() {
             <div className="form-grid">
               <NumField label="Sol Kenardan (X)" unit="mm" min={0}
                 value={draft.bolt_pos_x_mm}
-                hint={isAYT ? "≥ Ø/2;  posX + (n−1)×aralık + Ø/2 ≤ W" : undefined}
+                hint={isAYT ? "≥ Ø/2;  posX + Ø/2 ≤ W  (vida_aralığı Z yönünde)" : undefined}
                 error={isAYT ? (boltLeftErr ?? boltRightErr) : undefined}
                 onChange={(v) => set("bolt_pos_x_mm", v)} />
               <NumField label="Üstten (Y)" unit="mm" min={0}
@@ -575,8 +593,8 @@ export function TerminalFormPage() {
                 label={isAYT ? "Fin Başından (Z)" : "Önden (Z)"}
                 unit="mm" min={0}
                 value={draft.bolt_pos_z_mm}
-                hint={isAYT ? "≥ Ø/2;  posZ + Ø/2 ≤ fin_uzunluk" : undefined}
-                error={isAYT ? (boltZFrontErr ?? boltZBackErr) : undefined}
+                hint={isAYT ? "≥ Ø/2;  posZ + (n−1)×aralık + Ø/2 ≤ fin_uzunluk" : undefined}
+                error={isAYT ? (boltZFrontErr ?? boltZBackErr ?? boltZAutoErr) : undefined}
                 onChange={(v) => set("bolt_pos_z_mm", v)} />
             </div>
           </section>
@@ -634,12 +652,12 @@ export function TerminalFormPage() {
                 <NumField label="Fin Aralığı (m-m)" unit="mm" min={0}
                   value={draft.fin_spacing_mm}
                   hint={isAYT ? "≥ fin_kalınlık;  (n−1)×aralık + kalınlık ≤ H − boşluk" : undefined}
-                  error={isAYT ? (spacingErr ?? finBlockErr) : undefined}
+                  error={isAYT ? (fsZeroErr ?? spacingErr ?? finBlockErr) : undefined}
                   onChange={(v) => set("fin_spacing_mm", v)} />
                 <NumField label="Fin Kalınlığı" unit="mm" min={0}
                   value={draft.fin_thickness_mm}
                   hint={isAYT ? "≤ fin_aralık  (finler örtüşmesin)" : undefined}
-                  error={isAYT ? spacingErr : undefined}
+                  error={isAYT ? (ftZeroErr ?? spacingErr) : undefined}
                   onChange={(v) => set("fin_thickness_mm", v)} />
                 <NumField label="İlk Fin Boşluğu (üstten)" unit="mm" min={0}
                   value={draft.fin_offset_mm}
@@ -648,13 +666,13 @@ export function TerminalFormPage() {
                   onChange={(v) => set("fin_offset_mm", v)} />
                 <NumField label="Fin Uzunluğu" unit="mm" min={0}
                   value={draft.fin_length_mm}
-                  hint={isAYT ? "plaka + fin_uzunluk = D;  posZ + Ø/2 ≤ fin_uzunluk" : undefined}
-                  error={isAYT ? (depthError ?? boltZBackErr) : undefined}
+                  hint={isAYT ? "plaka + fin_uzunluk = D;  posZ + (n−1)×aralık + Ø/2 ≤ fin_uzunluk" : undefined}
+                  error={isAYT ? (flZeroErr ?? depthError ?? boltZBackErr ?? hdFlErr) : undefined}
                   onChange={(v) => set("fin_length_mm", v)} />
                 <NumField label="Plaka Kalınlığı" unit="mm" min={0}
                   value={draft.plate_thickness_mm}
                   hint={isAYT ? "plaka_kalınlık + fin_uzunluk = D" : undefined}
-                  error={isAYT ? depthError : undefined}
+                  error={isAYT ? (ptZeroErr ?? depthError) : undefined}
                   onChange={(v) => set("plate_thickness_mm", v)} />
               </div>
             </section>
