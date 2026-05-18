@@ -216,28 +216,29 @@ export function TerminalFormPage() {
   useEffect(() => {
     if (isEdit && detailQuery.data) {
       const def = detailQuery.data;
+      const n = (v: unknown) => (v != null ? Number(v) : null);
       setDraft({
         name: def.name,
         terminal_type: def.terminal_type,
         surface: def.surface,
         bolt_type: def.bolt_type ?? "M12",
-        bolt_count: def.bolt_count ?? null,
-        bolt_center_distance_mm: def.bolt_center_distance_mm ?? null,
-        hole_diameter_mm: def.hole_diameter_mm ?? null,
-        slot_width_mm: def.slot_width_mm ?? null,
-        slot_length_mm: def.slot_length_mm ?? null,
-        terminal_width_mm: def.terminal_width_mm ?? null,
-        terminal_height_mm: def.terminal_height_mm ?? null,
-        terminal_depth_mm: def.terminal_depth_mm ?? null,
-        fin_count:          def.fin_count          ?? 2,
-        fin_spacing_mm:     def.fin_spacing_mm     ?? 20,
-        fin_thickness_mm:   def.fin_thickness_mm   ?? 10,
-        fin_length_mm:      def.fin_length_mm      ?? 20,
-        fin_offset_mm:      def.fin_offset_mm      ?? 30,
-        plate_thickness_mm: def.plate_thickness_mm ?? 10,
-        bolt_pos_x_mm: def.bolt_pos_x_mm ?? null,
-        bolt_pos_y_mm: def.bolt_pos_y_mm ?? null,
-        bolt_pos_z_mm: def.bolt_pos_z_mm ?? null,
+        bolt_count:              n(def.bolt_count),
+        bolt_center_distance_mm: n(def.bolt_center_distance_mm),
+        hole_diameter_mm:        n(def.hole_diameter_mm),
+        slot_width_mm:           n(def.slot_width_mm),
+        slot_length_mm:          n(def.slot_length_mm),
+        terminal_width_mm:       n(def.terminal_width_mm),
+        terminal_height_mm:      n(def.terminal_height_mm),
+        terminal_depth_mm:       n(def.terminal_depth_mm),
+        fin_count:               n(def.fin_count)          ?? 2,
+        fin_spacing_mm:          n(def.fin_spacing_mm)     ?? 20,
+        fin_thickness_mm:        n(def.fin_thickness_mm)   ?? 10,
+        fin_length_mm:           n(def.fin_length_mm)      ?? 20,
+        fin_offset_mm:           n(def.fin_offset_mm)      ?? 30,
+        plate_thickness_mm:      n(def.plate_thickness_mm) ?? 10,
+        bolt_pos_x_mm:           n(def.bolt_pos_x_mm),
+        bolt_pos_y_mm:           n(def.bolt_pos_y_mm),
+        bolt_pos_z_mm:           n(def.bolt_pos_z_mm),
       });
       if (def.slot_width_mm || def.slot_length_mm) setHoleMode("slot");
     }
