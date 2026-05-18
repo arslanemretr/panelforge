@@ -411,9 +411,9 @@ export function PanelSelectionTab({ projectId }: PanelSelectionTabProps) {
                   </label>
                   <NumInput label="Genişlik" value={draft.width_mm}  onChange={(v) => setD("width_mm", v ?? 100)} />
                   <NumInput label="Yükseklik" value={draft.height_mm} onChange={(v) => setD("height_mm", v ?? 200)} />
-                  <NumInput label="Derinlik" value={draft.depth_mm}  onChange={(v) => setD("depth_mm", v)} nullable />
-                  <NumInput label="Mont. Plaka Genişliği" value={draft.mounting_plate_width_mm}  onChange={(v) => setD("mounting_plate_width_mm", v)} nullable />
-                  <NumInput label="Mont. Plaka Yüksekliği" value={draft.mounting_plate_height_mm} onChange={(v) => setD("mounting_plate_height_mm", v)} nullable />
+                  <NumInput label="Derinlik" value={draft.depth_mm ?? null}  onChange={(v) => setD("depth_mm", v)} nullable />
+                  <NumInput label="Mont. Plaka Genişliği" value={draft.mounting_plate_width_mm ?? null}  onChange={(v) => setD("mounting_plate_width_mm", v)} nullable />
+                  <NumInput label="Mont. Plaka Yüksekliği" value={draft.mounting_plate_height_mm ?? null} onChange={(v) => setD("mounting_plate_height_mm", v)} nullable />
                 </div>
               )}
 
