@@ -26,6 +26,7 @@ import type {
 } from "../../types";
 import { ConfirmModal } from "../ConfirmModal";
 import { Modal } from "../Modal";
+import { ConnectionSchematicView } from "./ConnectionSchematicView";
 
 interface Props {
   projectId: number;
@@ -532,6 +533,12 @@ export function ConnectionTab({ projectId }: Props) {
               </div>
             ))}
           </div>
+        </section>
+
+        {/* Bağlantı şeması */}
+        <section className="table-card">
+          <h3 style={{ margin: "0 0 0.75rem" }}>Bağlantı Şeması</h3>
+          <ConnectionSchematicView connections={connections} devices={devices} />
         </section>
 
         {/* Faz dağılımı */}

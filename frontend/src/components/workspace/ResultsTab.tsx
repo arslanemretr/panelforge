@@ -10,7 +10,160 @@ import { BusbarTable } from "../results/BusbarTable";
 import { HoleTable } from "../results/HoleTable";
 import { SummaryCards } from "../results/SummaryCards";
 import { TechnicalDrawingView } from "./TechnicalDrawingView";
-import type { Busbar } from "../../types";
+import type { Busbar, CalculationSummary } from "../../types";
+
+// ── Faz renkleri (yerel) ─────────────────────────────────────────────────────
+const PHASE_COLORS_MAP: Record<string, string> = {
+  L1: "#e53935", L2: "#f9a825", L3: "#1565c0", N: "#616161", PE: "#388e3c",
+};
+
+// ── Malzeme Dağılım Görsel ───────────────────────────────────────────────────
+function MaterialBreakdownView({ busbars, summary }: { busbars: Busbar[]; summary: CalculationSummary }) {
+  const mainBars   = busbars.filter((b) => b.busbar_type === "main");
+  const branchBars = busbars.filter((b) => b.busbar_type !== "main");
+
+  const mainLen   = mainBars.reduce((s, b) => s + Number(b.cut_length_mm), 0);
+  const branchLen = branchBars.reduce((s, b) => s + Number(b.cut_length_mm), 0);
+  const totalLen  = Math.max(mainLen + branchLen, 1);
+
+  const mainHoles   = mainBars.reduce((s, b) => s + b.holes.length, 0);
+  const branchHoles = branchBars.reduce((s, b) => s + b.holes.length, 0);
+  const totalHoles  = Math.max(mainHoles + branchHoles, 1);
+
+  const mainBends   = mainBars.reduce((s, b) => s + b.bends.length, 0);
+  const branchBends = branchBars.reduce((s, b) => s + b.bends.length, 0);
+
+  const BAR_W = 200; // maksimum bar genişliği px
+
+  function row(
+    label: string, color: string,
+    count: number, len: number, holes: number, bends: number, total: number,
+  ) {
+    const barPx = Math.round((len / total) * BAR_W);
+    return (
+      <g>
+        {/* Etiket */}
+        <text fill="#94a3b8" fontSize={10} fontWeight={700}>{label}</text>
+        {/* Boş arka plan */}
+        <rect y={14} width={BAR_W} height={14} fill="#1e293b" rx={3} />
+        {/* Dolu bar */}
+        <rect y={14} width={barPx} height={14} fill={color} rx={3} opacity={0.85} />
+        {/* Değer metni */}
+        <text y={25} x={barPx + 6} fill={color} fontSize={9} fontWeight={600}>
+          {len.toFixed(0)} mm
+        </text>
+        {/* İkincil bilgi */}
+        <text y={38} fill="#475569" fontSize={9}>
+          {count} parça · {holes} delik · {bends} büküm
+        </text>
+      </g>
+    );
+  }
+
+  return (
+    <svg
+      viewBox="0 0 420 120"
+      width="100%"
+      style={{ display: "block" }}
+      fontFamily="'Segoe UI', system-ui, monospace"
+    >
+      <rect width={420} height={120} fill="#0d1117" rx={8} />
+
+      {/* Ana Bakır satırı */}
+      <g transform="translate(16, 14)">
+        {row("Ana Bakır", "#e65100", mainBars.length, mainLen, mainHoles, mainBends, totalLen)}
+      </g>
+
+      {/* Tali Bakır satırı */}
+      <g transform="translate(16, 68)">
+        {row("Tali Bakır", "#1565c0", branchBars.length, branchLen, branchHoles, branchBends, totalLen)}
+      </g>
+
+      {/* Toplam bilgiler (sağda) */}
+      <g transform="translate(248, 14)">
+        <rect width={156} height={92} fill="#1a1f2b" rx={6} />
+        <text x={10} y={18} fill="#475569" fontSize={9}>Toplam Kesim Boyu</text>
+        <text x={10} y={32} fill="#94a3b8" fontSize={13} fontWeight={700}>
+          {(totalLen / 1000).toFixed(2)} m
+        </text>
+        <text x={10} y={50} fill="#475569" fontSize={9}>Toplam Ağırlık</text>
+        <text x={10} y={64} fill="#94a3b8" fontSize={13} fontWeight={700}>
+          {Number(summary.total_weight_kg).toFixed(2)} kg
+        </text>
+        <text x={10} y={82} fill="#475569" fontSize={9}>
+          {summary.main_busbar_count} ana · {summary.branch_busbar_count} tali parça
+        </text>
+      </g>
+    </svg>
+  );
+}
+
+// ── Bara Önizleme Galerisi ───────────────────────────────────────────────────
+function BusbarGallery({ busbars, onSelect }: { busbars: Busbar[]; onSelect: (b: Busbar) => void }) {
+  if (busbars.length === 0) return null;
+
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", marginTop: "0.5rem" }}>
+      {busbars.map((b) => {
+        const phaseColor = PHASE_COLORS_MAP[b.phase] ?? "#888";
+        return (
+          <button
+            key={b.id}
+            type="button"
+            onClick={() => onSelect(b)}
+            title={`${b.part_no} — ${b.name}`}
+            style={{
+              background: "var(--panel-strong)",
+              border: `1.5px solid ${phaseColor}55`,
+              borderRadius: 8,
+              padding: "0.5rem 0.6rem",
+              cursor: "pointer",
+              textAlign: "left",
+              minWidth: 150,
+              maxWidth: 200,
+              flex: "1 1 150px",
+              transition: "border-color 0.15s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.borderColor = phaseColor)}
+            onMouseLeave={(e) => (e.currentTarget.style.borderColor = `${phaseColor}55`)}
+          >
+            {/* Mini bara çizimi */}
+            <div style={{
+              background: "#fff",
+              borderRadius: 4,
+              padding: "2px 4px",
+              marginBottom: "0.4rem",
+              overflow: "hidden",
+              maxHeight: 60,
+            }}>
+              <BusbarDrawing busbar={b} />
+            </div>
+
+            {/* Etiket satırı */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.25rem" }}>
+              <span style={{
+                fontFamily: "monospace", fontSize: "0.75rem", fontWeight: 700,
+                color: "var(--text)",
+              }}>
+                {b.part_no}
+              </span>
+              <span style={{
+                padding: "1px 6px", borderRadius: 4, fontSize: "0.72rem", fontWeight: 700,
+                background: `${phaseColor}22`, color: phaseColor,
+                fontFamily: "monospace",
+              }}>
+                {b.phase}
+              </span>
+            </div>
+            <div style={{ fontSize: "0.7rem", color: "var(--muted)", marginTop: 2 }}>
+              {b.cut_length_mm} mm · {b.holes.length} delik · {b.bends.length} büküm
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 interface ResultsTabProps {
   projectId: number;
@@ -206,6 +359,14 @@ export function ResultsTab({ projectId }: ResultsTabProps) {
             </div>
             <SummaryCards summary={results!.summary} />
 
+            {/* Malzeme Dağılımı Görsel */}
+            <div style={{ marginTop: "1rem" }}>
+              <div style={{ fontSize: "0.8rem", color: "var(--muted)", marginBottom: "0.4rem", fontWeight: 600 }}>
+                Malzeme Dağılımı
+              </div>
+              <MaterialBreakdownView busbars={results!.busbars} summary={results!.summary} />
+            </div>
+
             {results!.warnings.length > 0 && (
               <div
                 style={{
@@ -237,6 +398,13 @@ export function ResultsTab({ projectId }: ResultsTabProps) {
         {hasResults && (
           <Collapsible title="Bakir Parca Tablosu" badge={`${results!.busbars.length} parca`}>
             <BusbarTable busbars={results!.busbars} onView={setSelectedBusbar} />
+            {/* Bara Önizleme Galerisi */}
+            <div style={{ marginTop: "1rem", borderTop: "1px solid var(--line)", paddingTop: "1rem" }}>
+              <div style={{ fontSize: "0.8rem", color: "var(--muted)", marginBottom: "0.5rem", fontWeight: 600 }}>
+                Bara Önizlemeleri — Tıklanınca Detay Açılır
+              </div>
+              <BusbarGallery busbars={results!.busbars} onSelect={setSelectedBusbar} />
+            </div>
           </Collapsible>
         )}
 
