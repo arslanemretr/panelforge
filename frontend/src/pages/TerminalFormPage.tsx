@@ -325,18 +325,20 @@ export function TerminalFormPage() {
   const W   = draft.terminal_width_mm;
   const H   = draft.terminal_height_mm;
   const D   = draft.terminal_depth_mm;
+  const num = (v: number | null | undefined): number | null =>
+    v != null ? Number(v) : null;
   const n   = draft.fin_count ?? 1;
-  const ft  = draft.fin_thickness_mm;
-  const fs  = draft.fin_spacing_mm;
-  const fo  = draft.fin_offset_mm;
-  const fl  = draft.fin_length_mm;
-  const pt  = draft.plate_thickness_mm;
-  const hd  = draft.hole_diameter_mm;
-  const bsp = draft.bolt_center_distance_mm;
+  const ft  = num(draft.fin_thickness_mm);
+  const fs  = num(draft.fin_spacing_mm);
+  const fo  = num(draft.fin_offset_mm);
+  const fl  = num(draft.fin_length_mm);
+  const pt  = num(draft.plate_thickness_mm);
+  const hd  = num(draft.hole_diameter_mm);
+  const bsp = num(draft.bolt_center_distance_mm);
   const bn  = draft.bolt_count ?? 1;
-  const px  = draft.bolt_pos_x_mm;
-  const py  = draft.bolt_pos_y_mm;
-  const pz  = draft.bolt_pos_z_mm;
+  const px  = num(draft.bolt_pos_x_mm);
+  const py  = num(draft.bolt_pos_y_mm);
+  const pz  = num(draft.bolt_pos_z_mm);
 
   // A — Derinlik: plaka + fin = D
   const depthSum    = (pt ?? 0) + (fl ?? 0);
