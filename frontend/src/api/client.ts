@@ -182,6 +182,8 @@ export const client = {
       target_terminal_id: number;
       phase: string;
       connection_type: string;
+      bend_type_id?: number | null;
+      branch_conductor_id?: number | null;
     },
   ) => (await api.post<DeviceConnection>(`/projects/${projectId}/connections`, payload)).data,
   updateConnection: async (
@@ -195,6 +197,8 @@ export const client = {
       target_terminal_id: number;
       phase: string;
       connection_type: string;
+      bend_type_id?: number | null;
+      branch_conductor_id?: number | null;
     },
   ) => (await api.put<DeviceConnection>(`/projects/${projectId}/connections/${connectionId}`, payload)).data,
   deleteConnection: async (projectId: number, connectionId: number) =>

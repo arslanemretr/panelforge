@@ -167,6 +167,11 @@ export interface DeviceConnection {
   target_terminal_id: number;
   phase: string;
   connection_type: string;         // "main_to_device" | "device_to_device"
+  bend_type_id?: number | null;
+  branch_conductor_id?: number | null;
+  // Nested
+  bend_type?: BendType | null;
+  branch_conductor?: BranchConductor | null;
 }
 
 export interface Device {

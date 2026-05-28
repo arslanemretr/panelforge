@@ -8,6 +8,21 @@ from app.schemas.device_connection import DeviceConnectionCreate, DeviceConnecti
 router = APIRouter(tags=["device-connections"])
 
 
+def _load_connection(db: Session, connection_id: int) -> models.DeviceConnection:
+    conn = (
+        db.query(models.DeviceConnection)
+        .options(
+            selectinload(models.DeviceConnection.bend_type),
+            selectinload(models.DeviceConnection.branch_conductor),
+        )
+        .filter(models.DeviceConnection.id == connection_id)
+        .one_or_none()
+    )
+    if conn is None:
+        raise HTTPException(status_code=404, detail="Connection not found")
+    return conn
+
+
 @router.get(
     "/projects/{project_id}/connections",
     response_model=list[DeviceConnectionRead],
@@ -18,6 +33,10 @@ def list_connections(
 ) -> list[models.DeviceConnection]:
     return (
         db.query(models.DeviceConnection)
+        .options(
+            selectinload(models.DeviceConnection.bend_type),
+            selectinload(models.DeviceConnection.branch_conductor),
+        )
         .filter(models.DeviceConnection.project_id == project_id)
         .order_by(models.DeviceConnection.id.asc())
         .all()
@@ -38,12 +57,10 @@ def create_connection(
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    # Validate target device belongs to project
     target = db.get(models.ProjectDevice, payload.target_device_id)
     if target is None or target.project_id != project_id:
         raise HTTPException(status_code=404, detail="Target device not found in project")
 
-    # Validate source device if provided
     if payload.source_device_id is not None:
         source = db.get(models.ProjectDevice, payload.source_device_id)
         if source is None or source.project_id != project_id:
@@ -58,11 +75,12 @@ def create_connection(
         target_terminal_id=payload.target_terminal_id,
         phase=payload.phase,
         connection_type=payload.connection_type,
+        bend_type_id=payload.bend_type_id,
+        branch_conductor_id=payload.branch_conductor_id,
     )
     db.add(conn)
     db.commit()
-    db.refresh(conn)
-    return conn
+    return _load_connection(db, conn.id)
 
 
 @router.put(
@@ -99,8 +117,7 @@ def update_connection(
         setattr(conn, field, value)
 
     db.commit()
-    db.refresh(conn)
-    return conn
+    return _load_connection(db, conn.id)
 
 
 @router.post(
@@ -115,7 +132,6 @@ def auto_assign_connections(
     """
     Projedeki tüm cihaz terminallerini faz eşleştirmesiyle Ana Bara → Cihaz
     bağlantısı olarak otomatik atar.
-
     Mevcut tüm bağlantılar önce silinir, ardından her cihazın her terminali
     için bir DeviceConnection kaydı oluşturulur.
     """
@@ -123,13 +139,11 @@ def auto_assign_connections(
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    # Mevcut bağlantıları temizle
     db.query(models.DeviceConnection).filter(
         models.DeviceConnection.project_id == project_id
     ).delete()
     db.flush()
 
-    # Tüm cihaz + terminal çift
     placements = (
         db.query(models.ProjectDevice)
         .options(selectinload(models.ProjectDevice.device).selectinload(models.Device.terminals))
@@ -138,7 +152,7 @@ def auto_assign_connections(
         .all()
     )
 
-    new_conns: list[models.DeviceConnection] = []
+    new_ids: list[int] = []
     for pd in placements:
         for term in pd.device.terminals:
             conn = models.DeviceConnection(
@@ -152,13 +166,21 @@ def auto_assign_connections(
                 connection_type="main_to_device",
             )
             db.add(conn)
-            new_conns.append(conn)
+            db.flush()
+            new_ids.append(conn.id)
 
     db.commit()
-    for conn in new_conns:
-        db.refresh(conn)
 
-    return new_conns
+    return (
+        db.query(models.DeviceConnection)
+        .options(
+            selectinload(models.DeviceConnection.bend_type),
+            selectinload(models.DeviceConnection.branch_conductor),
+        )
+        .filter(models.DeviceConnection.id.in_(new_ids))
+        .order_by(models.DeviceConnection.id.asc())
+        .all()
+    )
 
 
 @router.delete(

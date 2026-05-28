@@ -291,11 +291,21 @@ class DeviceConnection(Base):
     phase: Mapped[str] = mapped_column(Text, nullable=False)                 # L1 | L2 | L3 | N | PE
     connection_type: Mapped[str] = mapped_column(Text, nullable=False)       # "main_to_device" | "device_to_device"
 
+    # Büküm ve tali bakır (proje seviyesi genel ayar yerine bağlantıya özgü seçim)
+    bend_type_id: Mapped[int | None] = mapped_column(
+        ForeignKey("bend_types.id", ondelete="SET NULL"), nullable=True
+    )
+    branch_conductor_id: Mapped[int | None] = mapped_column(
+        ForeignKey("branch_conductors.id", ondelete="SET NULL"), nullable=True
+    )
+
     project: Mapped["Project"] = relationship(back_populates="device_connections")
     source_device: Mapped["ProjectDevice | None"] = relationship(foreign_keys=[source_device_id])
     target_device: Mapped["ProjectDevice"] = relationship(foreign_keys=[target_device_id])
     source_terminal: Mapped["DeviceTerminal | None"] = relationship(foreign_keys=[source_terminal_id])
     target_terminal: Mapped["DeviceTerminal"] = relationship(foreign_keys=[target_terminal_id])
+    bend_type: Mapped["BendType | None"] = relationship(foreign_keys=[bend_type_id])
+    branch_conductor: Mapped["BranchConductor | None"] = relationship(foreign_keys=[branch_conductor_id])
 
 
 class CopperSettings(Base):
