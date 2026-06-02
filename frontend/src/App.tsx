@@ -5,6 +5,7 @@ import { BendTypesListPage } from "./pages/BendTypesListPage";
 import { CopperDefinitionsPage } from "./pages/CopperDefinitionsPage";
 import { DeviceDefinitionsPage } from "./pages/DeviceDefinitionsPage";
 import { DeviceEditorPage } from "./pages/DeviceEditorPage";
+import { FirmsPage } from "./pages/FirmsPage";
 import { MainCopperFormPage } from "./pages/MainCopperFormPage";
 import { MainCopperListPage } from "./pages/MainCopperListPage";
 import { PanelDefinitionsPage } from "./pages/PanelDefinitionsPage";
@@ -19,12 +20,13 @@ const navSections = [
   {
     title: "Projeler",
     items: [
-      ["/projects", "Proje Listesi"],
+      ["/projects", "Bakir Projesi Listesi"],
     ],
   },
   {
     title: "Tanimlamalar",
     items: [
+      ["/definitions/firms", "Firma & Proje"],
       ["/definitions/panels", "Kabin Tanimlama"],
       ["/definitions/terminal-types", "Terminal Tanimlama"],
       ["/definitions/devices", "Cihaz Tanimlama"],
@@ -100,6 +102,7 @@ export default function App() {
           <Route path="/definitions/bend-types/:id/edit" element={<BendTypeFormPage />} />
           <Route path="/definitions/devices/new" element={<DeviceEditorPage />} />
           <Route path="/definitions/devices/:id" element={<DeviceEditorPage />} />
+          <Route path="/definitions/firms" element={<FirmsPage />} />
           <Route path="/definitions/panels" element={<PanelDefinitionsPage />} />
           <Route path="/definitions/panels/new" element={<PanelFormPage />} />
           <Route path="/definitions/panels/:id/edit" element={<PanelFormPage />} />

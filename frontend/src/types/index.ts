@@ -1,3 +1,24 @@
+export interface Firm {
+  id: number;
+  name: string;
+  vkn: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClientProject {
+  id: number;
+  firm_id: number;
+  code: string | null;
+  name: string;
+  created_at: string;
+  updated_at: string;
+  firm: Firm;
+}
+
 export interface Project {
   id: number;
   name: string;
@@ -5,6 +26,8 @@ export interface Project {
   panel_code: string | null;
   prepared_by: string | null;
   description: string | null;
+  client_project_id: number | null;
+  client_project: ClientProject | null;
   created_at: string;
   updated_at: string;
 }

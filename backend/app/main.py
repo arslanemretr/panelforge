@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.client_projects import router as client_projects_router
+from app.api.firms import router as firms_router
 from app.api.calculations import router as calculations_router
 from app.api.copper_definitions import router as copper_definitions_router
 from app.api.copper_settings import router as copper_router
@@ -30,6 +32,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(firms_router, prefix="/api")
+app.include_router(client_projects_router, prefix="/api")
 app.include_router(projects_router, prefix="/api")
 app.include_router(panels_router, prefix="/api")
 app.include_router(devices_router, prefix="/api")

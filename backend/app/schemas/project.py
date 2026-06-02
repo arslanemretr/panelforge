@@ -3,6 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from app.schemas.common import ORMModel
+from app.schemas.client_project import ClientProjectBrief
 
 
 class ProjectBase(BaseModel):
@@ -11,6 +12,7 @@ class ProjectBase(BaseModel):
     panel_code: str | None = None
     prepared_by: str | None = None
     description: str | None = None
+    client_project_id: int | None = None
 
 
 class ProjectCreate(ProjectBase):
@@ -25,3 +27,4 @@ class ProjectRead(ProjectBase, ORMModel):
     id: int
     created_at: datetime
     updated_at: datetime
+    client_project: ClientProjectBrief | None = None

@@ -6,93 +6,113 @@ import { client } from "../api/client";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { Modal } from "../components/Modal";
 import { useProjectStore } from "../store/useProjectStore";
+import type { ClientProject, Firm } from "../types";
 
-const emptyProjectDraft = {
+const EMPTY_DRAFT = {
   name: "",
-  customer_name: "",
   panel_code: "",
   prepared_by: "",
   description: "",
+  client_project_id: null as number | null,
 };
 
 export function ProjectListPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const setActiveProjectId = useProjectStore((state) => state.setActiveProjectId);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [draft, setDraft] = useState(emptyProjectDraft);
+
+  const [modalOpen, setModalOpen]     = useState(false);
+  const [draft, setDraft]             = useState(EMPTY_DRAFT);
+  const [selectedFirmId, setSelectedFirmId] = useState<number | "">("");
   const [confirmPending, setConfirmPending] = useState<{ message: string; onConfirm: () => void } | null>(null);
 
-  const projectsQuery = useQuery({
-    queryKey: ["projects"],
-    queryFn: client.listProjects,
+  // ── Queries ─────────────────────────────────────────────────────────────────
+  const projectsQuery = useQuery({ queryKey: ["projects"],       queryFn: client.listProjects });
+  const firmsQuery    = useQuery({ queryKey: ["firms"],          queryFn: client.listFirms });
+  const cpsQuery      = useQuery({
+    queryKey: ["client-projects", selectedFirmId || null],
+    queryFn: () => client.listClientProjects(selectedFirmId ? Number(selectedFirmId) : undefined),
+    enabled: !!selectedFirmId,
   });
 
+  const firms: Firm[]           = firmsQuery.data ?? [];
+  const clientProjects: ClientProject[] = cpsQuery.data ?? [];
+
+  // ── Mutations ────────────────────────────────────────────────────────────────
   const deleteProjectMutation = useMutation({
-    mutationFn: (projectId: number) => client.deleteProject(projectId),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["projects"] });
-    },
+    mutationFn: (id: number) => client.deleteProject(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["projects"] }),
   });
-
-  function handleDelete(projectId: number, projectName: string) {
-    setConfirmPending({
-      message: `"${projectName}" projesini kalıcı olarak silmek istediğinizden emin misiniz?`,
-      onConfirm: () => { deleteProjectMutation.mutate(projectId); setConfirmPending(null); },
-    });
-  }
 
   const createProjectMutation = useMutation({
     mutationFn: () =>
       client.createProject({
-        ...draft,
+        name: draft.name,
         panel_code: draft.panel_code || `PF-${Date.now().toString().slice(-6)}`,
+        prepared_by: draft.prepared_by || null,
+        description: draft.description || null,
+        client_project_id: draft.client_project_id,
       }),
     onSuccess: async (project) => {
       await queryClient.invalidateQueries({ queryKey: ["projects"] });
       setActiveProjectId(project.id);
-      setModalOpen(false);
-      setDraft(emptyProjectDraft);
+      closeModal();
       navigate("/workspace");
     },
   });
+
+  function closeModal() {
+    setModalOpen(false);
+    setDraft(EMPTY_DRAFT);
+    setSelectedFirmId("");
+  }
+
+  function handleDelete(id: number, name: string) {
+    setConfirmPending({
+      message: `"${name}" bakır projesini kalıcı olarak silmek istediğinizden emin misiniz?`,
+      onConfirm: () => { deleteProjectMutation.mutate(id); setConfirmPending(null); },
+    });
+  }
 
   const sortedProjects = useMemo(
     () => [...(projectsQuery.data ?? [])].sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
     [projectsQuery.data],
   );
 
-  function set<K extends keyof typeof draft>(key: K, value: string) {
-    setDraft((cur) => ({ ...cur, [key]: value }));
-  }
-
   return (
     <div className="stack">
+      {/* Sayfa başlığı */}
       <section className="card page-heading">
         <div>
           <span className="eyebrow">Projeler</span>
-          <h1>Proje Listesi</h1>
-          <p>Projeleri tablo halinde görüntüleyin, yeni proje oluşturun ve seçilen projeyi çalışma ekranında açın.</p>
+          <h1>Bakır Projesi Listesi</h1>
+          <p>
+            Bakır projelerini görüntüleyin ve çalışma ekranında açın.
+            Firma ve proje tanımları için{" "}
+            <a href="/definitions/firms" style={{ color: "var(--accent)" }}>Firma &amp; Proje Tanımlama</a>{" "}
+            sayfasını kullanın.
+          </p>
         </div>
         <button type="button" onClick={() => setModalOpen(true)}>
-          Yeni Proje
+          + Yeni Bakır Projesi
         </button>
       </section>
 
+      {/* Tablo */}
       <section className="card">
         <div className="section-header">
-          <h2>Kayıtlı Projeler</h2>
+          <h2>Kayıtlı Bakır Projeleri</h2>
           <span className="helper-text">{sortedProjects.length} proje</span>
         </div>
         <div className="table-wrap">
           <table className="project-table">
             <thead>
               <tr>
-                <th>Proje Kodu</th>
-                <th>Proje Adı</th>
-                <th>Müşteri Adı</th>
+                <th>Firma</th>
+                <th>Proje</th>
+                <th>Panel Kodu</th>
+                <th>Bakır Projesi Adı</th>
                 <th>Hazırlayan</th>
-                <th>Oluşturma</th>
                 <th>Güncelleme</th>
                 <th>İşlem</th>
               </tr>
@@ -100,14 +120,29 @@ export function ProjectListPage() {
             <tbody>
               {sortedProjects.map((project) => (
                 <tr key={project.id}>
+                  <td style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
+                    {project.client_project?.firm.name ?? <span style={{ color: "var(--line)" }}>—</span>}
+                  </td>
+                  <td style={{ fontSize: "0.85rem" }}>
+                    {project.client_project ? (
+                      <span>
+                        {project.client_project.code && (
+                          <span style={{ fontFamily: "monospace", color: "var(--accent)", fontWeight: 600, marginRight: 4 }}>
+                            {project.client_project.code}
+                          </span>
+                        )}
+                        {project.client_project.name}
+                      </span>
+                    ) : (
+                      <span style={{ color: "var(--line)" }}>—</span>
+                    )}
+                  </td>
                   <td style={{ fontFamily: "monospace", color: "var(--accent)", fontWeight: 600 }}>
-                    {project.panel_code || "-"}
+                    {project.panel_code || "—"}
                   </td>
                   <td style={{ fontWeight: 600 }}>{project.name}</td>
-                  <td>{project.customer_name || "-"}</td>
-                  <td>{project.prepared_by || "-"}</td>
                   <td style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
-                    {new Date(project.created_at).toLocaleDateString("tr-TR")}
+                    {project.prepared_by || "—"}
                   </td>
                   <td style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
                     {new Date(project.updated_at).toLocaleDateString("tr-TR")}
@@ -117,10 +152,7 @@ export function ProjectListPage() {
                       type="button"
                       className="btn-primary"
                       style={{ padding: "0.3rem 0.9rem", fontSize: "0.85rem", borderRadius: "8px" }}
-                      onClick={() => {
-                        setActiveProjectId(project.id);
-                        navigate("/workspace");
-                      }}
+                      onClick={() => { setActiveProjectId(project.id); navigate("/workspace"); }}
                     >
                       Aç →
                     </button>
@@ -139,7 +171,9 @@ export function ProjectListPage() {
               {!sortedProjects.length && (
                 <tr>
                   <td colSpan={7}>
-                    <div className="empty-state">Henüz proje yok. "Yeni Proje" butonuyla ilk kaydı ekleyin.</div>
+                    <div className="empty-state">
+                      Henüz bakır projesi yok. "Yeni Bakır Projesi" ile ilk kaydı oluşturun.
+                    </div>
                   </td>
                 </tr>
               )}
@@ -148,49 +182,83 @@ export function ProjectListPage() {
         </div>
       </section>
 
-      <Modal title="Yeni Proje Ekle" open={modalOpen} onClose={() => setModalOpen(false)}>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            createProjectMutation.mutate();
-          }}
-        >
+      {/* ── Yeni Bakır Projesi Modal ──────────────────────────────────────────── */}
+      <Modal title="Yeni Bakır Projesi" open={modalOpen} onClose={closeModal}>
+        <form onSubmit={(e) => { e.preventDefault(); createProjectMutation.mutate(); }}>
           <div className="form-grid">
+
+            {/* Firma seçimi */}
+            <label className="field" style={{ gridColumn: "1 / -1" }}>
+              <span>Firma</span>
+              <select
+                className="input"
+                value={selectedFirmId}
+                onChange={(e) => {
+                  setSelectedFirmId(e.target.value ? Number(e.target.value) : "");
+                  setDraft((d) => ({ ...d, client_project_id: null }));
+                }}
+              >
+                <option value="">— Firma seçin (opsiyonel) —</option>
+                {firms.map((f) => (
+                  <option key={f.id} value={f.id}>{f.name}</option>
+                ))}
+              </select>
+            </label>
+
+            {/* Proje seçimi (firmaya bağlı) */}
+            {selectedFirmId && (
+              <label className="field" style={{ gridColumn: "1 / -1" }}>
+                <span>Proje</span>
+                <select
+                  className="input"
+                  value={draft.client_project_id ?? ""}
+                  onChange={(e) => setDraft((d) => ({ ...d, client_project_id: e.target.value ? Number(e.target.value) : null }))}
+                >
+                  <option value="">— Proje seçin (opsiyonel) —</option>
+                  {clientProjects.map((cp) => (
+                    <option key={cp.id} value={cp.id}>
+                      {cp.code ? `${cp.code} — ` : ""}{cp.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+
+            {/* Ayırıcı */}
+            {selectedFirmId && (
+              <div style={{ gridColumn: "1 / -1", borderTop: "1px solid var(--line)", marginTop: "0.25rem", paddingTop: "0.75rem" }}>
+                <span style={{ fontSize: "0.78rem", color: "var(--muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  Bakır Projesi Bilgileri
+                </span>
+              </div>
+            )}
+
             <label className="field">
-              <span>Proje Kodu</span>
+              <span>Panel Kodu</span>
               <input
                 className="input"
                 value={draft.panel_code}
                 placeholder="Örn: PF-2024-001"
-                onChange={(e) => set("panel_code", e.target.value)}
+                onChange={(e) => setDraft((d) => ({ ...d, panel_code: e.target.value }))}
               />
             </label>
 
             <label className="field">
-              <span>Proje Adı <span style={{ color: "#e53935" }}>*</span></span>
+              <span>Bakır Projesi Adı <span style={{ color: "#e53935" }}>*</span></span>
               <input
                 className="input"
                 value={draft.name}
                 required
-                onChange={(e) => set("name", e.target.value)}
+                onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
               />
             </label>
 
-            <label className="field">
-              <span>Müşteri Adı</span>
-              <input
-                className="input"
-                value={draft.customer_name}
-                onChange={(e) => set("customer_name", e.target.value)}
-              />
-            </label>
-
-            <label className="field">
+            <label className="field" style={{ gridColumn: "1 / -1" }}>
               <span>Hazırlayan</span>
               <input
                 className="input"
                 value={draft.prepared_by}
-                onChange={(e) => set("prepared_by", e.target.value)}
+                onChange={(e) => setDraft((d) => ({ ...d, prepared_by: e.target.value }))}
               />
             </label>
 
@@ -200,7 +268,7 @@ export function ProjectListPage() {
                 className="input"
                 rows={3}
                 value={draft.description}
-                onChange={(e) => set("description", e.target.value)}
+                onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
                 style={{ resize: "vertical" }}
               />
             </label>
@@ -212,11 +280,9 @@ export function ProjectListPage() {
               className="btn-primary"
               disabled={!draft.name.trim() || createProjectMutation.isPending}
             >
-              {createProjectMutation.isPending ? "Oluşturuluyor..." : "Projeyi Oluştur"}
+              {createProjectMutation.isPending ? "Oluşturuluyor…" : "Bakır Projesini Oluştur"}
             </button>
-            <button type="button" className="ghost" onClick={() => setModalOpen(false)}>
-              İptal
-            </button>
+            <button type="button" className="ghost" onClick={closeModal}>İptal</button>
           </div>
         </form>
       </Modal>

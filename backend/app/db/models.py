@@ -9,6 +9,47 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.database import Base
 
 
+class Firm(Base):
+    __tablename__ = "firms"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    vkn: Mapped[str | None] = mapped_column(Text)
+    address: Mapped[str | None] = mapped_column(Text)
+    phone: Mapped[str | None] = mapped_column(Text)
+    email: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    client_projects: Mapped[list["ClientProject"]] = relationship(
+        back_populates="firm", cascade="all, delete-orphan"
+    )
+
+
+class ClientProject(Base):
+    __tablename__ = "client_projects"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    firm_id: Mapped[int] = mapped_column(ForeignKey("firms.id", ondelete="CASCADE"), nullable=False)
+    code: Mapped[str | None] = mapped_column(Text)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    firm: Mapped["Firm"] = relationship(back_populates="client_projects")
+    copper_projects: Mapped[list["Project"]] = relationship(back_populates="client_project")
+
+
 class Project(Base):
     __tablename__ = "projects"
 
@@ -18,6 +59,9 @@ class Project(Base):
     panel_code: Mapped[str | None] = mapped_column(Text)
     prepared_by: Mapped[str | None] = mapped_column(Text)
     description: Mapped[str | None] = mapped_column(Text)
+    client_project_id: Mapped[int | None] = mapped_column(
+        ForeignKey("client_projects.id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -26,6 +70,7 @@ class Project(Base):
         nullable=False,
     )
 
+    client_project: Mapped["ClientProject | None"] = relationship(back_populates="copper_projects")
     panel: Mapped["Panel | None"] = relationship(back_populates="project", cascade="all, delete-orphan", uselist=False)
     panel_layout_items: Mapped[list["ProjectPanel"]] = relationship(back_populates="project", cascade="all, delete-orphan")
     placed_devices: Mapped[list["ProjectDevice"]] = relationship(back_populates="project", cascade="all, delete-orphan")

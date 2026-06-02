@@ -4,12 +4,14 @@ import type {
   BendType,
   BranchConductor,
   CalculationResults,
+  ClientProject,
   CopperDefinition,
   CopperSettings,
   Device,
   DeviceImportPreview,
   DeviceImportResult,
   DeviceConnection,
+  Firm,
   Panel,
   PanelDefinition,
   PanelType,
@@ -28,6 +30,24 @@ const api = axios.create({
 });
 
 export const client = {
+  // Firma
+  listFirms: async () => (await api.get<Firm[]>("/firms")).data,
+  createFirm: async (payload: Omit<Firm, "id" | "created_at" | "updated_at">) =>
+    (await api.post<Firm>("/firms", payload)).data,
+  updateFirm: async (id: number, payload: Omit<Firm, "id" | "created_at" | "updated_at">) =>
+    (await api.put<Firm>(`/firms/${id}`, payload)).data,
+  deleteFirm: async (id: number) => api.delete(`/firms/${id}`),
+
+  // Proje (müşteri projesi)
+  listClientProjects: async (firmId?: number) =>
+    (await api.get<ClientProject[]>("/client-projects", { params: firmId ? { firm_id: firmId } : undefined })).data,
+  createClientProject: async (payload: { firm_id: number; code?: string | null; name: string }) =>
+    (await api.post<ClientProject>("/client-projects", payload)).data,
+  updateClientProject: async (id: number, payload: { firm_id: number; code?: string | null; name: string }) =>
+    (await api.put<ClientProject>(`/client-projects/${id}`, payload)).data,
+  deleteClientProject: async (id: number) => api.delete(`/client-projects/${id}`),
+
+  // Bakır Projesi
   listProjects: async () => (await api.get<Project[]>("/projects")).data,
   getProject: async (projectId: number) => (await api.get<Project>(`/projects/${projectId}`)).data,
   createProject: async (payload: Partial<Project>) => (await api.post<Project>("/projects", payload)).data,
