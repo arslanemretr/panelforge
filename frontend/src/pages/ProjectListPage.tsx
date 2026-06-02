@@ -6,7 +6,7 @@ import { client } from "../api/client";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { Modal } from "../components/Modal";
 import { useProjectStore } from "../store/useProjectStore";
-import type { ClientProject, Firm } from "../types";
+import type { ClientProject, Firm, Project } from "../types";
 
 const EMPTY_DRAFT = {
   name: "",
@@ -21,21 +21,22 @@ export function ProjectListPage() {
   const queryClient = useQueryClient();
   const setActiveProjectId = useProjectStore((state) => state.setActiveProjectId);
 
-  const [modalOpen, setModalOpen]     = useState(false);
-  const [draft, setDraft]             = useState(EMPTY_DRAFT);
+  const [modalOpen, setModalOpen]           = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [draft, setDraft]                   = useState(EMPTY_DRAFT);
   const [selectedFirmId, setSelectedFirmId] = useState<number | "">("");
   const [confirmPending, setConfirmPending] = useState<{ message: string; onConfirm: () => void } | null>(null);
 
   // ── Queries ─────────────────────────────────────────────────────────────────
-  const projectsQuery = useQuery({ queryKey: ["projects"],       queryFn: client.listProjects });
-  const firmsQuery    = useQuery({ queryKey: ["firms"],          queryFn: client.listFirms });
+  const projectsQuery = useQuery({ queryKey: ["projects"], queryFn: client.listProjects });
+  const firmsQuery    = useQuery({ queryKey: ["firms"],    queryFn: client.listFirms });
   const cpsQuery      = useQuery({
     queryKey: ["client-projects", selectedFirmId || null],
     queryFn: () => client.listClientProjects(selectedFirmId ? Number(selectedFirmId) : undefined),
     enabled: !!selectedFirmId,
   });
 
-  const firms: Firm[]           = firmsQuery.data ?? [];
+  const firms: Firm[]                   = firmsQuery.data ?? [];
   const clientProjects: ClientProject[] = cpsQuery.data ?? [];
 
   // ── Mutations ────────────────────────────────────────────────────────────────
@@ -61,10 +62,58 @@ export function ProjectListPage() {
     },
   });
 
-  function closeModal() {
-    setModalOpen(false);
+  const updateProjectMutation = useMutation({
+    mutationFn: () =>
+      client.updateProject(editingProject!.id, {
+        name: draft.name,
+        panel_code: draft.panel_code || null,
+        prepared_by: draft.prepared_by || null,
+        description: draft.description || null,
+        client_project_id: draft.client_project_id,
+        customer_name: editingProject!.customer_name,
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["projects"] });
+      closeModal();
+    },
+  });
+
+  // ── Modal yardımcıları ───────────────────────────────────────────────────────
+  function openCreateModal() {
+    setEditingProject(null);
     setDraft(EMPTY_DRAFT);
     setSelectedFirmId("");
+    setModalOpen(true);
+  }
+
+  function openEditModal(project: Project) {
+    setEditingProject(project);
+    setDraft({
+      name:              project.name,
+      panel_code:        project.panel_code ?? "",
+      prepared_by:       project.prepared_by ?? "",
+      description:       project.description ?? "",
+      client_project_id: project.client_project_id ?? null,
+    });
+    // Firma seçimini doldur
+    const firmId = project.client_project?.firm_id ?? "";
+    setSelectedFirmId(firmId);
+    setModalOpen(true);
+  }
+
+  function closeModal() {
+    setModalOpen(false);
+    setEditingProject(null);
+    setDraft(EMPTY_DRAFT);
+    setSelectedFirmId("");
+  }
+
+  function handleSubmit() {
+    if (editingProject) {
+      updateProjectMutation.mutate();
+    } else {
+      createProjectMutation.mutate();
+    }
   }
 
   function handleDelete(id: number, name: string) {
@@ -78,6 +127,8 @@ export function ProjectListPage() {
     () => [...(projectsQuery.data ?? [])].sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
     [projectsQuery.data],
   );
+
+  const isPending = createProjectMutation.isPending || updateProjectMutation.isPending;
 
   return (
     <div className="stack">
@@ -93,7 +144,7 @@ export function ProjectListPage() {
             sayfasını kullanın.
           </p>
         </div>
-        <button type="button" onClick={() => setModalOpen(true)}>
+        <button type="button" onClick={openCreateModal}>
           + Yeni Bakır Projesi
         </button>
       </section>
@@ -158,6 +209,14 @@ export function ProjectListPage() {
                     </button>
                     <button
                       type="button"
+                      className="ghost"
+                      style={{ padding: "0.3rem 0.7rem", fontSize: "0.85rem", borderRadius: "8px" }}
+                      onClick={() => openEditModal(project)}
+                    >
+                      Düzenle
+                    </button>
+                    <button
+                      type="button"
                       className="ghost danger"
                       style={{ padding: "0.3rem 0.7rem", fontSize: "0.85rem", borderRadius: "8px" }}
                       disabled={deleteProjectMutation.isPending}
@@ -182,9 +241,13 @@ export function ProjectListPage() {
         </div>
       </section>
 
-      {/* ── Yeni Bakır Projesi Modal ──────────────────────────────────────────── */}
-      <Modal title="Yeni Bakır Projesi" open={modalOpen} onClose={closeModal}>
-        <form onSubmit={(e) => { e.preventDefault(); createProjectMutation.mutate(); }}>
+      {/* ── Oluştur / Düzenle Modal (ortak form) ──────────────────────────────── */}
+      <Modal
+        title={editingProject ? `Düzenle — ${editingProject.name}` : "Yeni Bakır Projesi"}
+        open={modalOpen}
+        onClose={closeModal}
+      >
+        <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
           <div className="form-grid">
 
             {/* Firma seçimi */}
@@ -212,7 +275,9 @@ export function ProjectListPage() {
                 <select
                   className="input"
                   value={draft.client_project_id ?? ""}
-                  onChange={(e) => setDraft((d) => ({ ...d, client_project_id: e.target.value ? Number(e.target.value) : null }))}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, client_project_id: e.target.value ? Number(e.target.value) : null }))
+                  }
                 >
                   <option value="">— Proje seçin (opsiyonel) —</option>
                   {clientProjects.map((cp) => (
@@ -225,13 +290,11 @@ export function ProjectListPage() {
             )}
 
             {/* Ayırıcı */}
-            {selectedFirmId && (
-              <div style={{ gridColumn: "1 / -1", borderTop: "1px solid var(--line)", marginTop: "0.25rem", paddingTop: "0.75rem" }}>
-                <span style={{ fontSize: "0.78rem", color: "var(--muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  Bakır Projesi Bilgileri
-                </span>
-              </div>
-            )}
+            <div style={{ gridColumn: "1 / -1", borderTop: "1px solid var(--line)", marginTop: "0.25rem", paddingTop: "0.75rem" }}>
+              <span style={{ fontSize: "0.78rem", color: "var(--muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                Bakır Projesi Bilgileri
+              </span>
+            </div>
 
             <label className="field">
               <span>Panel Kodu</span>
@@ -278,9 +341,11 @@ export function ProjectListPage() {
             <button
               type="submit"
               className="btn-primary"
-              disabled={!draft.name.trim() || createProjectMutation.isPending}
+              disabled={!draft.name.trim() || isPending}
             >
-              {createProjectMutation.isPending ? "Oluşturuluyor…" : "Bakır Projesini Oluştur"}
+              {isPending
+                ? (editingProject ? "Güncelleniyor…" : "Oluşturuluyor…")
+                : (editingProject ? "Güncelle" : "Bakır Projesini Oluştur")}
             </button>
             <button type="button" className="ghost" onClick={closeModal}>İptal</button>
           </div>
