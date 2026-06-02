@@ -15,7 +15,7 @@ import type { ClientProject, Firm } from "../types";
 
 // ── Boş taslaklar ─────────────────────────────────────────────────────────────
 const EMPTY_FIRM = { name: "", vkn: "", address: "", phone: "", email: "" };
-const EMPTY_CP   = { name: "", code: "" };
+const EMPTY_CP   = { name: "", code: "", agreement_date: "", planned_completion_date: "" };
 
 export function FirmsPage() {
   const queryClient = useQueryClient();
@@ -70,11 +70,23 @@ export function FirmsPage() {
 
   // ── ClientProject mutations ───────────────────────────────────────────────────
   const createCpMutation = useMutation({
-    mutationFn: () => client.createClientProject({ firm_id: selectedFirm!.id, name: cpDraft.name, code: cpDraft.code || null }),
+    mutationFn: () => client.createClientProject({
+      firm_id:                 selectedFirm!.id,
+      name:                    cpDraft.name,
+      code:                    cpDraft.code || null,
+      agreement_date:          cpDraft.agreement_date || null,
+      planned_completion_date: cpDraft.planned_completion_date || null,
+    }),
     onSuccess: () => { invalidateCps(); closeCpModal(); },
   });
   const updateCpMutation = useMutation({
-    mutationFn: () => client.updateClientProject(editingCp!.id, { firm_id: selectedFirm!.id, name: cpDraft.name, code: cpDraft.code || null }),
+    mutationFn: () => client.updateClientProject(editingCp!.id, {
+      firm_id:                 selectedFirm!.id,
+      name:                    cpDraft.name,
+      code:                    cpDraft.code || null,
+      agreement_date:          cpDraft.agreement_date || null,
+      planned_completion_date: cpDraft.planned_completion_date || null,
+    }),
     onSuccess: () => { invalidateCps(); closeCpModal(); },
   });
   const deleteCpMutation = useMutation({
@@ -92,7 +104,12 @@ export function FirmsPage() {
 
   function openCpModal(cp?: ClientProject) {
     setEditingCp(cp ?? null);
-    setCpDraft(cp ? { name: cp.name, code: cp.code ?? "" } : EMPTY_CP);
+    setCpDraft(cp ? {
+      name:                    cp.name,
+      code:                    cp.code ?? "",
+      agreement_date:          cp.agreement_date ?? "",
+      planned_completion_date: cp.planned_completion_date ?? "",
+    } : EMPTY_CP);
     setCpModal(true);
   }
   function closeCpModal() { setCpModal(false); setEditingCp(null); setCpDraft(EMPTY_CP); }
@@ -225,7 +242,8 @@ export function FirmsPage() {
                       <tr>
                         <th>Proje Kodu</th>
                         <th>Proje Adı</th>
-                        <th>Bakır Proje</th>
+                        <th>Anlaşma Tarihi</th>
+                        <th>Plan. Tamamlanma</th>
                         <th></th>
                       </tr>
                     </thead>
@@ -237,7 +255,14 @@ export function FirmsPage() {
                           </td>
                           <td style={{ fontWeight: 600 }}>{cp.name}</td>
                           <td style={{ color: "var(--muted)", fontSize: "0.82rem" }}>
-                            —
+                            {cp.agreement_date
+                              ? new Date(cp.agreement_date).toLocaleDateString("tr-TR")
+                              : "—"}
+                          </td>
+                          <td style={{ color: "var(--muted)", fontSize: "0.82rem" }}>
+                            {cp.planned_completion_date
+                              ? new Date(cp.planned_completion_date).toLocaleDateString("tr-TR")
+                              : "—"}
                           </td>
                           <td className="actions-cell">
                             <button
@@ -338,6 +363,16 @@ export function FirmsPage() {
             <span>Proje Adı <span style={{ color: "#e53935" }}>*</span></span>
             <input className="input" value={cpDraft.name} required
               onChange={(e) => setCpDraft((d) => ({ ...d, name: e.target.value }))} />
+          </label>
+          <label className="field">
+            <span>Anlaşma Tarihi</span>
+            <input className="input" type="date" value={cpDraft.agreement_date}
+              onChange={(e) => setCpDraft((d) => ({ ...d, agreement_date: e.target.value }))} />
+          </label>
+          <label className="field">
+            <span>Planlanan Tamamlanma Tarihi</span>
+            <input className="input" type="date" value={cpDraft.planned_completion_date}
+              onChange={(e) => setCpDraft((d) => ({ ...d, planned_completion_date: e.target.value }))} />
           </label>
         </div>
         <div className="form-actions" style={{ marginTop: "1rem" }}>

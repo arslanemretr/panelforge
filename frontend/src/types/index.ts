@@ -14,6 +14,8 @@ export interface ClientProject {
   firm_id: number;
   code: string | null;
   name: string;
+  agreement_date: string | null;           // ISO date "YYYY-MM-DD"
+  planned_completion_date: string | null;  // ISO date "YYYY-MM-DD"
   created_at: string;
   updated_at: string;
   firm: Firm;

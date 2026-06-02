@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel
 
@@ -10,12 +10,16 @@ class ClientProjectCreate(BaseModel):
     firm_id: int
     code: str | None = None
     name: str
+    agreement_date: date | None = None
+    planned_completion_date: date | None = None
 
 
 class ClientProjectUpdate(BaseModel):
     firm_id: int
     code: str | None = None
     name: str
+    agreement_date: date | None = None
+    planned_completion_date: date | None = None
 
 
 class ClientProjectRead(ORMModel):
@@ -23,6 +27,8 @@ class ClientProjectRead(ORMModel):
     firm_id: int
     code: str | None = None
     name: str
+    agreement_date: date | None = None
+    planned_completion_date: date | None = None
     created_at: datetime
     updated_at: datetime
     firm: FirmRead
@@ -34,4 +40,6 @@ class ClientProjectBrief(ORMModel):
     firm_id: int
     code: str | None = None
     name: str
+    agreement_date: date | None = None
+    planned_completion_date: date | None = None
     firm: FirmRead

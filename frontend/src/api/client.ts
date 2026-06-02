@@ -41,9 +41,9 @@ export const client = {
   // Proje (müşteri projesi)
   listClientProjects: async (firmId?: number) =>
     (await api.get<ClientProject[]>("/client-projects", { params: firmId ? { firm_id: firmId } : undefined })).data,
-  createClientProject: async (payload: { firm_id: number; code?: string | null; name: string }) =>
+  createClientProject: async (payload: { firm_id: number; code?: string | null; name: string; agreement_date?: string | null; planned_completion_date?: string | null }) =>
     (await api.post<ClientProject>("/client-projects", payload)).data,
-  updateClientProject: async (id: number, payload: { firm_id: number; code?: string | null; name: string }) =>
+  updateClientProject: async (id: number, payload: { firm_id: number; code?: string | null; name: string; agreement_date?: string | null; planned_completion_date?: string | null }) =>
     (await api.put<ClientProject>(`/client-projects/${id}`, payload)).data,
   deleteClientProject: async (id: number) => api.delete(`/client-projects/${id}`),
 
