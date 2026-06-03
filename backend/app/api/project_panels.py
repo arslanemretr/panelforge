@@ -5,12 +5,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.dependencies import db_session
+from app.api.dependencies import db_session, require_active_user, require_operator
 from app.db import models
 from app.schemas.panel import PanelUpsert
 from app.schemas.project_panel import ProjectPanelCreate, ProjectPanelRead, ProjectPanelUpdate
 
-router = APIRouter(tags=["project-panels"])
+router = APIRouter(tags=["project-panels"], dependencies=[Depends(require_active_user)])
 
 
 def _load_options():
@@ -90,7 +90,7 @@ def list_project_panels(project_id: int, db: Session = Depends(db_session)) -> l
     )
 
 
-@router.post("/projects/{project_id}/panel-layout", response_model=ProjectPanelRead, status_code=status.HTTP_201_CREATED)
+@router.post("/projects/{project_id}/panel-layout", response_model=ProjectPanelRead, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_operator)])
 def create_project_panel(
     project_id: int,
     payload: ProjectPanelCreate,
@@ -143,7 +143,7 @@ def create_project_panel(
     )
 
 
-@router.put("/projects/{project_id}/panel-layout/{project_panel_id}", response_model=ProjectPanelRead)
+@router.put("/projects/{project_id}/panel-layout/{project_panel_id}", response_model=ProjectPanelRead, dependencies=[Depends(require_operator)])
 def update_project_panel(
     project_id: int,
     project_panel_id: int,
@@ -173,7 +173,7 @@ def update_project_panel(
     )
 
 
-@router.post("/projects/{project_id}/panel-layout/{project_panel_id}/reset", response_model=ProjectPanelRead)
+@router.post("/projects/{project_id}/panel-layout/{project_panel_id}/reset", response_model=ProjectPanelRead, dependencies=[Depends(require_operator)])
 def reset_project_panel_from_library(
     project_id: int,
     project_panel_id: int,
@@ -225,7 +225,7 @@ class UpdateLabelRequest(BaseModel):
     label: str
 
 
-@router.put("/projects/{project_id}/panel-layout/{project_panel_id}/reorder", response_model=list[ProjectPanelRead])
+@router.put("/projects/{project_id}/panel-layout/{project_panel_id}/reorder", response_model=list[ProjectPanelRead], dependencies=[Depends(require_operator)])
 def reorder_project_panel(
     project_id: int,
     project_panel_id: int,
@@ -259,7 +259,7 @@ def reorder_project_panel(
     )
 
 
-@router.patch("/projects/{project_id}/panel-layout/{project_panel_id}", response_model=ProjectPanelRead)
+@router.patch("/projects/{project_id}/panel-layout/{project_panel_id}", response_model=ProjectPanelRead, dependencies=[Depends(require_operator)])
 def update_project_panel_label(
     project_id: int,
     project_panel_id: int,
@@ -284,7 +284,7 @@ def update_project_panel_label(
     )
 
 
-@router.delete("/projects/{project_id}/panel-layout/{project_panel_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/projects/{project_id}/panel-layout/{project_panel_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_operator)])
 def delete_project_panel(project_id: int, project_panel_id: int, db: Session = Depends(db_session)) -> None:
     item = (
         db.query(models.ProjectPanel)

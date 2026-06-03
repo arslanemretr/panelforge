@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import db_session
+from app.api.dependencies import db_session, require_active_user, require_operator
 from app.db import models
 from app.schemas.copper import CopperSettingsRead, CopperSettingsUpsert
 
-router = APIRouter(tags=["copper-settings"])
+router = APIRouter(tags=["copper-settings"], dependencies=[Depends(require_active_user)])
 
 
 @router.get("/projects/{project_id}/copper-settings", response_model=CopperSettingsRead | None)
@@ -13,7 +13,7 @@ def get_copper_settings(project_id: int, db: Session = Depends(db_session)):
     return db.query(models.CopperSettings).filter(models.CopperSettings.project_id == project_id).one_or_none()
 
 
-@router.post("/projects/{project_id}/copper-settings", response_model=CopperSettingsRead, status_code=status.HTTP_201_CREATED)
+@router.post("/projects/{project_id}/copper-settings", response_model=CopperSettingsRead, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_operator)])
 def create_copper_settings(project_id: int, payload: CopperSettingsUpsert, db: Session = Depends(db_session)):
     settings = models.CopperSettings(project_id=project_id, **payload.model_dump())
     db.add(settings)
@@ -22,7 +22,7 @@ def create_copper_settings(project_id: int, payload: CopperSettingsUpsert, db: S
     return settings
 
 
-@router.put("/projects/{project_id}/copper-settings", response_model=CopperSettingsRead)
+@router.put("/projects/{project_id}/copper-settings", response_model=CopperSettingsRead, dependencies=[Depends(require_operator)])
 def upsert_copper_settings(project_id: int, payload: CopperSettingsUpsert, db: Session = Depends(db_session)):
     settings = db.query(models.CopperSettings).filter(models.CopperSettings.project_id == project_id).one_or_none()
     if settings is None:

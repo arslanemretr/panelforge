@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import db_session
+from app.api.dependencies import db_session, require_active_user, require_engineer
 from app.db import models
 from app.schemas.phase_type import PhaseTypeCreate, PhaseTypeRead
 
-router = APIRouter(tags=["phase-types"])
+router = APIRouter(tags=["phase-types"], dependencies=[Depends(require_active_user)])
 
 
 def _validate_phases(phases: str, db: Session) -> None:
@@ -30,7 +30,7 @@ def list_phase_types(db: Session = Depends(db_session)) -> list[models.PhaseType
     return db.query(models.PhaseType).order_by(models.PhaseType.id).all()
 
 
-@router.post("/phase-types", response_model=PhaseTypeRead, status_code=status.HTTP_201_CREATED)
+@router.post("/phase-types", response_model=PhaseTypeRead, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_engineer)])
 def create_phase_type(payload: PhaseTypeCreate, db: Session = Depends(db_session)) -> models.PhaseType:
     _validate_phases(payload.phases, db)
     pt = models.PhaseType(name=payload.name.strip(), phases=payload.phases.strip())
@@ -40,7 +40,7 @@ def create_phase_type(payload: PhaseTypeCreate, db: Session = Depends(db_session
     return pt
 
 
-@router.delete("/phase-types/{phase_type_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/phase-types/{phase_type_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_engineer)])
 def delete_phase_type(phase_type_id: int, db: Session = Depends(db_session)) -> None:
     pt = db.get(models.PhaseType, phase_type_id)
     if not pt:

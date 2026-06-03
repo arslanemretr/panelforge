@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.dependencies import db_session
+from app.api.dependencies import db_session, require_active_user, require_engineer
 from app.db import models
 from app.schemas.client_project import ClientProjectCreate, ClientProjectRead, ClientProjectUpdate
 
-router = APIRouter(tags=["client-projects"])
+router = APIRouter(tags=["client-projects"], dependencies=[Depends(require_active_user)])
 
 
 def _load(db: Session, project_id: int) -> models.ClientProject:
@@ -35,6 +35,7 @@ def list_client_projects(
     "/client-projects",
     response_model=ClientProjectRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_engineer)],
 )
 def create_client_project(
     payload: ClientProjectCreate,
@@ -50,7 +51,7 @@ def create_client_project(
     return _load(db, cp.id)
 
 
-@router.put("/client-projects/{project_id}", response_model=ClientProjectRead)
+@router.put("/client-projects/{project_id}", response_model=ClientProjectRead, dependencies=[Depends(require_engineer)])
 def update_client_project(
     project_id: int,
     payload: ClientProjectUpdate,
@@ -68,7 +69,7 @@ def update_client_project(
     return _load(db, project_id)
 
 
-@router.delete("/client-projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/client-projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_engineer)])
 def delete_client_project(project_id: int, db: Session = Depends(db_session)) -> None:
     cp = _load(db, project_id)
     db.delete(cp)

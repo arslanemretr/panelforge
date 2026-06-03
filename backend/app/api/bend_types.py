@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.dependencies import db_session
+from app.api.dependencies import db_session, require_active_user, require_engineer
 from app.db import models
 from app.schemas.bend_type import (
     BendTypeCreate,
@@ -10,7 +10,7 @@ from app.schemas.bend_type import (
     BendTypeUpdate,
 )
 
-router = APIRouter(tags=["bend-types"])
+router = APIRouter(tags=["bend-types"], dependencies=[Depends(require_active_user)])
 
 
 def _load_full(bend_type_id: int, db: Session) -> models.BendType:
@@ -50,7 +50,7 @@ def get_bend_type(
     return _load_full(bend_type_id, db)
 
 
-@router.post("/bend-types", response_model=BendTypeRead, status_code=status.HTTP_201_CREATED)
+@router.post("/bend-types", response_model=BendTypeRead, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_engineer)])
 def create_bend_type(
     payload: BendTypeCreate,
     db: Session = Depends(db_session),
@@ -75,7 +75,7 @@ def create_bend_type(
     return _load_full(obj.id, db)
 
 
-@router.put("/bend-types/{bend_type_id}", response_model=BendTypeRead)
+@router.put("/bend-types/{bend_type_id}", response_model=BendTypeRead, dependencies=[Depends(require_engineer)])
 def update_bend_type(
     bend_type_id: int,
     payload: BendTypeUpdate,
@@ -107,7 +107,7 @@ def update_bend_type(
     return _load_full(obj.id, db)
 
 
-@router.delete("/bend-types/{bend_type_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/bend-types/{bend_type_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_engineer)])
 def delete_bend_type(
     bend_type_id: int,
     db: Session = Depends(db_session),

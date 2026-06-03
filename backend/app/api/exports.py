@@ -2,10 +2,10 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import db_session
+from app.api.dependencies import db_session, require_active_user
 from app.services.export_service import build_csv, build_dxf, build_excel, build_pdf
 
-router = APIRouter(tags=["exports"])
+router = APIRouter(tags=["exports"], dependencies=[Depends(require_active_user)])
 
 
 @router.get("/projects/{project_id}/export/csv")

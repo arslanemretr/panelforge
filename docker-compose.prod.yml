@@ -15,6 +15,9 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://panelforge:panelforge@database:5432/panelforge}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY env variable is required}
+      FIRST_ADMIN_EMAIL: ${FIRST_ADMIN_EMAIL:-admin@panelforge.com}
+      FIRST_ADMIN_PASSWORD: ${FIRST_ADMIN_PASSWORD:-changeme123}
     depends_on:
       - database
     ports:

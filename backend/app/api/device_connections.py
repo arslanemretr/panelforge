@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.dependencies import db_session
+from app.api.dependencies import db_session, require_active_user, require_operator
 from app.db import models
 from app.schemas.device_connection import DeviceConnectionCreate, DeviceConnectionRead, DeviceConnectionUpdate
 
-router = APIRouter(tags=["device-connections"])
+router = APIRouter(tags=["device-connections"], dependencies=[Depends(require_active_user)])
 
 
 def _load_connection(db: Session, connection_id: int) -> models.DeviceConnection:
@@ -47,6 +47,7 @@ def list_connections(
     "/projects/{project_id}/connections",
     response_model=DeviceConnectionRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_operator)],
 )
 def create_connection(
     project_id: int,
@@ -86,6 +87,7 @@ def create_connection(
 @router.put(
     "/projects/{project_id}/connections/{connection_id}",
     response_model=DeviceConnectionRead,
+    dependencies=[Depends(require_operator)],
 )
 def update_connection(
     project_id: int,
@@ -124,6 +126,7 @@ def update_connection(
     "/projects/{project_id}/connections/auto-assign",
     response_model=list[DeviceConnectionRead],
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_operator)],
 )
 def auto_assign_connections(
     project_id: int,
@@ -186,6 +189,7 @@ def auto_assign_connections(
 @router.delete(
     "/projects/{project_id}/connections/{connection_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_operator)],
 )
 def delete_connection(
     project_id: int,

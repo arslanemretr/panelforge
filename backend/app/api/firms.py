@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.dependencies import db_session
+from app.api.dependencies import db_session, require_active_user, require_engineer
 from app.db import models
 from app.schemas.firm import FirmCreate, FirmRead, FirmUpdate
 
-router = APIRouter(tags=["firms"])
+router = APIRouter(tags=["firms"], dependencies=[Depends(require_active_user)])
 
 
 def _load_firm(db: Session, firm_id: int) -> models.Firm:
@@ -24,7 +24,7 @@ def list_firms(db: Session = Depends(db_session)) -> list[models.Firm]:
     )
 
 
-@router.post("/firms", response_model=FirmRead, status_code=status.HTTP_201_CREATED)
+@router.post("/firms", response_model=FirmRead, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_engineer)])
 def create_firm(payload: FirmCreate, db: Session = Depends(db_session)) -> models.Firm:
     firm = models.Firm(**payload.model_dump())
     db.add(firm)
@@ -33,7 +33,7 @@ def create_firm(payload: FirmCreate, db: Session = Depends(db_session)) -> model
     return firm
 
 
-@router.put("/firms/{firm_id}", response_model=FirmRead)
+@router.put("/firms/{firm_id}", response_model=FirmRead, dependencies=[Depends(require_engineer)])
 def update_firm(
     firm_id: int,
     payload: FirmUpdate,
@@ -47,7 +47,7 @@ def update_firm(
     return firm
 
 
-@router.delete("/firms/{firm_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/firms/{firm_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_engineer)])
 def delete_firm(firm_id: int, db: Session = Depends(db_session)) -> None:
     firm = _load_firm(db, firm_id)
     db.delete(firm)

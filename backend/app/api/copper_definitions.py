@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.dependencies import db_session
+from app.api.dependencies import db_session, require_active_user, require_engineer
 from app.db import models
 from app.schemas.copper_definition import (
     CopperDefinitionCreate,
@@ -9,7 +9,7 @@ from app.schemas.copper_definition import (
     CopperDefinitionUpdate,
 )
 
-router = APIRouter(tags=["copper-definitions"])
+router = APIRouter(tags=["copper-definitions"], dependencies=[Depends(require_active_user)])
 
 
 def _load_opts():
@@ -27,7 +27,7 @@ def list_copper_definitions(
     return query.order_by(models.CopperDefinition.updated_at.desc()).all()
 
 
-@router.post("/copper-definitions", response_model=CopperDefinitionRead, status_code=status.HTTP_201_CREATED)
+@router.post("/copper-definitions", response_model=CopperDefinitionRead, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_engineer)])
 def create_copper_definition(payload: CopperDefinitionCreate, db: Session = Depends(db_session)) -> models.CopperDefinition:
     definition = models.CopperDefinition(**payload.model_dump())
     db.add(definition)
@@ -52,7 +52,7 @@ def get_copper_definition(definition_id: int, db: Session = Depends(db_session))
     return definition
 
 
-@router.put("/copper-definitions/{definition_id}", response_model=CopperDefinitionRead)
+@router.put("/copper-definitions/{definition_id}", response_model=CopperDefinitionRead, dependencies=[Depends(require_engineer)])
 def update_copper_definition(
     definition_id: int,
     payload: CopperDefinitionUpdate,
@@ -73,7 +73,7 @@ def update_copper_definition(
     return definition
 
 
-@router.delete("/copper-definitions/{definition_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/copper-definitions/{definition_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_engineer)])
 def delete_copper_definition(definition_id: int, db: Session = Depends(db_session)) -> None:
     definition = db.get(models.CopperDefinition, definition_id)
     if not definition:

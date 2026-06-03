@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.api.dependencies import require_active_user, require_engineer
 from app.db.database import get_db
 from app.db.models import BendParameter, BendSegment, BendType, BranchConductor
 from app.schemas.branch_conductor import (
@@ -11,7 +12,7 @@ from app.schemas.branch_conductor import (
     BranchConductorUpdate,
 )
 
-router = APIRouter(tags=["branch-conductors"])
+router = APIRouter(tags=["branch-conductors"], dependencies=[Depends(require_active_user)])
 
 
 def _load_full(id: int, db: Session) -> BranchConductor:
@@ -51,7 +52,7 @@ def get_branch_conductor(id: int, db: Session = Depends(get_db)):
     return _load_full(id, db)
 
 
-@router.post("/branch-conductors", response_model=BranchConductorRead, status_code=201)
+@router.post("/branch-conductors", response_model=BranchConductorRead, status_code=201, dependencies=[Depends(require_engineer)])
 def create_branch_conductor(
     payload: BranchConductorCreate, db: Session = Depends(get_db)
 ):
@@ -62,7 +63,7 @@ def create_branch_conductor(
     return _load_full(obj.id, db)
 
 
-@router.put("/branch-conductors/{id}", response_model=BranchConductorRead)
+@router.put("/branch-conductors/{id}", response_model=BranchConductorRead, dependencies=[Depends(require_engineer)])
 def update_branch_conductor(
     id: int, payload: BranchConductorUpdate, db: Session = Depends(get_db)
 ):
@@ -75,7 +76,7 @@ def update_branch_conductor(
     return _load_full(id, db)
 
 
-@router.delete("/branch-conductors/{id}", status_code=204)
+@router.delete("/branch-conductors/{id}", status_code=204, dependencies=[Depends(require_engineer)])
 def delete_branch_conductor(id: int, db: Session = Depends(get_db)):
     obj = db.get(BranchConductor, id)
     if obj is None:

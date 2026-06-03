@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.dependencies import db_session
+from app.api.dependencies import db_session, require_active_user, require_operator
 from app.db import models
 from app.schemas.device import ProjectDeviceCreate, ProjectDeviceRead, ProjectDeviceUpdate
 
-router = APIRouter(tags=["project-devices"])
+router = APIRouter(tags=["project-devices"], dependencies=[Depends(require_active_user)])
 
 
 @router.get("/projects/{project_id}/devices", response_model=list[ProjectDeviceRead])
@@ -19,7 +19,7 @@ def list_project_devices(project_id: int, db: Session = Depends(db_session)) -> 
     )
 
 
-@router.post("/projects/{project_id}/devices", response_model=ProjectDeviceRead, status_code=status.HTTP_201_CREATED)
+@router.post("/projects/{project_id}/devices", response_model=ProjectDeviceRead, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_operator)])
 def create_project_device(project_id: int, payload: ProjectDeviceCreate, db: Session = Depends(db_session)) -> models.ProjectDevice:
     placement = models.ProjectDevice(project_id=project_id, **payload.model_dump())
     db.add(placement)
@@ -32,7 +32,7 @@ def create_project_device(project_id: int, payload: ProjectDeviceCreate, db: Ses
     )
 
 
-@router.put("/projects/{project_id}/devices/{project_device_id}", response_model=ProjectDeviceRead)
+@router.put("/projects/{project_id}/devices/{project_device_id}", response_model=ProjectDeviceRead, dependencies=[Depends(require_operator)])
 def update_project_device(
     project_id: int,
     project_device_id: int,
@@ -57,7 +57,7 @@ def update_project_device(
     )
 
 
-@router.delete("/projects/{project_id}/devices/{project_device_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/projects/{project_id}/devices/{project_device_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_operator)])
 def delete_project_device(project_id: int, project_device_id: int, db: Session = Depends(db_session)) -> None:
     placement = (
         db.query(models.ProjectDevice)

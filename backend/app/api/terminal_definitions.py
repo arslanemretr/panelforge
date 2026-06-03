@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import db_session
+from app.api.dependencies import db_session, require_active_user, require_engineer
 from app.db import models
 from app.schemas.terminal_definition import (
     TerminalDefinitionCreate,
@@ -9,7 +9,7 @@ from app.schemas.terminal_definition import (
     TerminalDefinitionUpdate,
 )
 
-router = APIRouter(tags=["terminal-definitions"])
+router = APIRouter(tags=["terminal-definitions"], dependencies=[Depends(require_active_user)])
 
 
 @router.get("/terminal-definitions", response_model=list[TerminalDefinitionRead])
@@ -36,6 +36,7 @@ def get_terminal_definition(
     "/terminal-definitions",
     response_model=TerminalDefinitionRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_engineer)],
 )
 def create_terminal_definition(
     payload: TerminalDefinitionCreate,
@@ -56,7 +57,7 @@ def create_terminal_definition(
     return obj
 
 
-@router.put("/terminal-definitions/{def_id}", response_model=TerminalDefinitionRead)
+@router.put("/terminal-definitions/{def_id}", response_model=TerminalDefinitionRead, dependencies=[Depends(require_engineer)])
 def update_terminal_definition(
     def_id: int,
     payload: TerminalDefinitionUpdate,
@@ -72,7 +73,7 @@ def update_terminal_definition(
     return obj
 
 
-@router.delete("/terminal-definitions/{def_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/terminal-definitions/{def_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_engineer)])
 def delete_terminal_definition(
     def_id: int,
     db: Session = Depends(db_session),

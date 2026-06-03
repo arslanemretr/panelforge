@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.dependencies import db_session
+from app.api.dependencies import db_session, require_active_user, require_engineer, require_operator
 from app.db import models
 from app.schemas.project import ProjectCreate, ProjectRead, ProjectUpdate
 
-router = APIRouter(tags=["projects"])
+router = APIRouter(tags=["projects"], dependencies=[Depends(require_active_user)])
 
 
 def _load_project(db: Session, project_id: int) -> models.Project:
@@ -38,7 +38,7 @@ def list_projects(db: Session = Depends(db_session)) -> list[models.Project]:
     )
 
 
-@router.post("/projects", response_model=ProjectRead, status_code=status.HTTP_201_CREATED)
+@router.post("/projects", response_model=ProjectRead, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_engineer)])
 def create_project(payload: ProjectCreate, db: Session = Depends(db_session)) -> models.Project:
     if payload.client_project_id is not None:
         cp = db.get(models.ClientProject, payload.client_project_id)
@@ -56,7 +56,7 @@ def get_project(project_id: int, db: Session = Depends(db_session)) -> models.Pr
     return _load_project(db, project_id)
 
 
-@router.put("/projects/{project_id}", response_model=ProjectRead)
+@router.put("/projects/{project_id}", response_model=ProjectRead, dependencies=[Depends(require_engineer)])
 def update_project(
     project_id: int,
     payload: ProjectUpdate,
@@ -77,7 +77,7 @@ def update_project(
     return _load_project(db, project_id)
 
 
-@router.delete("/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_engineer)])
 def delete_project(project_id: int, db: Session = Depends(db_session)) -> None:
     project = db.get(models.Project, project_id)
     if not project:

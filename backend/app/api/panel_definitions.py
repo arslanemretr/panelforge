@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.dependencies import db_session
+from app.api.dependencies import db_session, require_active_user, require_engineer
 from app.db import models
 from app.schemas.panel_definition import (
     PanelDefinitionCreate,
@@ -9,7 +9,7 @@ from app.schemas.panel_definition import (
     PanelDefinitionUpdate,
 )
 
-router = APIRouter(tags=["panel-definitions"])
+router = APIRouter(tags=["panel-definitions"], dependencies=[Depends(require_active_user)])
 
 
 def _load_definition(db: Session, definition_id: int) -> models.PanelDefinition:
@@ -34,7 +34,7 @@ def list_panel_definitions(db: Session = Depends(db_session)) -> list[models.Pan
     )
 
 
-@router.post("/panel-definitions", response_model=PanelDefinitionRead, status_code=status.HTTP_201_CREATED)
+@router.post("/panel-definitions", response_model=PanelDefinitionRead, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_engineer)])
 def create_panel_definition(payload: PanelDefinitionCreate, db: Session = Depends(db_session)) -> models.PanelDefinition:
     definition = models.PanelDefinition(**payload.model_dump())
     db.add(definition)
@@ -47,7 +47,7 @@ def get_panel_definition(definition_id: int, db: Session = Depends(db_session)) 
     return _load_definition(db, definition_id)
 
 
-@router.put("/panel-definitions/{definition_id}", response_model=PanelDefinitionRead)
+@router.put("/panel-definitions/{definition_id}", response_model=PanelDefinitionRead, dependencies=[Depends(require_engineer)])
 def update_panel_definition(
     definition_id: int,
     payload: PanelDefinitionUpdate,
@@ -62,7 +62,7 @@ def update_panel_definition(
     return _load_definition(db, definition_id)
 
 
-@router.delete("/panel-definitions/{definition_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/panel-definitions/{definition_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_engineer)])
 def delete_panel_definition(definition_id: int, db: Session = Depends(db_session)) -> None:
     definition = db.get(models.PanelDefinition, definition_id)
     if not definition:

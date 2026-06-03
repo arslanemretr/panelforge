@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.dependencies import db_session
+from app.api.dependencies import db_session, require_active_user, require_operator
 from app.db import models
 from app.schemas.project_copper import ProjectCopperCreate, ProjectCopperRead, ProjectCopperUpdate
 
-router = APIRouter(tags=["project-coppers"])
+router = APIRouter(tags=["project-coppers"], dependencies=[Depends(require_active_user)])
 
 
 def _load_copper(db: Session, project_id: int, project_copper_id: int) -> models.ProjectCopper:
@@ -44,6 +44,7 @@ def list_project_coppers(project_id: int, db: Session = Depends(db_session)) -> 
     "/projects/{project_id}/copper-layout",
     response_model=ProjectCopperRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_operator)],
 )
 def create_project_copper(
     project_id: int,
@@ -94,6 +95,7 @@ def create_project_copper(
 @router.put(
     "/projects/{project_id}/copper-layout/{project_copper_id}",
     response_model=ProjectCopperRead,
+    dependencies=[Depends(require_operator)],
 )
 def update_project_copper(
     project_id: int,
@@ -122,6 +124,7 @@ def update_project_copper(
 @router.post(
     "/projects/{project_id}/copper-layout/{project_copper_id}/reset",
     response_model=ProjectCopperRead,
+    dependencies=[Depends(require_operator)],
 )
 def reset_project_copper(
     project_id: int,
@@ -163,6 +166,7 @@ def reset_project_copper(
 @router.delete(
     "/projects/{project_id}/copper-layout/{project_copper_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_operator)],
 )
 def delete_project_copper(
     project_id: int,

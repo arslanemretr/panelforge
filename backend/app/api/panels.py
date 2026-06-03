@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import db_session
+from app.api.dependencies import db_session, require_active_user, require_operator
 from app.db import models
 from app.schemas.panel import PanelRead, PanelUpsert
 
-router = APIRouter(tags=["panels"])
+router = APIRouter(tags=["panels"], dependencies=[Depends(require_active_user)])
 
 
 @router.get("/projects/{project_id}/panel", response_model=PanelRead | None)
@@ -13,7 +13,7 @@ def get_panel(project_id: int, db: Session = Depends(db_session)):
     return db.query(models.Panel).filter(models.Panel.project_id == project_id).one_or_none()
 
 
-@router.post("/projects/{project_id}/panel", response_model=PanelRead, status_code=status.HTTP_201_CREATED)
+@router.post("/projects/{project_id}/panel", response_model=PanelRead, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_operator)])
 def create_panel(project_id: int, payload: PanelUpsert, db: Session = Depends(db_session)) -> models.Panel:
     if db.query(models.Panel).filter(models.Panel.project_id == project_id).one_or_none():
         raise HTTPException(status_code=409, detail="Panel already exists")
@@ -24,7 +24,7 @@ def create_panel(project_id: int, payload: PanelUpsert, db: Session = Depends(db
     return panel
 
 
-@router.put("/projects/{project_id}/panel", response_model=PanelRead)
+@router.put("/projects/{project_id}/panel", response_model=PanelRead, dependencies=[Depends(require_operator)])
 def upsert_panel(project_id: int, payload: PanelUpsert, db: Session = Depends(db_session)) -> models.Panel:
     panel = db.query(models.Panel).filter(models.Panel.project_id == project_id).one_or_none()
     if panel is None:

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.dependencies import db_session
+from app.api.dependencies import db_session, require_active_user, require_engineer
 from app.db import models
 from app.schemas.device import DeviceCreate, DeviceRead, DeviceUpdate
 from app.schemas.device_import import DeviceImportPreview, DeviceImportResult
@@ -12,7 +12,7 @@ from app.services.device_excel_service import (
     preview_import,
 )
 
-router = APIRouter(tags=["devices"])
+router = APIRouter(tags=["devices"], dependencies=[Depends(require_active_user)])
 
 
 @router.get("/devices", response_model=list[DeviceRead])
@@ -40,12 +40,12 @@ def download_devices_template() -> Response:
     )
 
 
-@router.post("/devices/import/preview", response_model=DeviceImportPreview)
+@router.post("/devices/import/preview", response_model=DeviceImportPreview, dependencies=[Depends(require_engineer)])
 async def preview_devices_import(file: UploadFile = File(...)) -> DeviceImportPreview:
     return preview_import(await file.read())
 
 
-@router.post("/devices/import/excel", response_model=DeviceImportResult, status_code=status.HTTP_201_CREATED)
+@router.post("/devices/import/excel", response_model=DeviceImportResult, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_engineer)])
 async def import_devices_excel(file: UploadFile = File(...), db: Session = Depends(db_session)) -> DeviceImportResult:
     try:
         return import_devices_from_excel(db, await file.read())
@@ -53,7 +53,7 @@ async def import_devices_excel(file: UploadFile = File(...), db: Session = Depen
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.post("/devices", response_model=DeviceRead, status_code=status.HTTP_201_CREATED)
+@router.post("/devices", response_model=DeviceRead, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_engineer)])
 def create_device(payload: DeviceCreate, db: Session = Depends(db_session)) -> models.Device:
     data = payload.model_dump(exclude={"terminals"})
     device = models.Device(**data)
@@ -84,7 +84,7 @@ def get_device(device_id: int, db: Session = Depends(db_session)) -> models.Devi
     return device
 
 
-@router.put("/devices/{device_id}", response_model=DeviceRead)
+@router.put("/devices/{device_id}", response_model=DeviceRead, dependencies=[Depends(require_engineer)])
 def update_device(device_id: int, payload: DeviceUpdate, db: Session = Depends(db_session)) -> models.Device:
     device = db.get(models.Device, device_id)
     if not device:
@@ -107,7 +107,7 @@ def update_device(device_id: int, payload: DeviceUpdate, db: Session = Depends(d
     )
 
 
-@router.delete("/devices/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/devices/{device_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_engineer)])
 def delete_device(device_id: int, db: Session = Depends(db_session)) -> None:
     device = db.get(models.Device, device_id)
     if not device:

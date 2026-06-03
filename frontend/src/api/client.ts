@@ -1,6 +1,8 @@
 import axios from "axios";
 
 import type {
+  AuthToken,
+  AuthUser,
   BendType,
   BranchConductor,
   CalculationResults,
@@ -29,7 +31,108 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? "/api",
 });
 
+// ── Auth interceptors ────────────────────────────────────────────────────────
+// Request: her isteğe Authorization header ekle
+api.interceptors.request.use((config) => {
+  // Dinamik import: store'u doğrudan import etmek döngüsel bağımlılık yaratır
+  try {
+    const raw = localStorage.getItem("panelforge-auth");
+    if (raw) {
+      const { state } = JSON.parse(raw);
+      if (state?.accessToken) {
+        config.headers.Authorization = `Bearer ${state.accessToken}`;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return config;
+});
+
+// Response: 401 → refresh dene → başarısızsa logout
+let isRefreshing = false;
+let failedQueue: Array<{ resolve: (token: string) => void; reject: (err: unknown) => void }> = [];
+
+function processQueue(error: unknown, token: string | null) {
+  failedQueue.forEach((p) => (token ? p.resolve(token) : p.reject(error)));
+  failedQueue = [];
+}
+
+api.interceptors.response.use(
+  (res) => res,
+  async (error) => {
+    const original = error.config;
+    if (error.response?.status !== 401 || original._retry || original.url?.includes("/auth/")) {
+      return Promise.reject(error);
+    }
+
+    if (isRefreshing) {
+      return new Promise((resolve, reject) => {
+        failedQueue.push({ resolve, reject });
+      }).then((token) => {
+        original.headers.Authorization = `Bearer ${token}`;
+        return api(original);
+      });
+    }
+
+    original._retry = true;
+    isRefreshing = true;
+
+    try {
+      const raw = localStorage.getItem("panelforge-auth");
+      const { state } = raw ? JSON.parse(raw) : { state: null };
+      if (!state?.refreshToken) throw new Error("no refresh token");
+
+      const { data } = await axios.post<AuthToken>(
+        `${api.defaults.baseURL}/auth/refresh`,
+        { refresh_token: state.refreshToken },
+      );
+
+      // Store'u güncelle
+      const stored = raw ? JSON.parse(raw) : {};
+      stored.state = { ...stored.state, accessToken: data.access_token, refreshToken: data.refresh_token, user: data.user };
+      localStorage.setItem("panelforge-auth", JSON.stringify(stored));
+
+      api.defaults.headers.common.Authorization = `Bearer ${data.access_token}`;
+      processQueue(null, data.access_token);
+      original.headers.Authorization = `Bearer ${data.access_token}`;
+      return api(original);
+    } catch (err) {
+      processQueue(err, null);
+      // Logout
+      const raw = localStorage.getItem("panelforge-auth");
+      if (raw) {
+        const stored = JSON.parse(raw);
+        stored.state = { ...stored.state, user: null, accessToken: null, refreshToken: null };
+        localStorage.setItem("panelforge-auth", JSON.stringify(stored));
+      }
+      window.location.href = "/login";
+      return Promise.reject(err);
+    } finally {
+      isRefreshing = false;
+    }
+  },
+);
+
 export const client = {
+  // Auth
+  login: async (email: string, password: string) =>
+    (await api.post<AuthToken>("/auth/login", { email, password })).data,
+  refreshToken: async (refresh_token: string) =>
+    (await api.post<AuthToken>("/auth/refresh", { refresh_token })).data,
+  getMe: async () => (await api.get<AuthUser>("/auth/me")).data,
+  changePassword: async (current_password: string, new_password: string) =>
+    api.put("/auth/me/password", { current_password, new_password }),
+
+  // Kullanıcı Yönetimi (admin)
+  listUsers: async () => (await api.get<AuthUser[]>("/users")).data,
+  createUser: async (payload: { email: string; full_name: string; password: string; role: string }) =>
+    (await api.post<AuthUser>("/users", payload)).data,
+  updateUser: async (id: number, payload: { full_name: string; role: string; is_active: boolean }) =>
+    (await api.put<AuthUser>(`/users/${id}`, payload)).data,
+  adminResetPassword: async (id: number, new_password: string) =>
+    api.put(`/users/${id}/password`, { new_password }),
+
   // Firma
   listFirms: async () => (await api.get<Firm[]>("/firms")).data,
   createFirm: async (payload: Omit<Firm, "id" | "created_at" | "updated_at">) =>

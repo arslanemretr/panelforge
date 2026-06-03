@@ -1,3 +1,20 @@
+export interface AuthUser {
+  id: number;
+  email: string;
+  full_name: string;
+  role: "admin" | "engineer" | "operator" | "viewer";
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AuthToken {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  user: AuthUser;
+}
+
 export interface Firm {
   id: number;
   name: string;
